@@ -3,7 +3,7 @@ import { Box } from '@mui/material'
 import { useSelector, useDispatch } from 'react-redux'
 import { RootState } from '../store'
 import { updateCell } from '../store/mapSlice'
-import { Cell, Position, FloorType } from '../types/map'
+import { Position } from '../types/map'
 
 const MapEditor2D: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -16,7 +16,7 @@ const MapEditor2D: React.FC = () => {
   const cellSize = 32 * zoom
   const floor = dungeon?.floors[currentFloor]
 
-  const drawGrid = useCallback((ctx: CanvasRenderingContext2D, width: number, height: number) => {
+  const drawGrid = useCallback((ctx: CanvasRenderingContext2D) => {
     if (!gridVisible || !floor) return
 
     ctx.strokeStyle = '#333'
@@ -74,6 +74,20 @@ const MapEditor2D: React.FC = () => {
 
         ctx.fillStyle = floorColor
         ctx.fillRect(xPos, yPos, cellSize, cellSize)
+
+        // 通行不可の場合は「X」マークを表示
+        if (!cell.floor.passable) {
+          ctx.strokeStyle = '#f00'
+          ctx.lineWidth = Math.max(1, cellSize / 20)
+          ctx.beginPath()
+          const margin = cellSize * 0.2
+          ctx.moveTo(xPos + margin, yPos + margin)
+          ctx.lineTo(xPos + cellSize - margin, yPos + cellSize - margin)
+          ctx.moveTo(xPos + cellSize - margin, yPos + margin)
+          ctx.lineTo(xPos + margin, yPos + cellSize - margin)
+          ctx.stroke()
+          ctx.lineWidth = 1
+        }
 
         // 床タイプのテキスト表示（ズームが大きい時のみ）
         if (cellSize > 24) {
@@ -198,7 +212,7 @@ const MapEditor2D: React.FC = () => {
       drawEvents(ctx)
     }
     
-    drawGrid(ctx, canvas.width, canvas.height)
+    drawGrid(ctx)
   }, [floor, cellSize, drawFloor, drawWalls, drawEvents, drawGrid, editorState])
 
   const getCellPosition = useCallback((event: React.MouseEvent): Position | null => {
