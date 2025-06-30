@@ -73,13 +73,13 @@ const mapSlice = createSlice({
       }
       
       state.dungeon = newDungeon
-      state.history = [structuredClone(newDungeon)]
+      state.history = [JSON.parse(JSON.stringify(newDungeon))]
       state.historyIndex = 0
     },
     
     loadDungeon: (state, action: PayloadAction<Dungeon>) => {
       state.dungeon = action.payload
-      state.history = [structuredClone(action.payload)]
+      state.history = [JSON.parse(JSON.stringify(action.payload))]
       state.historyIndex = 0
     },
     
@@ -130,7 +130,7 @@ const mapSlice = createSlice({
       
       // 履歴に追加
       const newHistory = state.history.slice(0, state.historyIndex + 1)
-      newHistory.push(structuredClone(state.dungeon))
+      newHistory.push(JSON.parse(JSON.stringify(state.dungeon)))
       
       if (newHistory.length > state.maxHistory) {
         newHistory.shift()
@@ -149,14 +149,14 @@ const mapSlice = createSlice({
     undo: (state) => {
       if (state.historyIndex > 0) {
         state.historyIndex--
-        state.dungeon = structuredClone(state.history[state.historyIndex])
+        state.dungeon = JSON.parse(JSON.stringify(state.history[state.historyIndex]))
       }
     },
     
     redo: (state) => {
       if (state.historyIndex < state.history.length - 1) {
         state.historyIndex++
-        state.dungeon = structuredClone(state.history[state.historyIndex])
+        state.dungeon = JSON.parse(JSON.stringify(state.history[state.historyIndex]))
       }
     },
   },
