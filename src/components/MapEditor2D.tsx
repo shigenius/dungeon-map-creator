@@ -270,6 +270,9 @@ const MapEditor2D: React.FC = () => {
   }, [cellSize, floor])
 
   const handleCanvasClick = useCallback((event: React.MouseEvent) => {
+    event.preventDefault()
+    event.stopPropagation()
+    
     console.log('🐛 handleCanvasClick: イベント発火', {
       selectedTool,
       selectedLayer,
@@ -437,18 +440,30 @@ const MapEditor2D: React.FC = () => {
       sx={{
         width: '100%',
         height: '100%',
-        overflow: 'auto',
+        overflow: 'visible',
         cursor: selectedTool === 'pen' ? 'crosshair' : 'default',
+        position: 'relative',
+        userSelect: 'none',
       }}
     >
       <canvas
         ref={canvasRef}
         onClick={handleCanvasClick}
+        onPointerDown={(e) => {
+          console.log('🐛 Pointer down:', e.button, e.clientX, e.clientY)
+          e.currentTarget.setPointerCapture(e.pointerId)
+        }}
+        onPointerUp={(e) => console.log('🐛 Pointer up:', e.button, e.clientX, e.clientY)}
         onMouseDown={(e) => console.log('🐛 Mouse down:', e.button, e.clientX, e.clientY)}
         onMouseUp={(e) => console.log('🐛 Mouse up:', e.button, e.clientX, e.clientY)}
         style={{
           display: 'block',
           imageRendering: 'pixelated',
+          pointerEvents: 'auto',
+          touchAction: 'none',
+          width: floor ? `${floor.width * cellSize}px` : 'auto',
+          height: floor ? `${floor.height * cellSize}px` : 'auto',
+          border: '1px solid #666',
         }}
       />
     </Box>
