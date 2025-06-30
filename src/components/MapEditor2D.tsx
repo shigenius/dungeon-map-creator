@@ -10,7 +10,8 @@ const MapEditor2D: React.FC = () => {
   const dispatch = useDispatch()
   
   const dungeon = useSelector((state: RootState) => state.map.dungeon)
-  const { currentFloor, selectedTool, selectedLayer, zoom, gridVisible } = useSelector((state: RootState) => state.editor)
+  const editorState = useSelector((state: RootState) => state.editor)
+  const { currentFloor, selectedTool, selectedLayer, zoom, gridVisible } = editorState
 
   const cellSize = 32 * zoom
   const floor = dungeon?.floors[currentFloor]
@@ -184,12 +185,21 @@ const MapEditor2D: React.FC = () => {
     ctx.fillStyle = '#222'
     ctx.fillRect(0, 0, canvas.width, canvas.height)
 
-    // レイヤーに応じて描画
-    drawFloor(ctx)
-    drawWalls(ctx)
-    drawEvents(ctx)
+    // レイヤーの表示状態に応じて描画
+    const { layerVisibility } = editorState
+    
+    if (layerVisibility.floor) {
+      drawFloor(ctx)
+    }
+    if (layerVisibility.walls) {
+      drawWalls(ctx)
+    }
+    if (layerVisibility.events) {
+      drawEvents(ctx)
+    }
+    
     drawGrid(ctx, canvas.width, canvas.height)
-  }, [floor, cellSize, drawFloor, drawWalls, drawEvents, drawGrid])
+  }, [floor, cellSize, drawFloor, drawWalls, drawEvents, drawGrid, editorState])
 
   const getCellPosition = useCallback((event: React.MouseEvent): Position | null => {
     const canvas = canvasRef.current
@@ -212,42 +222,95 @@ const MapEditor2D: React.FC = () => {
 
     const currentCell = floor.cells[position.y][position.x]
 
-    if (selectedLayer === 'floor' && selectedTool === 'pen') {
-      // 床の編集（簡単な例：通常床と通行不可床の切り替え）
-      const newFloorType: FloorType = currentCell.floor.passable ? 'normal' : 'normal'
-      const newPassable = !currentCell.floor.passable
+    if (selectedLayer === 'floor') {
+      if (selectedTool === 'pen') {
+        // 床の編集：通行可否の切り替え
+        const newPassable = !currentCell.floor.passable
 
-      dispatch(updateCell({
-        floorIndex: currentFloor,
-        position,
-        cell: {
-          floor: {
-            ...currentCell.floor,
-            type: newFloorType,
-            passable: newPassable,
+        dispatch(updateCell({
+          floorIndex: currentFloor,
+          position,
+          cell: {
+            floor: {
+              ...currentCell.floor,
+              passable: newPassable,
+            }
+          }
+        }))
+      } else if (selectedTool === 'fill') {
+        // 塗りつぶしツール：同じタイプの床を一括変更
+        const targetPassable = currentCell.floor.passable
+        const newPassable = !targetPassable
+        
+        // 連結したセルを探してまとめて変更（簡単な実装）
+        for (let y = 0; y < floor.height; y++) {
+          for (let x = 0; x < floor.width; x++) {
+            const cell = floor.cells[y][x]
+            if (cell.floor.passable === targetPassable) {
+              dispatch(updateCell({
+                floorIndex: currentFloor,
+                position: { x, y },
+                cell: {
+                  floor: {
+                    ...cell.floor,
+                    passable: newPassable,
+                  }
+                }
+              }))
+            }
           }
         }
-      }))
-    } else if (selectedLayer === 'walls' && selectedTool === 'pen') {
-      // 壁の編集（簡単な例：全方向の壁の切り替え）
-      const hasWall = currentCell.walls.north !== null
-      const wall = hasWall ? null : {
-        type: 'normal' as const,
-        transparent: false,
       }
-
-      dispatch(updateCell({
-        floorIndex: currentFloor,
-        position,
-        cell: {
-          walls: {
-            north: wall,
-            east: wall,
-            south: wall,
-            west: wall,
-          }
+    } else if (selectedLayer === 'walls') {
+      if (selectedTool === 'pen') {
+        // 壁の編集：全方向の壁の切り替え
+        const hasWall = currentCell.walls.north !== null
+        const wall = hasWall ? null : {
+          type: 'normal' as const,
+          transparent: false,
         }
-      }))
+
+        dispatch(updateCell({
+          floorIndex: currentFloor,
+          position,
+          cell: {
+            walls: {
+              north: wall,
+              east: wall,
+              south: wall,
+              west: wall,
+            }
+          }
+        }))
+      }
+    } else if (selectedLayer === 'events') {
+      if (selectedTool === 'pen') {
+        // イベントの追加/削除
+        const hasEvent = currentCell.events.length > 0
+        const newEvents = hasEvent ? [] : [{
+          id: crypto.randomUUID(),
+          type: 'treasure' as const,
+          name: '宝箱',
+          position: position,
+          appearance: {
+            visible: true,
+          },
+          trigger: {
+            type: 'interact' as const,
+          },
+          actions: [],
+          flags: {},
+          enabled: true,
+        }]
+
+        dispatch(updateCell({
+          floorIndex: currentFloor,
+          position,
+          cell: {
+            events: newEvents,
+          }
+        }))
+      }
     }
   }, [getCellPosition, floor, selectedLayer, selectedTool, dispatch, currentFloor])
 

@@ -18,9 +18,9 @@ test.describe('ダンジョンマップクリエイター 基本機能', () => {
     await expect(page.locator('[role="dialog"]')).toBeVisible();
     await expect(page.locator('h2')).toContainText('新規プロジェクト作成');
     
-    // フォーム要素の確認
-    await expect(page.locator('input[label="ダンジョン名"]')).toBeVisible();
-    await expect(page.locator('input[label="作成者"]')).toBeVisible();
+    // フォーム要素の確認 - MUIのTextField用のセレクタ
+    await expect(page.locator('input[value="新しいダンジョン"]')).toBeVisible();
+    await expect(page.locator('input[placeholder="名前を入力（任意）"]')).toBeVisible();
   });
 
   test('新規プロジェクトを作成できる', async ({ page }) => {
@@ -61,16 +61,16 @@ test.describe('ダンジョンマップクリエイター 基本機能', () => {
     // プロジェクト作成
     await page.click('button:has-text("作成")');
     
-    // ツールバーのツールを確認
+    // ツールバーのツールを確認 - MUIのToggleButtonGroup用のセレクタ
     const tools = ['pen', 'rectangle', 'fill', 'eyedropper', 'select'];
     
     for (const tool of tools) {
-      await expect(page.locator(`button[value="${tool}"]`)).toBeVisible();
+      await expect(page.locator(`[role="group"] button[value="${tool}"]`)).toBeVisible();
     }
     
     // ツールを切り替える
-    await page.click('button[value="rectangle"]');
-    await expect(page.locator('button[value="rectangle"]')).toHaveAttribute('aria-pressed', 'true');
+    await page.click('[role="group"] button[value="rectangle"]');
+    await expect(page.locator('[role="group"] button[value="rectangle"]')).toHaveAttribute('aria-pressed', 'true');
   });
 
   test('レイヤー管理パネル', async ({ page }) => {
