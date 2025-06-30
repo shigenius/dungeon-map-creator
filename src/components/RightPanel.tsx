@@ -10,7 +10,7 @@ import {
 import {
   ExpandMore as ExpandMoreIcon,
   Settings as PropertiesIcon,
-  Template as TemplateIcon,
+  GridView as TemplateIcon,
 } from '@mui/icons-material'
 import { useSelector } from 'react-redux'
 import { RootState } from '../store'

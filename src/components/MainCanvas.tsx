@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react'
+import React from 'react'
 import { Box, Typography } from '@mui/material'
 import { useSelector } from 'react-redux'
 import { RootState } from '../store'

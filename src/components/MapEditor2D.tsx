@@ -185,15 +185,34 @@ const MapEditor2D: React.FC = () => {
   }, [floor, cellSize])
 
   const redraw = useCallback(() => {
+    console.log('🐛 redraw: キャンバス再描画開始', {
+      hasCanvas: !!canvasRef.current,
+      hasFloor: !!floor,
+      cellSize,
+      layerVisibility: editorState.layerVisibility
+    })
+
     const canvas = canvasRef.current
-    if (!canvas || !floor) return
+    if (!canvas || !floor) {
+      console.log('🐛 redraw: canvas or floor is null - 描画中止')
+      return
+    }
 
     const ctx = canvas.getContext('2d')
-    if (!ctx) return
+    if (!ctx) {
+      console.log('🐛 redraw: context取得失敗')
+      return
+    }
 
     // キャンバスサイズを設定
     canvas.width = floor.width * cellSize
     canvas.height = floor.height * cellSize
+
+    console.log('🐛 redraw: キャンバスサイズ設定', {
+      width: canvas.width,
+      height: canvas.height,
+      floorSize: { width: floor.width, height: floor.height }
+    })
 
     // 背景をクリア
     ctx.fillStyle = '#222'
@@ -203,45 +222,90 @@ const MapEditor2D: React.FC = () => {
     const { layerVisibility } = editorState
     
     if (layerVisibility.floor) {
+      console.log('🐛 redraw: 床レイヤー描画')
       drawFloor(ctx)
     }
     if (layerVisibility.walls) {
+      console.log('🐛 redraw: 壁レイヤー描画')
       drawWalls(ctx)
     }
     if (layerVisibility.events) {
+      console.log('🐛 redraw: イベントレイヤー描画')
       drawEvents(ctx)
     }
     
+    console.log('🐛 redraw: グリッド描画')
     drawGrid(ctx)
+    
+    console.log('🐛 redraw: 描画完了')
   }, [floor, cellSize, drawFloor, drawWalls, drawEvents, drawGrid, editorState])
 
   const getCellPosition = useCallback((event: React.MouseEvent): Position | null => {
     const canvas = canvasRef.current
-    if (!canvas || !floor) return null
+    if (!canvas || !floor) {
+      console.log('🐛 getCellPosition: canvas or floor is null', { canvas: !!canvas, floor: !!floor })
+      return null
+    }
 
     const rect = canvas.getBoundingClientRect()
-    const x = Math.floor((event.clientX - rect.left) / cellSize)
-    const y = Math.floor((event.clientY - rect.top) / cellSize)
+    const rawX = event.clientX - rect.left
+    const rawY = event.clientY - rect.top
+    const x = Math.floor(rawX / cellSize)
+    const y = Math.floor(rawY / cellSize)
+
+    console.log('🐛 getCellPosition: 座標変換', {
+      rawX, rawY,
+      cellSize,
+      calculatedX: x, calculatedY: y,
+      floorSize: { width: floor.width, height: floor.height }
+    })
 
     if (x >= 0 && x < floor.width && y >= 0 && y < floor.height) {
+      console.log('🐛 getCellPosition: 有効な座標', { x, y })
       return { x, y }
     }
 
+    console.log('🐛 getCellPosition: 無効な座標', { x, y, bounds: { width: floor.width, height: floor.height } })
     return null
   }, [cellSize, floor])
 
   const handleCanvasClick = useCallback((event: React.MouseEvent) => {
+    console.log('🐛 handleCanvasClick: イベント発火', {
+      selectedTool,
+      selectedLayer,
+      currentFloor,
+      eventType: event.type,
+      button: event.button
+    })
+
     const position = getCellPosition(event)
-    if (!position || !floor) return
+    if (!position || !floor) {
+      console.log('🐛 handleCanvasClick: position or floor is null', { position, floor: !!floor })
+      return
+    }
 
     const currentCell = floor.cells[position.y][position.x]
+    console.log('🐛 handleCanvasClick: 現在のセル状態', {
+      position,
+      currentCell: {
+        floor: currentCell.floor,
+        walls: currentCell.walls,
+        eventsCount: currentCell.events.length
+      }
+    })
 
     if (selectedLayer === 'floor') {
       if (selectedTool === 'pen') {
         // 床の編集：通行可否の切り替え
         const newPassable = !currentCell.floor.passable
+        console.log('🐛 床編集（pen）: 通行可否切り替え', {
+          oldPassable: currentCell.floor.passable,
+          newPassable,
+          position,
+          currentFloor
+        })
 
-        dispatch(updateCell({
+        const updatePayload = {
           floorIndex: currentFloor,
           position,
           cell: {
@@ -250,17 +314,27 @@ const MapEditor2D: React.FC = () => {
               passable: newPassable,
             }
           }
-        }))
+        }
+
+        console.log('🐛 Redux dispatch: updateCell', updatePayload)
+        dispatch(updateCell(updatePayload))
       } else if (selectedTool === 'fill') {
         // 塗りつぶしツール：同じタイプの床を一括変更
         const targetPassable = currentCell.floor.passable
         const newPassable = !targetPassable
+        console.log('🐛 床編集（fill）: 塗りつぶし開始', {
+          targetPassable,
+          newPassable,
+          floorSize: { width: floor.width, height: floor.height }
+        })
         
+        let updatedCount = 0
         // 連結したセルを探してまとめて変更（簡単な実装）
         for (let y = 0; y < floor.height; y++) {
           for (let x = 0; x < floor.width; x++) {
             const cell = floor.cells[y][x]
             if (cell.floor.passable === targetPassable) {
+              updatedCount++
               dispatch(updateCell({
                 floorIndex: currentFloor,
                 position: { x, y },
@@ -274,6 +348,7 @@ const MapEditor2D: React.FC = () => {
             }
           }
         }
+        console.log('🐛 床編集（fill）: 更新完了', { updatedCount })
       }
     } else if (selectedLayer === 'walls') {
       if (selectedTool === 'pen') {
@@ -284,7 +359,14 @@ const MapEditor2D: React.FC = () => {
           transparent: false,
         }
 
-        dispatch(updateCell({
+        console.log('🐛 壁編集（pen）: 壁の切り替え', {
+          hasWall,
+          wall,
+          position,
+          currentWalls: currentCell.walls
+        })
+
+        const updatePayload = {
           floorIndex: currentFloor,
           position,
           cell: {
@@ -295,7 +377,10 @@ const MapEditor2D: React.FC = () => {
               west: wall,
             }
           }
-        }))
+        }
+
+        console.log('🐛 Redux dispatch: updateCell (walls)', updatePayload)
+        dispatch(updateCell(updatePayload))
       }
     } else if (selectedLayer === 'events') {
       if (selectedTool === 'pen') {
@@ -317,18 +402,29 @@ const MapEditor2D: React.FC = () => {
           enabled: true,
         }]
 
-        dispatch(updateCell({
+        console.log('🐛 イベント編集（pen）: イベントの切り替え', {
+          hasEvent,
+          eventsCount: currentCell.events.length,
+          newEventsCount: newEvents.length,
+          position
+        })
+
+        const updatePayload = {
           floorIndex: currentFloor,
           position,
           cell: {
             events: newEvents,
           }
-        }))
+        }
+
+        console.log('🐛 Redux dispatch: updateCell (events)', updatePayload)
+        dispatch(updateCell(updatePayload))
       }
     }
   }, [getCellPosition, floor, selectedLayer, selectedTool, dispatch, currentFloor])
 
   useEffect(() => {
+    console.log('🐛 useEffect: redraw依存関係が変更されました')
     redraw()
   }, [redraw])
 
@@ -348,6 +444,8 @@ const MapEditor2D: React.FC = () => {
       <canvas
         ref={canvasRef}
         onClick={handleCanvasClick}
+        onMouseDown={(e) => console.log('🐛 Mouse down:', e.button, e.clientX, e.clientY)}
+        onMouseUp={(e) => console.log('🐛 Mouse up:', e.button, e.clientX, e.clientY)}
         style={{
           display: 'block',
           imageRendering: 'pixelated',

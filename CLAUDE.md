@@ -1,33 +1,43 @@
 # CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 必ず日本語で回答してください。
 t-wadaのTDDに従う
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
 
-This is a 3D Dungeon RPG mapping tool - a web-based map editor for creating and managing dungeon maps for 3D RPGs. The project is designed to be comprehensive with both 2D editing capabilities and real-time 3D preview functionality.
+This is a 3D Dungeon RPG mapping tool - a fully implemented web-based map editor for creating and managing dungeon maps for 3D RPGs. The application features a sophisticated 2D grid-based editor with real-time editing capabilities and is designed for 3D preview functionality.
 
 ## Technology Stack
 
-- **Frontend**: React 18+ with Vite as build tool
-- **Backend**: Rails 8+
-- **State Management**: Redux Toolkit
-- **3D Rendering**: Three.js for real-time 3D previews
-- **UI Components**: Material-UI
-- **Data Format**: JSON with JSON Schema Draft 7 validation
-- **Languages**: JavaScript/TypeScript (frontend), Ruby (backend)
+- **Frontend**: React 18+ with TypeScript and Vite as build tool
+- **State Management**: Redux Toolkit with structured slices
+- **UI Framework**: Material-UI (MUI) with dark theme
+- **3D Rendering**: Three.js (prepared, basic implementation pending)
+- **Testing**: Playwright E2E testing
+- **Data Format**: JSON with complex nested structures
 
 ## Architecture Overview
 
-The application follows a layered architecture:
+The application is built with a component-based React architecture:
 
-1. **Map Editor Layer**: Grid-based editing with multiple drawing tools (pen, rectangle, fill, eyedropper)
-2. **Layer System**: Separate layers for floor, walls, events, and decorations
-3. **Event System**: Complex event handling with triggers, conditions, and actions
-4. **3D Preview System**: Real-time 3D rendering of the 2D map data
-5. **Template System**: Reusable room and event templates
-6. **Validation System**: Map structure validation and balance checking
-7. **Export System**: Multiple format support (JSON, PNG, Markdown)
+1. **State Management**: Redux Toolkit with two main slices:
+   - `mapSlice`: Manages dungeon data, cell modifications, and undo/redo history
+   - `editorSlice`: Manages UI state (selected tools, layers, zoom, view modes)
+
+2. **Component Structure**:
+   - `App.tsx`: Main application with keyboard shortcuts and layout
+   - `MapEditor2D.tsx`: Core canvas-based map editing with tool logic
+   - Panel components: MenuBar, ToolBar, LeftPanel, RightPanel, BottomPanel
+   - `NewProjectDialog.tsx`: Initial project creation workflow
+
+3. **Data Flow**: 
+   - User interactions → Redux actions → State updates → Canvas redraw
+   - Keyboard shortcuts managed at App level
+   - Layer visibility controls affect rendering logic
+
+4. **Map Structure**: Hierarchical data model with Dungeon → Floors → Cells → (Floor/Walls/Events)
 
 ## Key Data Structures
 
@@ -49,37 +59,54 @@ Events support:
 
 ## Development Commands
 
-Since this is a new project, the following commands will likely be needed once the project is set up:
-
-### Frontend (React + Vite)
+### Core Development
 ```bash
 npm install          # Install dependencies
-npm run dev         # Start development server
-npm run build       # Build for production
+npm run dev         # Start development server (http://localhost:3000)
+npm run build       # Build for production (includes TypeScript check)
 npm run preview     # Preview production build
-npm run lint        # Run ESLint
-npm run test        # Run tests
+npm run lint        # Run ESLint with TypeScript rules
 ```
 
-### Backend (Rails)
+### Testing (Playwright)
 ```bash
-bundle install      # Install Ruby gems
-rails server        # Start Rails server
-rails db:migrate    # Run database migrations
-rails db:seed       # Seed database
-rails test          # Run tests
+npm run test        # Run Playwright E2E tests
+npm run test:ui     # Run Playwright with UI mode
 ```
 
-## Key Features to Implement
+### Common Development Workflow
+```bash
+npm run dev         # Start dev server in background
+# Make changes to src/ files
+npm run build       # Verify TypeScript compilation
+npm run test        # Run browser tests
+```
 
-1. **Grid-based Map Editor** with multiple drawing tools
-2. **Multi-layer System** (floor, walls, events, decorations)
-3. **Real-time 3D Preview** using Three.js
-4. **Event System** with triggers and actions
-5. **Template Management** for rooms and events
-6. **Map Validation** (reachability, balance checking)
-7. **Import/Export** (JSON, PNG, Markdown formats)
-8. **Version Control** with edit history (up to 50 versions)
+## Implemented Features
+
+### ✅ Core Map Editor
+- Grid-based 2D map editing with HTML5 Canvas
+- Multiple drawing tools: pen, rectangle, fill, eyedropper, select
+- Multi-layer system: floor, walls, events, decorations with visibility toggles
+- Real-time canvas redrawing with zoom (10%-400%)
+- Undo/Redo system with 50-step history
+
+### ✅ User Interface
+- Material-UI dark theme with responsive layout
+- Keyboard shortcuts (Ctrl+Z/Y, 1-5 for tools, Ctrl+S)
+- Project creation dialog with configurable map size (5×5 to 100×100)
+- Panel-based layout: MenuBar, ToolBar, LeftPanel, RightPanel, BottomPanel
+
+### ✅ Data Management
+- JSON export functionality
+- Redux state persistence with structured data model
+- Cell-based editing with floor passability and wall placement
+
+### 🚧 Pending Implementation
+- Three.js 3D preview system
+- Advanced event system with complex triggers
+- Template management system
+- Map validation and balance checking
 
 ## Performance Constraints
 
@@ -108,12 +135,15 @@ The interface consists of:
 - Right panel (properties, templates)
 - Bottom panel (coordinates, zoom, validation results)
 
-## Key Shortcuts
+## Implemented Keyboard Shortcuts
 
-- Ctrl+S: Save
-- Ctrl+Z/Y: Undo/Redo
-- Ctrl+C/V: Copy/Paste
-- Space: Hand tool
-- 1-9: Tool switching
-- F5: Preview mode
-- Tab: Toggle 3D view
+- **Ctrl+Z**: Undo
+- **Ctrl+Y** / **Ctrl+Shift+Z**: Redo  
+- **1**: Pen tool
+- **2**: Rectangle tool
+- **3**: Fill tool
+- **4**: Eyedropper tool
+- **5**: Select tool
+- **Ctrl+S**: Save (prepared, shows console log)
+
+Note: Shortcuts are disabled during text input and when no project is loaded.
