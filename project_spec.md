@@ -19,7 +19,6 @@
 ### 2.2 技術スタック
 - **フロントエンド**
   - フレームワーク: React 18+
-  - バックエンド: Rails 8+
   - 状態管理: Redux Toolkit
   - 3D描画: Three.js
   - UIコンポーネント: Material-UI
