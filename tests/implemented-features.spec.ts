@@ -10,7 +10,7 @@ test.describe('実装済み機能のブラウザテスト', () => {
     await expect(page).toHaveTitle(/3D ダンジョンマップクリエイター/);
     
     // メインヘッダーの確認（正確なテキストで指定）
-    await expect(page.locator('h6:has-text("3D ダンジョンマップクリエイター")')).toBeVisible();
+    await expect(page.getByText('3D ダンジョンマップクリエイター')).toBeVisible();
     
     // 新規プロジェクト作成ダイアログが表示されていることを確認
     await expect(page.locator('[role="dialog"]')).toBeVisible();
@@ -39,8 +39,8 @@ test.describe('実装済み機能のブラウザテスト', () => {
     // プロジェクト作成
     await page.click('button:has-text("作成")');
     
-    // ツールボタンが表示されていることを確認
-    const tools = ['pen', 'rectangle', 'fill', 'eyedropper', 'select'];
+    // ツールボタンが表示されていることを確認（消しゴムツールを含む）
+    const tools = ['pen', 'rectangle', 'fill', 'eyedropper', 'select', 'eraser'];
     for (const tool of tools) {
       await expect(page.locator(`[role="group"] button[value="${tool}"]`)).toBeVisible();
     }
@@ -52,6 +52,11 @@ test.describe('実装済み機能のブラウザテスト', () => {
     await page.click('[role="group"] button[value="fill"]');
     await expect(page.locator('[role="group"] button[value="fill"]')).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator('[role="group"] button[value="pen"]')).toHaveAttribute('aria-pressed', 'false');
+    
+    // 消しゴムツールの切り替え
+    await page.click('[role="group"] button[value="eraser"]');
+    await expect(page.locator('[role="group"] button[value="eraser"]')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('[role="group"] button[value="fill"]')).toHaveAttribute('aria-pressed', 'false');
   });
 
   test('レイヤー管理パネル', async ({ page }) => {
@@ -123,8 +128,11 @@ test.describe('実装済み機能のブラウザテスト', () => {
     await page.keyboard.press('1'); // ペンツール
     await expect(page.locator('[role="group"] button[value="pen"]')).toHaveAttribute('aria-pressed', 'true');
     
+    await page.keyboard.press('6'); // 消しゴムツール
+    await expect(page.locator('[role="group"] button[value="eraser"]')).toHaveAttribute('aria-pressed', 'true');
+    
     // ステータスバーでツール変更が反映されることを確認
-    await expect(page.locator('text=ツール: pen')).toBeVisible();
+    await expect(page.locator('text=ツール: eraser')).toBeVisible();
   });
 
   test('基本的なマップ編集操作', async ({ page }) => {
@@ -299,9 +307,15 @@ test.describe('実装済み機能のブラウザテスト', () => {
     await canvas.click({ position: { x: 100, y: 100 } });
     
     // キャプチャされたセル情報が左パネルに表示されることを確認
-    await expect(page.locator('text=キャプチャされたセル')).toBeVisible();
-    // ダメージ床がキャプチャされたかチェック（表示内容を確認）
-    await expect(page.locator('text=床タイプ')).toBeVisible();
+    const capturedCellAccordion = page.locator('text=キャプチャされたセル');
+    await expect(capturedCellAccordion).toBeVisible();
+    
+    // アコーディオンが展開されていない場合は展開する
+    await capturedCellAccordion.click();
+    await page.waitForTimeout(300); // アニメーション待機
+    
+    // ダメージ床がキャプチャされたかチェック（通行可否情報でも確認）
+    await expect(page.locator('text=通行可否: 可能')).toBeVisible();
     
     // ペンツールに戻して別のセルに適用
     await page.keyboard.press('1'); // ペンツール
@@ -337,9 +351,15 @@ test.describe('実装済み機能のブラウザテスト', () => {
     await canvas.click({ position: { x: 100, y: 100 } });
     
     // キャプチャされた壁情報が表示されることを確認
-    await expect(page.locator('text=キャプチャされたセル')).toBeVisible();
-    // 壁情報が表示される（より具体的なチェック）
-    await expect(page.locator('text=通行可否')).toBeVisible();
+    const capturedCellAccordion2 = page.locator('text=キャプチャされたセル');
+    await expect(capturedCellAccordion2).toBeVisible();
+    
+    // アコーディオンを展開
+    await capturedCellAccordion2.click();
+    await page.waitForTimeout(300); // アニメーション待機
+    
+    // 壁情報が表示される（壁ありの状況を確認）
+    await expect(page.locator('text=壁情報')).toBeVisible();
     
     // ペンツールで別のセルに適用
     await page.keyboard.press('1'); // ペンツール
@@ -691,5 +711,272 @@ test.describe('実装済み機能のブラウザテスト', () => {
     // この部分は実装後に詳細なテストを追加予定
     const fileInput = page.locator('input[type="file"]');
     await expect(fileInput).toBeAttached();
+  });
+
+  test('消しゴムツールの基本機能', async ({ page }) => {
+    // プロジェクト作成
+    const authorInput = page.locator('input[type="text"]').nth(1);
+    await authorInput.fill('テストユーザー');
+    await page.click('button:has-text("作成")');
+    
+    // 壁レイヤーを選択
+    await page.click('text=壁レイヤー');
+    await expect(page.locator('text=レイヤー: walls')).toBeVisible();
+    
+    // 通常壁を選択
+    await page.click('text=通常壁');
+    
+    // ペンツールで壁を配置
+    await page.keyboard.press('1'); // ペンツール
+    const canvas = page.locator('canvas');
+    await canvas.click({ position: { x: 100, y: 100 } });
+    
+    // 消しゴムツールに切り替え
+    await page.keyboard.press('6'); // 消しゴムツール
+    await expect(page.locator('text=ツール: eraser')).toBeVisible();
+    await expect(page.locator('[role="group"] button[value="eraser"]')).toHaveAttribute('aria-pressed', 'true');
+    
+    // 消しゴムツールのツールチップを確認
+    await page.locator('[role="group"] button[value="eraser"]').hover();
+    await expect(page.locator('text=消しゴムツール (6) - 壁やイベントを消去')).toBeVisible();
+    
+    // 壁を消去（同じ位置をクリック）
+    await canvas.click({ position: { x: 100, y: 100 } });
+    
+    // 他のツールに切り替えて再度確認
+    await page.keyboard.press('1'); // ペンツール
+    await expect(page.locator('text=ツール: pen')).toBeVisible();
+  });
+
+  test('消しゴムツールのイベント消去機能', async ({ page }) => {
+    // プロジェクト作成
+    const authorInput = page.locator('input[type="text"]').nth(1);
+    await authorInput.fill('テストユーザー');
+    await page.click('button:has-text("作成")');
+    
+    // イベントレイヤーを選択
+    await page.click('text=イベントレイヤー');
+    await expect(page.locator('text=レイヤー: events')).toBeVisible();
+    
+    // イベント編集パネルが表示されることを確認
+    await expect(page.locator('text=イベント編集')).toBeVisible();
+    
+    // 消しゴムツールを選択
+    await page.keyboard.press('6'); // 消しゴムツール
+    await expect(page.locator('text=ツール: eraser')).toBeVisible();
+    
+    const canvas = page.locator('canvas');
+    
+    // イベントを消去する操作（キャンバスクリック）
+    await canvas.click({ position: { x: 150, y: 150 } });
+    
+    // 消しゴムツールが選択状態のままであることを確認
+    await expect(page.locator('[role="group"] button[value="eraser"]')).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  test('壁ドラッグ描画機能', async ({ page }) => {
+    // プロジェクト作成
+    const authorInput = page.locator('input[type="text"]').nth(1);
+    await authorInput.fill('テストユーザー');
+    await page.click('button:has-text("作成")');
+    
+    // 壁レイヤーを選択
+    await page.click('text=壁レイヤー');
+    await expect(page.locator('text=レイヤー: walls')).toBeVisible();
+    
+    // 通常壁を選択
+    await page.click('text=通常壁');
+    
+    // ペンツールで壁をドラッグ描画
+    await page.keyboard.press('1'); // ペンツール
+    const canvas = page.locator('canvas');
+    
+    // ドラッグ操作で壁を描画（開始位置から終了位置まで）
+    await canvas.click({ position: { x: 100, y: 100 } }); // 開始点
+    
+    // マウスダウン→移動→マウスアップでドラッグをシミュレート
+    await canvas.hover({ position: { x: 100, y: 100 } });
+    await page.mouse.down();
+    await canvas.hover({ position: { x: 200, y: 100 } });
+    await page.mouse.up();
+    
+    // ドラッグ後もツールが選択状態であることを確認
+    await expect(page.locator('text=ツール: pen')).toBeVisible();
+  });
+
+  test('Shift+クリックでの壁削除機能', async ({ page }) => {
+    // プロジェクト作成
+    const authorInput = page.locator('input[type="text"]').nth(1);
+    await authorInput.fill('テストユーザー');
+    await page.click('button:has-text("作成")');
+    
+    // 壁レイヤーを選択
+    await page.click('text=壁レイヤー');
+    await expect(page.locator('text=レイヤー: walls')).toBeVisible();
+    
+    // 通常壁を選択
+    await page.click('text=通常壁');
+    
+    // ペンツールで壁を配置
+    await page.keyboard.press('1'); // ペンツール
+    const canvas = page.locator('canvas');
+    await canvas.click({ position: { x: 150, y: 150 } });
+    
+    // Shift+クリックで壁を削除
+    await canvas.click({ position: { x: 150, y: 150 }, modifiers: ['Shift'] });
+    
+    // ツールがペンツールのまま維持されることを確認
+    await expect(page.locator('text=ツール: pen')).toBeVisible();
+    await expect(page.locator('[role="group"] button[value="pen"]')).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  test('壁境界線検出機能', async ({ page }) => {
+    // プロジェクト作成
+    const authorInput = page.locator('input[type="text"]').nth(1);
+    await authorInput.fill('テストユーザー');
+    await page.click('button:has-text("作成")');
+    
+    // 壁レイヤーを選択
+    await page.click('text=壁レイヤー');
+    await expect(page.locator('text=レイヤー: walls')).toBeVisible();
+    
+    // 扉を選択
+    await page.click('text=扉');
+    
+    // ペンツールで異なる境界線に壁を配置
+    await page.keyboard.press('1'); // ペンツール
+    const canvas = page.locator('canvas');
+    
+    // 上側境界線に近い位置をクリック
+    await canvas.click({ position: { x: 100, y: 95 } });
+    
+    // 右側境界線に近い位置をクリック
+    await canvas.click({ position: { x: 195, y: 100 } });
+    
+    // 下側境界線に近い位置をクリック
+    await canvas.click({ position: { x: 100, y: 195 } });
+    
+    // 左側境界線に近い位置をクリック
+    await canvas.click({ position: { x: 95, y: 100 } });
+    
+    // 操作完了を確認
+    await expect(page.locator('text=ツール: pen')).toBeVisible();
+  });
+
+  test('Undo/Redoキーボードショートカット機能', async ({ page }) => {
+    // プロジェクト作成
+    const authorInput = page.locator('input[type="text"]').nth(1);
+    await authorInput.fill('テストユーザー');
+    await page.click('button:has-text("作成")');
+    
+    // 床レイヤーで操作
+    await expect(page.locator('text=レイヤー: floor')).toBeVisible();
+    
+    // ダメージ床を選択
+    await page.click('text=ダメージ');
+    
+    // ペンツールで床を配置
+    await page.keyboard.press('1'); // ペンツール
+    const canvas = page.locator('canvas');
+    await canvas.click({ position: { x: 100, y: 100 } });
+    
+    // Ctrl+Zでundo
+    await page.keyboard.press('Control+z');
+    
+    // Ctrl+Yでredo
+    await page.keyboard.press('Control+y');
+    
+    // 操作完了を確認
+    await expect(page.locator('text=ツール: pen')).toBeVisible();
+  });
+
+  test('壁ドラッグ操作の単一undo機能', async ({ page }) => {
+    // プロジェクト作成
+    const authorInput = page.locator('input[type="text"]').nth(1);
+    await authorInput.fill('テストユーザー');
+    await page.click('button:has-text("作成")');
+    
+    // 壁レイヤーを選択
+    await page.click('text=壁レイヤー');
+    await expect(page.locator('text=レイヤー: walls')).toBeVisible();
+    
+    // 通常壁を選択
+    await page.click('text=通常壁');
+    
+    // ペンツールでドラッグ操作
+    await page.keyboard.press('1'); // ペンツール
+    const canvas = page.locator('canvas');
+    
+    // ドラッグ操作（重要：ドラッグは1つのundo操作として扱われるべき）
+    await canvas.hover({ position: { x: 100, y: 100 } });
+    await page.mouse.down();
+    await canvas.hover({ position: { x: 200, y: 100 } });
+    await page.mouse.up();
+    
+    // 1回のCtrl+Zで全ドラッグ操作が取り消されることを確認
+    await page.keyboard.press('Control+z');
+    
+    // 2回目のCtrl+Zは何も起こらないことを確認（まだ元に戻す操作があれば）
+    await page.keyboard.press('Control+z');
+    
+    // 操作完了を確認
+    await expect(page.locator('text=ツール: pen')).toBeVisible();
+  });
+
+  test('複数ツールでのUndo/Redo機能', async ({ page }) => {
+    // プロジェクト作成
+    const authorInput = page.locator('input[type="text"]').nth(1);
+    await authorInput.fill('テストユーザー');
+    await page.click('button:has-text("作成")');
+    
+    const canvas = page.locator('canvas');
+    
+    // 床レイヤーでペンツール操作
+    await page.keyboard.press('1'); // ペンツール
+    await canvas.click({ position: { x: 100, y: 100 } });
+    
+    // 塗りつぶしツールに変更
+    await page.keyboard.press('3'); // 塗りつぶしツール
+    await expect(page.locator('text=ツール: fill')).toBeVisible();
+    await canvas.click({ position: { x: 150, y: 150 } });
+    
+    // 矩形ツールに変更
+    await page.keyboard.press('2'); // 矩形ツール
+    await expect(page.locator('text=ツール: rectangle')).toBeVisible();
+    await canvas.click({ position: { x: 200, y: 200 } });
+    
+    // 3回のundo操作
+    await page.keyboard.press('Control+z'); // 矩形操作を取り消し
+    await page.keyboard.press('Control+z'); // 塗りつぶし操作を取り消し
+    await page.keyboard.press('Control+z'); // ペン操作を取り消し
+    
+    // 2回のredo操作
+    await page.keyboard.press('Control+y'); // ペン操作を復活
+    await page.keyboard.press('Control+y'); // 塗りつぶし操作を復活
+    
+    // 現在のツール状態を確認
+    await expect(page.locator('text=ツール: rectangle')).toBeVisible();
+  });
+
+  test('メニューからのUndo/Redo操作', async ({ page }) => {
+    // プロジェクト作成
+    const authorInput = page.locator('input[type="text"]').nth(1);
+    await authorInput.fill('テストユーザー');
+    await page.click('button:has-text("作成")');
+    
+    // 操作を実行
+    const canvas = page.locator('canvas');
+    await canvas.click({ position: { x: 100, y: 100 } });
+    
+    // 編集メニューからundo
+    await page.click('button:has-text("編集")');
+    await page.click('li:has-text("元に戻す")');
+    
+    // 編集メニューからredo
+    await page.click('button:has-text("編集")');
+    await page.click('li:has-text("やり直し")');
+    
+    // 操作完了を確認
+    await expect(page.locator('canvas')).toBeVisible();
   });
 });

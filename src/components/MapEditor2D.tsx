@@ -90,6 +90,63 @@ const convertBoundaryToCell = (boundaryX: number, boundaryY: number, cellSize: n
   return { x: cellX, y: cellY }
 }
 
+// 床タイプのドラッグ描画関数：開始点から終了点までの直線上のセルの床タイプを変更
+const generateFloorsAlongLine = (start: Position, end: Position, selectedFloorType: string, resetMode: boolean = false) => {
+  const updates: Array<{ position: Position; cell: Partial<{ floor: any }> }> = []
+  
+  // 開始点と終了点が同じ場合は、単一セルの操作として扱う
+  if (start.x === end.x && start.y === end.y) {
+    const newFloorData = resetMode ? 
+      { type: 'normal' as const, passable: true } : 
+      { type: selectedFloorType as any, passable: getPassableForFloorType(selectedFloorType) }
+    
+    updates.push({
+      position: start,
+      cell: { floor: newFloorData }
+    })
+    return updates
+  }
+  
+  // Bresenhamのアルゴリズムで直線上のセルを取得
+  const dx = Math.abs(end.x - start.x)
+  const dy = Math.abs(end.y - start.y)
+  const sx = start.x < end.x ? 1 : -1
+  const sy = start.y < end.y ? 1 : -1
+  let err = dx - dy
+  
+  let x = start.x
+  let y = start.y
+  
+  while (true) {
+    // 範囲チェック
+    if (x >= 0 && y >= 0) {
+      const newFloorData = resetMode ? 
+        { type: 'normal' as const, passable: true } : 
+        { type: selectedFloorType as any, passable: getPassableForFloorType(selectedFloorType) }
+      
+      updates.push({
+        position: { x, y },
+        cell: { floor: newFloorData }
+      })
+    }
+    
+    // 終点に到達したら終了
+    if (x === end.x && y === end.y) break
+    
+    const e2 = 2 * err
+    if (e2 > -dy) {
+      err -= dy
+      x += sx
+    }
+    if (e2 < dx) {
+      err += dx
+      y += sy
+    }
+  }
+  
+  return updates
+}
+
 // 世界樹の迷宮スタイルの壁配置関数：ドラッグした線自体が壁になる
 const generateWallsAlongLine = (start: Position, end: Position, selectedWallType: WallType, deleteMode: boolean = false, floor?: any) => {
   const updates: Array<{ position: Position; cell: Partial<{ walls: any }> }> = []
@@ -674,8 +731,8 @@ const MapEditor2D: React.FC = () => {
 
     const currentCell = floor.cells[position.y][position.x]
 
-    // ドラッグ操作中、または壁レイヤーのペンツール（handleMouseUpで処理済み）はクリック処理をスキップ
-    if (isDragging || isActuallyDragging || (selectedLayer === 'walls' && selectedTool === 'pen')) {
+    // ドラッグ操作中、または壁レイヤーのペンツール（handleMouseUpで処理済み）、または床レイヤーのペンツール（handleMouseUpで処理済み）はクリック処理をスキップ
+    if (isDragging || isActuallyDragging || (selectedLayer === 'walls' && selectedTool === 'pen') || (selectedLayer === 'floor' && selectedTool === 'pen')) {
       return
     }
 
@@ -1132,6 +1189,38 @@ const MapEditor2D: React.FC = () => {
         setDragEndPixel(boundaryPos)
       }
     }
+    
+    // 床ドラッグの処理
+    if (dragStartMouse && dragStart && selectedLayer === 'floor' && selectedTool === 'pen') {
+      const canvas = canvasRef.current
+      if (!canvas) return
+      
+      const rect = canvas.getBoundingClientRect()
+      const mouseX = event.clientX - rect.left
+      const mouseY = event.clientY - rect.top
+      
+      // ドラッグ距離を計算
+      const dragDistance = Math.sqrt(
+        Math.pow(mouseX - dragStartMouse.x, 2) + 
+        Math.pow(mouseY - dragStartMouse.y, 2)
+      )
+      
+      // 閾値（5ピクセル）を超えた場合のみドラッグ開始
+      const DRAG_THRESHOLD = 5
+      if (dragDistance > DRAG_THRESHOLD && !isActuallyDragging) {
+        setIsActuallyDragging(true)
+        setIsDragging(true)
+      }
+      
+      // 実際にドラッグ中の場合のみ更新
+      if (isActuallyDragging) {
+        // 床ドラッグはセル単位でスナップ
+        const position = getCellPosition(event)
+        if (position) {
+          setDragEnd(position)
+        }
+      }
+    }
   }, [selectedTool, isDrawingRectangle, rectangleStart, getCellPosition, isDragging, dragStart, selectedLayer, dragStartMouse, isActuallyDragging, cellSize])
 
   const handleMouseDown = useCallback((event: React.MouseEvent) => {
@@ -1157,6 +1246,26 @@ const MapEditor2D: React.FC = () => {
       setDragEnd(startCell)
       setDragStartPixel(boundaryPos)
       setDragEndPixel(boundaryPos)
+    } else if (selectedLayer === 'floor' && selectedTool === 'pen') {
+      // 床ドラッグの処理
+      const position = getCellPosition(event)
+      if (!position) return
+      
+      // マウス座標を保存してドラッグ開始準備
+      const canvas = canvasRef.current
+      if (!canvas) return
+      
+      const rect = canvas.getBoundingClientRect()
+      const mouseX = event.clientX - rect.left
+      const mouseY = event.clientY - rect.top
+      
+      setDragStartMouse({ x: mouseX, y: mouseY })
+      setIsShiftPressed(event.shiftKey)
+      setIsActuallyDragging(false)
+      
+      // 床ドラッグはセル単位でスナップ
+      setDragStart(position)
+      setDragEnd(position)
     }
   }, [selectedLayer, selectedTool, getCellPosition, cellSize])
 
@@ -1209,6 +1318,49 @@ const MapEditor2D: React.FC = () => {
       }
     }
     
+    // 床レイヤーのペンツールの処理
+    if (dragStartMouse && dragStart && selectedLayer === 'floor' && selectedTool === 'pen') {
+      if (isActuallyDragging && isDragging && dragEnd) {
+        // 実際にドラッグが行われた場合：床を描画
+        const floorUpdates = generateFloorsAlongLine(dragStart, dragEnd, selectedFloorType, isShiftPressed)
+        if (floorUpdates.length > 0) {
+          dispatch(updateCells({
+            floorIndex: currentFloor,
+            updates: floorUpdates
+          }))
+        }
+      } else {
+        // ドラッグしなかった場合：クリック処理として床の変更
+        if (dragStart && floor) {
+          // 床の編集：キャプチャされたデータがあればそれを使用、なければ選択された床タイプを適用
+          let newFloorData
+          if (capturedCellData) {
+            newFloorData = {
+              type: capturedCellData.floor.type,
+              passable: capturedCellData.floor.passable
+            }
+          } else if (isShiftPressed) {
+            // Shiftキーで通常床にリセット
+            newFloorData = {
+              type: 'normal' as const,
+              passable: true
+            }
+          } else {
+            newFloorData = {
+              type: selectedFloorType,
+              passable: getPassableForFloorType(selectedFloorType)
+            }
+          }
+
+          dispatch(updateCell({
+            floorIndex: currentFloor,
+            position: dragStart,
+            cell: { floor: newFloorData }
+          }))
+        }
+      }
+    }
+    
     // 状態をリセット
     setIsDragging(false)
     setIsActuallyDragging(false)
@@ -1218,7 +1370,7 @@ const MapEditor2D: React.FC = () => {
     setDragEndPixel(null)
     setDragStartMouse(null)
     setIsShiftPressed(false)
-  }, [isDragging, isActuallyDragging, dragStart, dragEnd, dragStartMouse, selectedLayer, selectedTool, selectedWallType, isShiftPressed, dispatch, currentFloor, getCellPosition, floor, cellSize])
+  }, [isDragging, isActuallyDragging, dragStart, dragEnd, dragStartMouse, selectedLayer, selectedTool, selectedWallType, selectedFloorType, isShiftPressed, dispatch, currentFloor, getCellPosition, floor, cellSize, capturedCellData])
 
   useEffect(() => {
     redraw()

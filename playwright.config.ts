@@ -11,6 +11,7 @@ export default defineConfig({
     baseURL: 'http://localhost:3000',
     trace: 'on-first-retry',
   },
+  timeout: 15000, // 15秒に短縮
 
   projects: [
     {

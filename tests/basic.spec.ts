@@ -8,7 +8,7 @@ test.describe('ダンジョンマップクリエイター 基本機能', () => {
     await expect(page).toHaveTitle(/3D ダンジョンマップクリエイター/);
     
     // メインヘッダーの確認（AppBarのヘッダーテキスト）
-    await expect(page.locator('h6:has-text("3D ダンジョンマップクリエイター")')).toBeVisible();
+    await expect(page.getByText('3D ダンジョンマップクリエイター')).toBeVisible();
   });
 
   test('新規プロジェクト作成ダイアログが表示される', async ({ page }) => {
