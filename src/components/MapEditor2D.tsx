@@ -509,49 +509,50 @@ const MapEditor2D: React.FC = () => {
   }, [floor, cellSize])
 
   const drawDragPreview = useCallback((ctx: CanvasRenderingContext2D) => {
-    if (!isDragging || !dragStartPixel || !dragEndPixel || selectedLayer !== 'walls') return
+    if (!isDragging || !dragStart || !dragEnd) return
 
-    // スナップポイントを強調表示（開始点と終了点）
-    ctx.fillStyle = '#ff0000' // 赤色
-    const snapPointSize = 6
-    
-    // 開始点のスナップポイント
-    ctx.fillRect(
-      dragStartPixel.x - snapPointSize / 2,
-      dragStartPixel.y - snapPointSize / 2,
-      snapPointSize,
-      snapPointSize
-    )
-    
-    // 終了点のスナップポイント
-    ctx.fillRect(
-      dragEndPixel.x - snapPointSize / 2,
-      dragEndPixel.y - snapPointSize / 2,
-      snapPointSize,
-      snapPointSize
-    )
-    
-    // デバッグ情報：境界線座標とセル座標を表示
-    ctx.fillStyle = '#ffffff'
-    ctx.font = '12px Arial'
-    ctx.fillText(`境界線: ${dragStartPixel.x}, ${dragStartPixel.y}`, dragStartPixel.x + 10, dragStartPixel.y - 10)
-    ctx.fillText(`セル: ${dragStart?.x}, ${dragStart?.y}`, dragStartPixel.x + 10, dragStartPixel.y + 5)
-    if (dragEnd && (dragEnd.x !== dragStart?.x || dragEnd.y !== dragStart?.y)) {
-      ctx.fillText(`→ セル: ${dragEnd.x}, ${dragEnd.y}`, dragEndPixel.x + 10, dragEndPixel.y + 5)
-    }
+    // 壁レイヤーでのドラッグプレビュー
+    if (selectedLayer === 'walls' && dragStartPixel && dragEndPixel) {
+      // スナップポイントを強調表示（開始点と終了点）
+      ctx.fillStyle = '#ff0000' // 赤色
+      const snapPointSize = 6
+      
+      // 開始点のスナップポイント
+      ctx.fillRect(
+        dragStartPixel.x - snapPointSize / 2,
+        dragStartPixel.y - snapPointSize / 2,
+        snapPointSize,
+        snapPointSize
+      )
+      
+      // 終了点のスナップポイント
+      ctx.fillRect(
+        dragEndPixel.x - snapPointSize / 2,
+        dragEndPixel.y - snapPointSize / 2,
+        snapPointSize,
+        snapPointSize
+      )
+      
+      // デバッグ情報：境界線座標とセル座標を表示
+      ctx.fillStyle = '#ffffff'
+      ctx.font = '12px Arial'
+      ctx.fillText(`境界線: ${dragStartPixel.x}, ${dragStartPixel.y}`, dragStartPixel.x + 10, dragStartPixel.y - 10)
+      ctx.fillText(`セル: ${dragStart?.x}, ${dragStart?.y}`, dragStartPixel.x + 10, dragStartPixel.y + 5)
+      if (dragEnd && (dragEnd.x !== dragStart?.x || dragEnd.y !== dragStart?.y)) {
+        ctx.fillText(`→ セル: ${dragEnd.x}, ${dragEnd.y}`, dragEndPixel.x + 10, dragEndPixel.y + 5)
+      }
 
-    // ドラッグ線を描画（境界線から境界線へ）
-    ctx.strokeStyle = '#ffff00' // 黄色の補助線
-    ctx.lineWidth = 2
-    ctx.setLineDash([5, 5]) // 破線
-    
-    ctx.beginPath()
-    ctx.moveTo(dragStartPixel.x, dragStartPixel.y)
-    ctx.lineTo(dragEndPixel.x, dragEndPixel.y)
-    ctx.stroke()
-    
-    // 実際に配置される壁のプレビューを描画
-    if (dragStart && dragEnd) {
+      // ドラッグ線を描画（境界線から境界線へ）
+      ctx.strokeStyle = '#ffff00' // 黄色の補助線
+      ctx.lineWidth = 2
+      ctx.setLineDash([5, 5]) // 破線
+      
+      ctx.beginPath()
+      ctx.moveTo(dragStartPixel.x, dragStartPixel.y)
+      ctx.lineTo(dragEndPixel.x, dragEndPixel.y)
+      ctx.stroke()
+      
+      // 実際に配置される壁のプレビューを描画
       const previewUpdates = generateWallsAlongLine(dragStart, dragEnd, selectedWallType, isShiftPressed, floor)
       
       // 削除モードと配置モードで色を変える
@@ -590,10 +591,70 @@ const MapEditor2D: React.FC = () => {
         }
       }
     }
+
+    // 床レイヤーでのドラッグプレビュー
+    if (selectedLayer === 'floor') {
+      // ドラッグ線を描画（セル中央から中央へ）
+      ctx.strokeStyle = isShiftPressed ? '#ff8888' : '#88ff88'  // Shiftキーで薄い赤、通常は薄い緑
+      ctx.lineWidth = 3
+      ctx.setLineDash([8, 4])  // 破線
+      ctx.beginPath()
+      ctx.moveTo(
+        dragStart.x * cellSize + cellSize / 2,
+        dragStart.y * cellSize + cellSize / 2
+      )
+      ctx.lineTo(
+        dragEnd.x * cellSize + cellSize / 2,
+        dragEnd.y * cellSize + cellSize / 2
+      )
+      ctx.stroke()
+      
+      // 実際に変更される床のプレビューを描画
+      const previewUpdates = generateFloorsAlongLine(dragStart, dragEnd, selectedFloorType, isShiftPressed)
+      
+      // 各セルの境界線を描画
+      ctx.strokeStyle = isShiftPressed ? '#ff4444' : '#44ff44' // 削除=赤、配置=緑
+      ctx.lineWidth = 2
+      ctx.setLineDash([4, 4])
+      
+      for (const update of previewUpdates) {
+        const { position } = update
+        const xPos = position.x * cellSize
+        const yPos = position.y * cellSize
+        
+        // セルの境界線を描画
+        ctx.strokeRect(xPos + 2, yPos + 2, cellSize - 4, cellSize - 4)
+        
+        // セル中央に床タイプの色を表示
+        if (cellSize > 16) {
+          const floorType = isShiftPressed ? 'normal' : selectedFloorType
+          let previewColor = '#666'
+          
+          switch (floorType) {
+            case 'normal': previewColor = '#888'; break
+            case 'damage': previewColor = '#c44'; break
+            case 'slippery': previewColor = '#48c'; break
+            case 'pit': previewColor = '#222'; break
+            case 'warp': previewColor = '#c84'; break
+          }
+          
+          ctx.fillStyle = previewColor
+          ctx.globalAlpha = 0.7
+          const margin = cellSize * 0.25
+          ctx.fillRect(
+            xPos + margin,
+            yPos + margin,
+            cellSize - margin * 2,
+            cellSize - margin * 2
+          )
+          ctx.globalAlpha = 1
+        }
+      }
+    }
     
     // 線のパターンをリセット
     ctx.setLineDash([])
-  }, [isDragging, dragStartPixel, dragEndPixel, dragStart, dragEnd, selectedLayer, selectedWallType, isShiftPressed, cellSize])
+  }, [isDragging, dragStartPixel, dragEndPixel, dragStart, dragEnd, selectedLayer, selectedWallType, selectedFloorType, isShiftPressed, cellSize])
 
   const drawEvents = useCallback((ctx: CanvasRenderingContext2D) => {
     if (!floor) return
