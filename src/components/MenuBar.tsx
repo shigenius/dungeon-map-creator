@@ -10,8 +10,9 @@ import {
 } from '@mui/material'
 import { useDispatch, useSelector } from 'react-redux'
 import { RootState } from '../store'
-import { undo, redo } from '../store/mapSlice'
-import { setViewMode } from '../store/editorSlice'
+import { undo, redo, loadDungeon } from '../store/mapSlice'
+import { setViewMode, openNewProjectDialog } from '../store/editorSlice'
+import { downloadDungeonAsJSON, openDungeonFromFile } from '../utils/fileUtils'
 
 const MenuBar: React.FC = () => {
   const dispatch = useDispatch()
@@ -50,20 +51,38 @@ const MenuBar: React.FC = () => {
 
   const handleExportJSON = () => {
     if (dungeon) {
-      const dataStr = JSON.stringify(dungeon, null, 2)
-      const dataBlob = new Blob([dataStr], { type: 'application/json' })
-      const url = URL.createObjectURL(dataBlob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = `${dungeon.name}.json`
-      link.click()
-      URL.revokeObjectURL(url)
+      downloadDungeonAsJSON(dungeon)
     }
     handleMenuClose()
   }
 
   const handleSwitchView = (mode: '2d' | '3d' | 'preview') => {
     dispatch(setViewMode(mode))
+    handleMenuClose()
+  }
+
+  const handleNewProject = () => {
+    dispatch(openNewProjectDialog())
+    handleMenuClose()
+  }
+
+  const handleSave = () => {
+    if (dungeon) {
+      downloadDungeonAsJSON(dungeon)
+    }
+    handleMenuClose()
+  }
+
+  const handleOpen = () => {
+    openDungeonFromFile(
+      (dungeonData) => {
+        dispatch(loadDungeon(dungeonData))
+        console.log('ファイルから読み込んだデータ:', dungeonData)
+      },
+      (error) => {
+        console.error('ファイルの読み込みに失敗しました:', error)
+      }
+    )
     handleMenuClose()
   }
 
@@ -105,9 +124,9 @@ const MenuBar: React.FC = () => {
         open={Boolean(fileMenuAnchor)}
         onClose={handleMenuClose}
       >
-        <MenuItem onClick={handleMenuClose}>新規作成</MenuItem>
-        <MenuItem onClick={handleMenuClose}>開く</MenuItem>
-        <MenuItem onClick={handleMenuClose} disabled={!dungeon}>保存</MenuItem>
+        <MenuItem onClick={handleNewProject}>新規作成</MenuItem>
+        <MenuItem onClick={handleOpen}>開く</MenuItem>
+        <MenuItem onClick={handleSave} disabled={!dungeon}>保存</MenuItem>
         <MenuItem onClick={handleExportJSON} disabled={!dungeon}>JSONエクスポート</MenuItem>
       </Menu>
 

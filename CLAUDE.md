@@ -137,13 +137,32 @@ The interface consists of:
 
 ## Implemented Keyboard Shortcuts
 
-- **Ctrl+Z**: Undo
-- **Ctrl+Y** / **Ctrl+Shift+Z**: Redo  
+### Tool Selection
 - **1**: Pen tool
 - **2**: Rectangle tool
 - **3**: Fill tool
 - **4**: Eyedropper tool
 - **5**: Select tool
+
+### Layer Management
+- **F**: Floor layer
+- **W**: Walls layer
+- **E**: Events layer
+- **D**: Decorations layer
+- **Tab**: Cycle through layers
+
+### View Controls
+- **Ctrl+G**: Toggle grid display
+- **Space**: Toggle grid display
+- **Ctrl++ / Ctrl+=**: Zoom in
+- **Ctrl+-**: Zoom out
+- **Ctrl+0**: Reset zoom to 100%
+
+### Edit Operations
+- **Ctrl+Z**: Undo
+- **Ctrl+Y** / **Ctrl+Shift+Z**: Redo
 - **Ctrl+S**: Save (prepared, shows console log)
+- **Ctrl+N**: New project (prepared, shows console log)
+- **Ctrl+O**: Open file (prepared, shows console log)
 
 Note: Shortcuts are disabled during text input and when no project is loaded.

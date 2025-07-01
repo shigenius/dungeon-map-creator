@@ -14,6 +14,7 @@ import {
   FormatColorFill as FillIcon,
   Colorize as EyedropperIcon,
   CropFree as SelectIcon,
+  Delete as EraserIcon,
   Undo as UndoIcon,
   Redo as RedoIcon,
   ZoomIn as ZoomInIcon,
@@ -91,13 +92,18 @@ const ToolBar: React.FC = () => {
           </Tooltip>
         </ToggleButton>
         <ToggleButton value="eyedropper">
-          <Tooltip title="スポイトツール (4)">
+          <Tooltip title="スポイトツール (4) - セルの設定をキャプチャして他のセルに適用">
             <EyedropperIcon />
           </Tooltip>
         </ToggleButton>
         <ToggleButton value="select">
           <Tooltip title="選択ツール (5)">
             <SelectIcon />
+          </Tooltip>
+        </ToggleButton>
+        <ToggleButton value="eraser">
+          <Tooltip title="消しゴムツール (6) - 壁やイベントを消去">
+            <EraserIcon />
           </Tooltip>
         </ToggleButton>
       </ToggleButtonGroup>

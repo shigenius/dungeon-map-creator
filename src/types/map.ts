@@ -51,25 +51,92 @@ export interface Wall {
   properties?: Record<string, any>
 }
 
+export type TriggerType = 
+  | 'auto'      // 自動実行
+  | 'interact'  // 調べる
+  | 'contact'   // 接触
+  | 'item'      // アイテム使用
+  | 'step'      // 踏む
+  | 'time'      // 時間経過
+  | 'flag'      // フラグ条件
+  | 'random'    // ランダム
+  | 'battle'    // 戦闘後
+  | 'combo'     // 複合条件
+
+export type ActionType = 
+  | 'message'      // メッセージ表示
+  | 'treasure'     // 宝箱開封
+  | 'battle'       // 戦闘開始
+  | 'move'         // 移動
+  | 'warp'         // ワープ
+  | 'heal'         // 回復
+  | 'damage'       // ダメージ
+  | 'item'         // アイテム取得/使用
+  | 'flag'         // フラグ操作
+  | 'shop'         // ショップ開始
+  | 'save'         // セーブ
+  | 'sound'        // 効果音
+  | 'cutscene'     // カットシーン
+  | 'conditional'  // 条件分岐
+  | 'loop'         // ループ
+  | 'custom'       // カスタムアクション
+
+export interface EventTrigger {
+  type: TriggerType
+  conditions?: Array<{
+    type: 'flag' | 'item' | 'level' | 'time' | 'random' | 'custom'
+    operator: '==' | '!=' | '>' | '<' | '>=' | '<=' | 'has' | 'not_has'
+    key?: string
+    value?: any
+    probability?: number // for random
+  }>
+  repeatPolicy: {
+    type: 'once' | 'always' | 'daily' | 'count'
+    maxCount?: number
+  }
+}
+
+export interface EventAction {
+  id: string
+  type: ActionType
+  params: Record<string, any>
+  conditions?: Array<{
+    type: 'flag' | 'item' | 'level' | 'random' | 'custom'
+    operator: '==' | '!=' | '>' | '<' | '>=' | '<=' | 'has' | 'not_has'
+    key?: string
+    value?: any
+    probability?: number
+  }>
+  nextActionId?: string // アクションチェーン用
+  branchActions?: Array<{
+    conditionId: string
+    actionId: string
+  }>
+}
+
 export interface DungeonEvent {
   id: string
   type: EventType
   name: string
+  description?: string
   position: Position
   appearance: {
     sprite?: string
     visible: boolean
+    color?: string
+    icon?: string
   }
-  trigger: {
-    type: 'auto' | 'interact' | 'contact' | 'item' | 'step' | 'time' | 'flag' | 'random'
-    params?: Record<string, any>
-  }
-  actions: Array<{
-    type: string
-    params: Record<string, any>
-  }>
+  trigger: EventTrigger
+  actions: EventAction[]
   flags: Record<string, any>
   enabled: boolean
+  priority: number // 実行優先度
+  metadata: {
+    created: string
+    modified: string
+    author?: string
+    version: number
+  }
 }
 
 export interface Cell {
@@ -137,6 +204,6 @@ export interface MapEditorState {
   viewMode: ViewMode
 }
 
-export type DrawingTool = 'pen' | 'rectangle' | 'fill' | 'eyedropper' | 'select'
+export type DrawingTool = 'pen' | 'rectangle' | 'fill' | 'eyedropper' | 'select' | 'eraser'
 export type Layer = 'floor' | 'walls' | 'events' | 'decorations'
 export type ViewMode = '2d' | '3d' | 'preview'

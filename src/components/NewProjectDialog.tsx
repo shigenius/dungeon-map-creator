@@ -11,29 +11,46 @@ import {
   Typography,
   Box,
 } from '@mui/material'
-import { useDispatch } from 'react-redux'
+import { useDispatch, useSelector } from 'react-redux'
 import { createNewDungeon } from '../store/mapSlice'
+import { closeNewProjectDialog } from '../store/editorSlice'
+import { RootState } from '../store'
 
 const NewProjectDialog: React.FC = () => {
   const dispatch = useDispatch()
-  const [open, setOpen] = useState(true)
-  const [dungeonName, setDungeonName] = useState('新しいダンジョン')
+  const dungeon = useSelector((state: RootState) => state.map.dungeon)
+  const showNewProjectDialog = useSelector((state: RootState) => state.editor.showNewProjectDialog)
+  
+  // 既存プロジェクトがある場合は、確認のためフィールドをリセット
+  const [dungeonName, setDungeonName] = useState(dungeon ? '' : '新しいダンジョン')
   const [author, setAuthor] = useState('')
   const [width, setWidth] = useState(20)
   const [height, setHeight] = useState(20)
 
+  const open = !dungeon || showNewProjectDialog
+
+  // ダイアログが開いた時にフィールドをリセット
+  React.useEffect(() => {
+    if (showNewProjectDialog && dungeon) {
+      setDungeonName('')
+      setAuthor('')
+      setWidth(20)
+      setHeight(20)
+    }
+  }, [showNewProjectDialog, dungeon])
+
   const handleCreate = () => {
     dispatch(createNewDungeon({
-      name: dungeonName,
+      name: dungeonName || '新しいダンジョン',
       author: author || '名無し',
       width,
       height,
     }))
-    setOpen(false)
+    dispatch(closeNewProjectDialog())
   }
 
   const handleCancel = () => {
-    setOpen(false)
+    dispatch(closeNewProjectDialog())
   }
 
   return (
@@ -53,6 +70,7 @@ const NewProjectDialog: React.FC = () => {
               label="ダンジョン名"
               value={dungeonName}
               onChange={(e) => setDungeonName(e.target.value)}
+              placeholder="新しいダンジョン"
               required
             />
           </Grid>

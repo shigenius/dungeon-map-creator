@@ -1,17 +1,231 @@
-import React, { useRef, useEffect, useCallback } from 'react'
+import React, { useRef, useEffect, useCallback, useState } from 'react'
 import { Box } from '@mui/material'
 import { useSelector, useDispatch } from 'react-redux'
 import { RootState } from '../store'
-import { updateCell } from '../store/mapSlice'
-import { Position } from '../types/map'
+import { updateCell, updateCells } from '../store/mapSlice'
+import { setCapturedCellData } from '../store/editorSlice'
+import { Position, WallType } from '../types/map'
+
+// 床タイプに応じた通行可否を決定する関数
+const getPassableForFloorType = (floorType: string) => {
+  switch (floorType) {
+    case 'normal': return true
+    case 'damage': return true  
+    case 'slippery': return true
+    case 'pit': return false
+    case 'warp': return true
+    default: return true
+  }
+}
+
+// 壁タイプに応じた透明性を決定する関数
+const getTransparentForWallType = (wallType: string) => {
+  switch (wallType) {
+    case 'normal': return false
+    case 'door': return false
+    case 'locked_door': return false
+    case 'hidden_door': return false
+    case 'breakable': return false
+    case 'oneway': return false
+    case 'invisible': return true
+    case 'event': return false
+    default: return false
+  }
+}
+
+// 壁タイプごとの視覚的スタイルを取得する関数
+const getWallStyle = (wallType: WallType) => {
+  switch (wallType) {
+    case 'normal': return { color: '#fff', lineWidth: 2, pattern: 'solid' }
+    case 'door': return { color: '#8B4513', lineWidth: 3, pattern: 'solid' }
+    case 'locked_door': return { color: '#FFD700', lineWidth: 3, pattern: 'solid' }
+    case 'hidden_door': return { color: '#888', lineWidth: 1, pattern: 'dashed' }
+    case 'breakable': return { color: '#FF6B35', lineWidth: 2, pattern: 'dashed' }
+    case 'oneway': return { color: '#00CED1', lineWidth: 3, pattern: 'solid' }
+    case 'invisible': return { color: '#666', lineWidth: 1, pattern: 'dotted' }
+    case 'event': return { color: '#FF1493', lineWidth: 2, pattern: 'dotted' }
+    default: return { color: '#fff', lineWidth: 2, pattern: 'solid' }
+  }
+}
+
+// 線のパターンを設定する関数
+const setLinePattern = (ctx: CanvasRenderingContext2D, pattern: string) => {
+  switch (pattern) {
+    case 'solid': ctx.setLineDash([]); break
+    case 'dashed': ctx.setLineDash([5, 5]); break
+    case 'dotted': ctx.setLineDash([2, 3]); break
+    default: ctx.setLineDash([])
+  }
+}
+
+// 境界線座標からセル座標に変換する関数
+const convertBoundaryToCell = (boundaryX: number, boundaryY: number, cellSize: number) => {
+  // 境界線座標を正確なセル座標に変換
+  // 垂直境界線：境界線が完全にセル境界上にある場合は右側のセルを選択
+  // 水平境界線：境界線が完全にセル境界上にある場合は下側のセルを選択
+  
+  const exactCellX = boundaryX / cellSize
+  const exactCellY = boundaryY / cellSize
+  
+  // 境界線が完全にグリッド線上にある場合の処理
+  const isOnVerticalBoundary = exactCellX === Math.floor(exactCellX) && exactCellX > 0
+  const isOnHorizontalBoundary = exactCellY === Math.floor(exactCellY) && exactCellY > 0
+  
+  let cellX, cellY
+  
+  if (isOnVerticalBoundary) {
+    // 垂直境界線上：左側のセルを選択してeast壁に配置
+    cellX = Math.floor(exactCellX) - 1
+  } else {
+    cellX = Math.floor(exactCellX)
+  }
+  
+  if (isOnHorizontalBoundary) {
+    // 水平境界線上：上側のセルを選択してsouth壁に配置
+    cellY = Math.floor(exactCellY) - 1
+  } else {
+    cellY = Math.floor(exactCellY)
+  }
+  
+  return { x: cellX, y: cellY }
+}
+
+// 世界樹の迷宮スタイルの壁配置関数：ドラッグした線自体が壁になる
+const generateWallsAlongLine = (start: Position, end: Position, selectedWallType: WallType, deleteMode: boolean = false) => {
+  const updates: Array<{ position: Position; cell: Partial<{ walls: any }> }> = []
+  
+  // 開始点と終了点が同じ場合は、単一セルのクリック操作として扱う
+  if (start.x === end.x && start.y === end.y) {
+    return []
+  }
+  
+  // 水平線の場合（左右にドラッグ）→ 水平壁を配置/削除
+  if (start.y === end.y) {
+    const minX = Math.min(start.x, end.x)
+    const maxX = Math.max(start.x, end.x)
+    
+    // 各セルの間に水平壁を配置/削除
+    for (let x = minX; x <= maxX; x++) {
+      updates.push({
+        position: { x, y: start.y },
+        cell: {
+          walls: {
+            south: deleteMode ? null : { type: selectedWallType, transparent: getTransparentForWallType(selectedWallType) }
+          }
+        }
+      })
+    }
+  }
+  // 垂直線の場合（上下にドラッグ）→ 垂直壁を配置/削除
+  else if (start.x === end.x) {
+    const minY = Math.min(start.y, end.y)
+    const maxY = Math.max(start.y, end.y)
+    
+    // 各セルの間に垂直壁を配置/削除
+    for (let y = minY; y <= maxY; y++) {
+      // 垂直境界線の場合、左側のセルのeast壁として配置
+      updates.push({
+        position: { x: start.x, y },
+        cell: {
+          walls: {
+            east: deleteMode ? null : { type: selectedWallType, transparent: getTransparentForWallType(selectedWallType) }
+          }
+        }
+      })
+    }
+  }
+  // 斜線の場合は対応しない（世界樹の迷宮では直線のみ）
+  
+  return updates
+}
+
+// クリック位置から最も近い壁方向を判定する関数
+const getWallDirectionFromClick = (
+  mouseX: number, 
+  mouseY: number, 
+  cellX: number, 
+  cellY: number, 
+  cellSize: number
+): 'north' | 'east' | 'south' | 'west' => {
+  // セル内の相対位置
+  const relativeX = (mouseX - cellX * cellSize) / cellSize
+  const relativeY = (mouseY - cellY * cellSize) / cellSize
+  
+  // セル中心からの距離を計算
+  const centerX = 0.5
+  const centerY = 0.5
+  const dx = relativeX - centerX
+  const dy = relativeY - centerY
+  
+  // どの辺に最も近いかを判定
+  if (Math.abs(dx) > Math.abs(dy)) {
+    return dx > 0 ? 'east' : 'west'
+  } else {
+    return dy > 0 ? 'south' : 'north'
+  }
+}
+
+// マウス位置から最も適切な壁境界線上の座標を取得する関数（世界樹の迷宮スタイル）
+const getWallBoundaryPosition = (
+  mouseX: number,
+  mouseY: number,
+  cellSize: number
+): { x: number; y: number; snapType: 'horizontal' | 'vertical' } => {
+  // すべての可能な境界線との距離を計算
+  const cellX = Math.floor(mouseX / cellSize)
+  const cellY = Math.floor(mouseY / cellSize)
+  
+  // 各境界線の座標を計算
+  const boundaries = [
+    // 垂直境界線
+    { x: cellX * cellSize, y: mouseY, type: 'vertical' as const, dist: Math.abs(mouseX - cellX * cellSize) },
+    { x: (cellX + 1) * cellSize, y: mouseY, type: 'vertical' as const, dist: Math.abs(mouseX - (cellX + 1) * cellSize) },
+    // 水平境界線
+    { x: mouseX, y: cellY * cellSize, type: 'horizontal' as const, dist: Math.abs(mouseY - cellY * cellSize) },
+    { x: mouseX, y: (cellY + 1) * cellSize, type: 'horizontal' as const, dist: Math.abs(mouseY - (cellY + 1) * cellSize) }
+  ]
+  
+  // 最も近い境界線を選択
+  const closest = boundaries.reduce((min, current) => 
+    current.dist < min.dist ? current : min
+  )
+  
+  return {
+    x: closest.x,
+    y: closest.y,
+    snapType: closest.type
+  }
+}
 
 const MapEditor2D: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const dispatch = useDispatch()
   
+  // 矩形ツール用の状態管理
+  const [rectangleStart, setRectangleStart] = useState<Position | null>(null)
+  const [rectangleEnd, setRectangleEnd] = useState<Position | null>(null)
+  const [isDrawingRectangle, setIsDrawingRectangle] = useState(false)
+  
+  // 選択ツール用の状態管理
+  const [selectedCell, setSelectedCell] = useState<Position | null>(null)
+  
+  // ドラッグ描画用の状態管理
+  const [isDragging, setIsDragging] = useState(false)
+  const [dragStart, setDragStart] = useState<Position | null>(null)
+  const [dragEnd, setDragEnd] = useState<Position | null>(null)
+  // 世界樹の迷宮スタイル用：実際のピクセル座標での開始・終了位置
+  const [dragStartPixel, setDragStartPixel] = useState<{ x: number; y: number } | null>(null)
+  const [dragEndPixel, setDragEndPixel] = useState<{ x: number; y: number } | null>(null)
+  // Shiftキーによる削除モード
+  const [isShiftPressed, setIsShiftPressed] = useState(false)
+  // ドラッグ開始点（マウス座標）
+  const [dragStartMouse, setDragStartMouse] = useState<{ x: number; y: number } | null>(null)
+  // 実際にドラッグが開始されたかどうかのフラグ
+  const [isActuallyDragging, setIsActuallyDragging] = useState(false)
+  
   const dungeon = useSelector((state: RootState) => state.map.dungeon)
   const editorState = useSelector((state: RootState) => state.editor)
-  const { currentFloor, selectedTool, selectedLayer, zoom, gridVisible } = editorState
+  const { currentFloor, selectedTool, selectedLayer, selectedFloorType, selectedWallType, capturedCellData, zoom, gridVisible } = editorState
 
   const cellSize = 32 * zoom
   const floor = dungeon?.floors[currentFloor]
@@ -107,9 +321,6 @@ const MapEditor2D: React.FC = () => {
   const drawWalls = useCallback((ctx: CanvasRenderingContext2D) => {
     if (!floor) return
 
-    ctx.strokeStyle = '#fff'
-    ctx.lineWidth = 2
-
     for (let y = 0; y < floor.height; y++) {
       for (let x = 0; x < floor.width; x++) {
         const cell = floor.cells[y][x]
@@ -118,6 +329,11 @@ const MapEditor2D: React.FC = () => {
 
         // 北の壁
         if (cell.walls.north) {
+          const style = getWallStyle(cell.walls.north.type)
+          ctx.strokeStyle = style.color
+          ctx.lineWidth = style.lineWidth
+          setLinePattern(ctx, style.pattern)
+          
           ctx.beginPath()
           ctx.moveTo(xPos, yPos)
           ctx.lineTo(xPos + cellSize, yPos)
@@ -126,6 +342,11 @@ const MapEditor2D: React.FC = () => {
 
         // 東の壁
         if (cell.walls.east) {
+          const style = getWallStyle(cell.walls.east.type)
+          ctx.strokeStyle = style.color
+          ctx.lineWidth = style.lineWidth
+          setLinePattern(ctx, style.pattern)
+          
           ctx.beginPath()
           ctx.moveTo(xPos + cellSize, yPos)
           ctx.lineTo(xPos + cellSize, yPos + cellSize)
@@ -134,6 +355,11 @@ const MapEditor2D: React.FC = () => {
 
         // 南の壁
         if (cell.walls.south) {
+          const style = getWallStyle(cell.walls.south.type)
+          ctx.strokeStyle = style.color
+          ctx.lineWidth = style.lineWidth
+          setLinePattern(ctx, style.pattern)
+          
           ctx.beginPath()
           ctx.moveTo(xPos, yPos + cellSize)
           ctx.lineTo(xPos + cellSize, yPos + cellSize)
@@ -142,6 +368,11 @@ const MapEditor2D: React.FC = () => {
 
         // 西の壁
         if (cell.walls.west) {
+          const style = getWallStyle(cell.walls.west.type)
+          ctx.strokeStyle = style.color
+          ctx.lineWidth = style.lineWidth
+          setLinePattern(ctx, style.pattern)
+          
           ctx.beginPath()
           ctx.moveTo(xPos, yPos)
           ctx.lineTo(xPos, yPos + cellSize)
@@ -149,7 +380,97 @@ const MapEditor2D: React.FC = () => {
         }
       }
     }
+    
+    // 線のパターンをリセット
+    ctx.setLineDash([])
   }, [floor, cellSize])
+
+  const drawDragPreview = useCallback((ctx: CanvasRenderingContext2D) => {
+    if (!isDragging || !dragStartPixel || !dragEndPixel || selectedLayer !== 'walls') return
+
+    // スナップポイントを強調表示（開始点と終了点）
+    ctx.fillStyle = '#ff0000' // 赤色
+    const snapPointSize = 6
+    
+    // 開始点のスナップポイント
+    ctx.fillRect(
+      dragStartPixel.x - snapPointSize / 2,
+      dragStartPixel.y - snapPointSize / 2,
+      snapPointSize,
+      snapPointSize
+    )
+    
+    // 終了点のスナップポイント
+    ctx.fillRect(
+      dragEndPixel.x - snapPointSize / 2,
+      dragEndPixel.y - snapPointSize / 2,
+      snapPointSize,
+      snapPointSize
+    )
+    
+    // デバッグ情報：境界線座標とセル座標を表示
+    ctx.fillStyle = '#ffffff'
+    ctx.font = '12px Arial'
+    ctx.fillText(`境界線: ${dragStartPixel.x}, ${dragStartPixel.y}`, dragStartPixel.x + 10, dragStartPixel.y - 10)
+    ctx.fillText(`セル: ${dragStart?.x}, ${dragStart?.y}`, dragStartPixel.x + 10, dragStartPixel.y + 5)
+    if (dragEnd && (dragEnd.x !== dragStart?.x || dragEnd.y !== dragStart?.y)) {
+      ctx.fillText(`→ セル: ${dragEnd.x}, ${dragEnd.y}`, dragEndPixel.x + 10, dragEndPixel.y + 5)
+    }
+
+    // ドラッグ線を描画（境界線から境界線へ）
+    ctx.strokeStyle = '#ffff00' // 黄色の補助線
+    ctx.lineWidth = 2
+    ctx.setLineDash([5, 5]) // 破線
+    
+    ctx.beginPath()
+    ctx.moveTo(dragStartPixel.x, dragStartPixel.y)
+    ctx.lineTo(dragEndPixel.x, dragEndPixel.y)
+    ctx.stroke()
+    
+    // 実際に配置される壁のプレビューを描画
+    if (dragStart && dragEnd) {
+      const previewUpdates = generateWallsAlongLine(dragStart, dragEnd, selectedWallType, isShiftPressed)
+      
+      // 削除モードと配置モードで色を変える
+      ctx.strokeStyle = isShiftPressed ? '#ff6666' : '#66ff66' // 削除=赤、配置=緑
+      ctx.lineWidth = 3
+      ctx.setLineDash([3, 3])
+      
+      for (const update of previewUpdates) {
+        const { position, cell } = update
+        const xPos = position.x * cellSize
+        const yPos = position.y * cellSize
+        
+        if (cell.walls?.north) {
+          ctx.beginPath()
+          ctx.moveTo(xPos, yPos)
+          ctx.lineTo(xPos + cellSize, yPos)
+          ctx.stroke()
+        }
+        if (cell.walls?.east) {
+          ctx.beginPath()
+          ctx.moveTo(xPos + cellSize, yPos)
+          ctx.lineTo(xPos + cellSize, yPos + cellSize)
+          ctx.stroke()
+        }
+        if (cell.walls?.south) {
+          ctx.beginPath()
+          ctx.moveTo(xPos, yPos + cellSize)
+          ctx.lineTo(xPos + cellSize, yPos + cellSize)
+          ctx.stroke()
+        }
+        if (cell.walls?.west) {
+          ctx.beginPath()
+          ctx.moveTo(xPos, yPos)
+          ctx.lineTo(xPos, yPos + cellSize)
+          ctx.stroke()
+        }
+      }
+    }
+    
+    // 線のパターンをリセット
+    ctx.setLineDash([])
+  }, [isDragging, dragStartPixel, dragEndPixel, dragStart, dragEnd, selectedLayer, selectedWallType, isShiftPressed, cellSize])
 
   const drawEvents = useCallback((ctx: CanvasRenderingContext2D) => {
     if (!floor) return
@@ -184,35 +505,53 @@ const MapEditor2D: React.FC = () => {
     }
   }, [floor, cellSize])
 
-  const redraw = useCallback(() => {
-    console.log('🐛 redraw: キャンバス再描画開始', {
-      hasCanvas: !!canvasRef.current,
-      hasFloor: !!floor,
-      cellSize,
-      layerVisibility: editorState.layerVisibility
-    })
+  const drawRectanglePreview = useCallback((ctx: CanvasRenderingContext2D) => {
+    if (!isDrawingRectangle || !rectangleStart || !rectangleEnd) return
 
+    const startX = Math.min(rectangleStart.x, rectangleEnd.x)
+    const startY = Math.min(rectangleStart.y, rectangleEnd.y)
+    const endX = Math.max(rectangleStart.x, rectangleEnd.x)
+    const endY = Math.max(rectangleStart.y, rectangleEnd.y)
+
+    // 矩形の枠線を描画
+    ctx.strokeStyle = '#ffff00'  // 黄色
+    ctx.lineWidth = 2
+    ctx.setLineDash([5, 5])  // 破線
+    ctx.strokeRect(
+      startX * cellSize,
+      startY * cellSize,
+      (endX - startX + 1) * cellSize,
+      (endY - startY + 1) * cellSize
+    )
+    ctx.setLineDash([])  // 破線を元に戻す
+    ctx.lineWidth = 1
+  }, [isDrawingRectangle, rectangleStart, rectangleEnd, cellSize])
+
+  const drawSelectedCell = useCallback((ctx: CanvasRenderingContext2D) => {
+    if (!selectedCell) return
+
+    // 選択されたセルの枠線を描画
+    ctx.strokeStyle = '#00ff00'  // 緑色
+    ctx.lineWidth = 3
+    ctx.strokeRect(
+      selectedCell.x * cellSize,
+      selectedCell.y * cellSize,
+      cellSize,
+      cellSize
+    )
+    ctx.lineWidth = 1
+  }, [selectedCell, cellSize])
+
+  const redraw = useCallback(() => {
     const canvas = canvasRef.current
-    if (!canvas || !floor) {
-      console.log('🐛 redraw: canvas or floor is null - 描画中止')
-      return
-    }
+    if (!canvas || !floor) return
 
     const ctx = canvas.getContext('2d')
-    if (!ctx) {
-      console.log('🐛 redraw: context取得失敗')
-      return
-    }
+    if (!ctx) return
 
     // キャンバスサイズを設定
     canvas.width = floor.width * cellSize
     canvas.height = floor.height * cellSize
-
-    console.log('🐛 redraw: キャンバスサイズ設定', {
-      width: canvas.width,
-      height: canvas.height,
-      floorSize: { width: floor.width, height: floor.height }
-    })
 
     // 背景をクリア
     ctx.fillStyle = '#222'
@@ -222,30 +561,30 @@ const MapEditor2D: React.FC = () => {
     const { layerVisibility } = editorState
     
     if (layerVisibility.floor) {
-      console.log('🐛 redraw: 床レイヤー描画')
       drawFloor(ctx)
     }
     if (layerVisibility.walls) {
-      console.log('🐛 redraw: 壁レイヤー描画')
       drawWalls(ctx)
     }
     if (layerVisibility.events) {
-      console.log('🐛 redraw: イベントレイヤー描画')
       drawEvents(ctx)
     }
     
-    console.log('🐛 redraw: グリッド描画')
-    drawGrid(ctx)
+    // 矩形プレビューを描画
+    drawRectanglePreview(ctx)
     
-    console.log('🐛 redraw: 描画完了')
-  }, [floor, cellSize, drawFloor, drawWalls, drawEvents, drawGrid, editorState])
+    // ドラッグプレビューを描画
+    drawDragPreview(ctx)
+    
+    // 選択されたセルを描画
+    drawSelectedCell(ctx)
+    
+    drawGrid(ctx)
+  }, [floor, cellSize, drawFloor, drawWalls, drawEvents, drawGrid, drawRectanglePreview, drawDragPreview, drawSelectedCell, editorState])
 
   const getCellPosition = useCallback((event: React.MouseEvent): Position | null => {
     const canvas = canvasRef.current
-    if (!canvas || !floor) {
-      console.log('🐛 getCellPosition: canvas or floor is null', { canvas: !!canvas, floor: !!floor })
-      return null
-    }
+    if (!canvas || !floor) return null
 
     const rect = canvas.getBoundingClientRect()
     const rawX = event.clientX - rect.left
@@ -253,137 +592,391 @@ const MapEditor2D: React.FC = () => {
     const x = Math.floor(rawX / cellSize)
     const y = Math.floor(rawY / cellSize)
 
-    console.log('🐛 getCellPosition: 座標変換', {
-      rawX, rawY,
-      cellSize,
-      calculatedX: x, calculatedY: y,
-      floorSize: { width: floor.width, height: floor.height }
-    })
-
     if (x >= 0 && x < floor.width && y >= 0 && y < floor.height) {
-      console.log('🐛 getCellPosition: 有効な座標', { x, y })
       return { x, y }
     }
 
-    console.log('🐛 getCellPosition: 無効な座標', { x, y, bounds: { width: floor.width, height: floor.height } })
     return null
   }, [cellSize, floor])
 
   const handleCanvasClick = useCallback((event: React.MouseEvent) => {
     event.preventDefault()
     event.stopPropagation()
-    
-    console.log('🐛 handleCanvasClick: イベント発火', {
-      selectedTool,
-      selectedLayer,
-      currentFloor,
-      eventType: event.type,
-      button: event.button
-    })
 
     const position = getCellPosition(event)
-    if (!position || !floor) {
-      console.log('🐛 handleCanvasClick: position or floor is null', { position, floor: !!floor })
+    if (!position || !floor) return
+
+    const currentCell = floor.cells[position.y][position.x]
+
+    // ドラッグ操作中、または壁レイヤーのペンツール（handleMouseUpで処理済み）はクリック処理をスキップ
+    if (isDragging || isActuallyDragging || (selectedLayer === 'walls' && selectedTool === 'pen')) {
       return
     }
 
-    const currentCell = floor.cells[position.y][position.x]
-    console.log('🐛 handleCanvasClick: 現在のセル状態', {
-      position,
-      currentCell: {
-        floor: currentCell.floor,
-        walls: currentCell.walls,
-        eventsCount: currentCell.events.length
+    // アイドロッパーツールの処理
+    if (selectedTool === 'eyedropper') {
+      const capturedData = {
+        floor: {
+          type: currentCell.floor.type,
+          passable: currentCell.floor.passable
+        },
+        walls: {
+          north: currentCell.walls.north,
+          east: currentCell.walls.east,
+          south: currentCell.walls.south,
+          west: currentCell.walls.west
+        },
+        hasEvents: currentCell.events.length > 0
       }
-    })
+      
+      dispatch(setCapturedCellData(capturedData))
+      console.log('セル状態をキャプチャしました:', capturedData)
+      return
+    }
 
-    if (selectedLayer === 'floor') {
-      if (selectedTool === 'pen') {
-        // 床の編集：通行可否の切り替え
-        const newPassable = !currentCell.floor.passable
-        console.log('🐛 床編集（pen）: 通行可否切り替え', {
-          oldPassable: currentCell.floor.passable,
-          newPassable,
+    // 選択ツールの処理
+    if (selectedTool === 'select') {
+      setSelectedCell(position)
+      return
+    }
+
+    // 消しゴムツールの処理
+    if (selectedTool === 'eraser') {
+      if (selectedLayer === 'walls') {
+        // 壁を消去：クリックした位置の最も近い壁を削除
+        const canvas = canvasRef.current!
+        const rect = canvas.getBoundingClientRect()
+        const mouseX = event.clientX - rect.left
+        const mouseY = event.clientY - rect.top
+        
+        const wallDirection = getWallDirectionFromClick(
+          mouseX, mouseY, position.x, position.y, cellSize
+        )
+        
+        // 現在のセルの壁状態をコピー
+        const walls = {
+          north: currentCell.walls.north,
+          east: currentCell.walls.east,
+          south: currentCell.walls.south,
+          west: currentCell.walls.west,
+        }
+        
+        // 判定した方向の壁を削除
+        walls[wallDirection] = null
+        
+        dispatch(updateCell({
+          floorIndex: currentFloor,
           position,
-          currentFloor
-        })
-
-        const updatePayload = {
+          cell: { walls }
+        }))
+      } else if (selectedLayer === 'events') {
+        // イベントを消去
+        dispatch(updateCell({
+          floorIndex: currentFloor,
+          position,
+          cell: { events: [] }
+        }))
+      } else if (selectedLayer === 'floor') {
+        // 床を通常床にリセット
+        dispatch(updateCell({
           floorIndex: currentFloor,
           position,
           cell: {
             floor: {
-              ...currentCell.floor,
-              passable: newPassable,
+              type: 'normal',
+              passable: true
             }
           }
-        }
-
-        console.log('🐛 Redux dispatch: updateCell', updatePayload)
-        dispatch(updateCell(updatePayload))
-      } else if (selectedTool === 'fill') {
-        // 塗りつぶしツール：同じタイプの床を一括変更
-        const targetPassable = currentCell.floor.passable
-        const newPassable = !targetPassable
-        console.log('🐛 床編集（fill）: 塗りつぶし開始', {
-          targetPassable,
-          newPassable,
-          floorSize: { width: floor.width, height: floor.height }
-        })
-        
-        let updatedCount = 0
-        // 連結したセルを探してまとめて変更（簡単な実装）
-        for (let y = 0; y < floor.height; y++) {
-          for (let x = 0; x < floor.width; x++) {
-            const cell = floor.cells[y][x]
-            if (cell.floor.passable === targetPassable) {
-              updatedCount++
-              dispatch(updateCell({
-                floorIndex: currentFloor,
-                position: { x, y },
-                cell: {
-                  floor: {
-                    ...cell.floor,
-                    passable: newPassable,
-                  }
-                }
-              }))
-            }
-          }
-        }
-        console.log('🐛 床編集（fill）: 更新完了', { updatedCount })
+        }))
       }
-    } else if (selectedLayer === 'walls') {
+      return
+    }
+
+    // 矩形ツールの処理
+    if (selectedTool === 'rectangle') {
+      if (!isDrawingRectangle) {
+        // 最初のクリック：開始点を設定
+        setRectangleStart(position)
+        setRectangleEnd(position)
+        setIsDrawingRectangle(true)
+      } else {
+        // 二回目のクリック：終了点を設定して矩形を描画
+        
+        if (rectangleStart) {
+          const startX = Math.min(rectangleStart.x, position.x)
+          const startY = Math.min(rectangleStart.y, position.y)
+          const endX = Math.max(rectangleStart.x, position.x)
+          const endY = Math.max(rectangleStart.y, position.y)
+          
+          // 矩形範囲内の全セルの更新データを準備
+          const updates = []
+          for (let y = startY; y <= endY; y++) {
+            for (let x = startX; x <= endX; x++) {
+              const cellPosition = { x, y }
+              const cell = floor.cells[y][x]
+              
+              // Shift+矩形ツールの場合は削除モード
+              if (event.shiftKey) {
+                if (selectedLayer === 'floor') {
+                  // 床を通常床にリセット
+                  updates.push({
+                    position: cellPosition,
+                    cell: {
+                      floor: {
+                        type: 'normal' as const,
+                        passable: true
+                      }
+                    }
+                  })
+                } else if (selectedLayer === 'walls') {
+                  // 全ての壁を削除
+                  updates.push({
+                    position: cellPosition,
+                    cell: {
+                      walls: {
+                        north: null,
+                        east: null,
+                        south: null,
+                        west: null,
+                      }
+                    }
+                  })
+                } else if (selectedLayer === 'events') {
+                  // イベントを消去
+                  updates.push({
+                    position: cellPosition,
+                    cell: { events: [] }
+                  })
+                }
+              } else {
+                // 通常の矩形描画ツール
+                if (selectedLayer === 'floor') {
+                  let newFloorData
+                  if (capturedCellData) {
+                    newFloorData = {
+                      type: capturedCellData.floor.type,
+                      passable: capturedCellData.floor.passable
+                    }
+                  } else {
+                    newFloorData = {
+                      type: selectedFloorType,
+                      passable: getPassableForFloorType(selectedFloorType)
+                    }
+                  }
+                  updates.push({
+                    position: cellPosition,
+                    cell: { floor: newFloorData }
+                  })
+                } else if (selectedLayer === 'walls') {
+                  let walls
+                  if (capturedCellData) {
+                    walls = {
+                      north: capturedCellData.walls.north,
+                      east: capturedCellData.walls.east,
+                      south: capturedCellData.walls.south,
+                      west: capturedCellData.walls.west,
+                    }
+                  } else {
+                    const hasWall = cell.walls.north !== null
+                    const wall = hasWall ? null : {
+                      type: selectedWallType,
+                      transparent: getTransparentForWallType(selectedWallType),
+                    }
+                    walls = {
+                      north: wall,
+                      east: wall,
+                      south: wall,
+                      west: wall,
+                    }
+                  }
+                  updates.push({
+                    position: cellPosition,
+                    cell: {
+                      walls
+                    }
+                  })
+                } else if (selectedLayer === 'events') {
+                  const hasEvent = cell.events.length > 0
+                  const newEvents = hasEvent ? [] : [{
+                    id: crypto.randomUUID(),
+                    type: 'treasure' as const,
+                    name: '宝箱',
+                    description: '基本的な宝箱',
+                    position: cellPosition,
+                    appearance: {
+                      visible: true,
+                      color: '#ffd700',
+                      icon: 'treasure'
+                    },
+                    trigger: {
+                      type: 'interact' as const,
+                      conditions: [],
+                      repeatPolicy: {
+                        type: 'once' as const
+                      }
+                    },
+                    actions: [{
+                      id: crypto.randomUUID(),
+                      type: 'treasure' as const,
+                      params: {
+                        items: [{ id: 'gold', count: 100 }],
+                        message: '金貨を100枚見つけた！'
+                      }
+                    }],
+                    flags: {},
+                    enabled: true,
+                    priority: 1,
+                    metadata: {
+                      created: new Date().toISOString(),
+                      modified: new Date().toISOString(),
+                      version: 1
+                    }
+                  }]
+                  updates.push({
+                    position: cellPosition,
+                    cell: { events: newEvents }
+                  })
+                }
+              }
+            }
+          }
+          
+          // バッチで更新を実行
+          if (updates.length > 0) {
+            dispatch(updateCells({
+              floorIndex: currentFloor,
+              updates
+            }))
+          }
+        }
+        
+        // 矩形描画完了後、状態をリセット
+        setRectangleStart(null)
+        setRectangleEnd(null)
+        setIsDrawingRectangle(false)
+      }
+      return
+    }
+
+    if (selectedLayer === 'floor') {
       if (selectedTool === 'pen') {
-        // 壁の編集：全方向の壁の切り替え
-        const hasWall = currentCell.walls.north !== null
-        const wall = hasWall ? null : {
-          type: 'normal' as const,
-          transparent: false,
+        // 床の編集：キャプチャされたデータがあればそれを使用、なければ選択された床タイプを適用
+        let newFloorData
+        if (capturedCellData) {
+          newFloorData = {
+            type: capturedCellData.floor.type,
+            passable: capturedCellData.floor.passable
+          }
+        } else {
+          newFloorData = {
+            type: selectedFloorType,
+            passable: getPassableForFloorType(selectedFloorType)
+          }
         }
 
-        console.log('🐛 壁編集（pen）: 壁の切り替え', {
-          hasWall,
-          wall,
-          position,
-          currentWalls: currentCell.walls
-        })
-
-        const updatePayload = {
+        dispatch(updateCell({
           floorIndex: currentFloor,
           position,
           cell: {
-            walls: {
-              north: wall,
-              east: wall,
-              south: wall,
-              west: wall,
+            floor: newFloorData
+          }
+        }))
+      } else if (selectedTool === 'fill') {
+        // 塗りつぶしツール：同じタイプの床を一括変更
+        const targetPassable = currentCell.floor.passable
+        const targetType = currentCell.floor.type
+        
+        // キャプチャされたデータがあればそれを使用、なければ選択された床タイプを適用
+        let newFloorDataForFill
+        if (capturedCellData) {
+          newFloorDataForFill = {
+            type: capturedCellData.floor.type,
+            passable: capturedCellData.floor.passable
+          }
+        } else {
+          newFloorDataForFill = {
+            type: selectedFloorType,
+            passable: getPassableForFloorType(selectedFloorType)
+          }
+        }
+        
+        // 同じタイプ・通行可否のセルを全て検索してバッチ更新データを準備
+        const updates = []
+        for (let y = 0; y < floor.height; y++) {
+          for (let x = 0; x < floor.width; x++) {
+            const cell = floor.cells[y][x]
+            if (cell.floor.passable === targetPassable && cell.floor.type === targetType) {
+              const newFloorData = newFloorDataForFill
+              updates.push({
+                position: { x, y },
+                cell: { floor: newFloorData }
+              })
+            }
+          }
+        }
+        
+        // バッチで更新を実行
+        if (updates.length > 0) {
+          dispatch(updateCells({
+            floorIndex: currentFloor,
+            updates
+          }))
+        }
+      }
+    } else if (selectedLayer === 'walls') {
+      if (selectedTool === 'pen') {
+        // 壁の編集：キャプチャされたデータがあればそれを使用、なければ選択された壁タイプを適用
+        let walls
+        if (capturedCellData) {
+          walls = {
+            north: capturedCellData.walls.north,
+            east: capturedCellData.walls.east,
+            south: capturedCellData.walls.south,
+            west: capturedCellData.walls.west,
+          }
+        } else {
+          // クリック位置から壁方向を判定
+          const canvas = canvasRef.current!
+          const rect = canvas.getBoundingClientRect()
+          const mouseX = event.clientX - rect.left
+          const mouseY = event.clientY - rect.top
+          
+          const wallDirection = getWallDirectionFromClick(
+            mouseX, mouseY, position.x, position.y, cellSize
+          )
+          
+          // 現在のセルの壁状態をコピー
+          walls = {
+            north: currentCell.walls.north,
+            east: currentCell.walls.east,
+            south: currentCell.walls.south,
+            west: currentCell.walls.west,
+          }
+          
+          // Shiftキーが押されている場合は削除、そうでなければ切り替え
+          const hasWallInDirection = walls[wallDirection] !== null
+          if (event.shiftKey) {
+            // Shiftキーが押されている場合は強制的に削除
+            walls[wallDirection] = null
+          } else if (hasWallInDirection) {
+            // 既に壁があれば削除
+            walls[wallDirection] = null
+          } else {
+            // 壁がなければ追加
+            walls[wallDirection] = {
+              type: selectedWallType,
+              transparent: getTransparentForWallType(selectedWallType),
             }
           }
         }
 
-        console.log('🐛 Redux dispatch: updateCell (walls)', updatePayload)
-        dispatch(updateCell(updatePayload))
+        dispatch(updateCell({
+          floorIndex: currentFloor,
+          position,
+          cell: {
+            walls
+          }
+        }))
       }
     } else if (selectedLayer === 'events') {
       if (selectedTool === 'pen') {
@@ -393,41 +986,189 @@ const MapEditor2D: React.FC = () => {
           id: crypto.randomUUID(),
           type: 'treasure' as const,
           name: '宝箱',
+          description: '基本的な宝箱',
           position: position,
           appearance: {
             visible: true,
+            color: '#ffd700',
+            icon: 'treasure'
           },
           trigger: {
             type: 'interact' as const,
+            conditions: [],
+            repeatPolicy: {
+              type: 'once' as const
+            }
           },
-          actions: [],
+          actions: [{
+            id: crypto.randomUUID(),
+            type: 'treasure' as const,
+            params: {
+              items: [{ id: 'gold', count: 100 }],
+              message: '金貨を100枚見つけた！'
+            }
+          }],
           flags: {},
           enabled: true,
+          priority: 1,
+          metadata: {
+            created: new Date().toISOString(),
+            modified: new Date().toISOString(),
+            version: 1
+          }
         }]
 
-        console.log('🐛 イベント編集（pen）: イベントの切り替え', {
-          hasEvent,
-          eventsCount: currentCell.events.length,
-          newEventsCount: newEvents.length,
-          position
-        })
-
-        const updatePayload = {
+        dispatch(updateCell({
           floorIndex: currentFloor,
           position,
           cell: {
             events: newEvents,
           }
-        }
-
-        console.log('🐛 Redux dispatch: updateCell (events)', updatePayload)
-        dispatch(updateCell(updatePayload))
+        }))
       }
     }
-  }, [getCellPosition, floor, selectedLayer, selectedTool, dispatch, currentFloor])
+  }, [getCellPosition, floor, selectedLayer, selectedTool, selectedFloorType, selectedWallType, dispatch, currentFloor, isDrawingRectangle, rectangleStart, isDragging, capturedCellData])
+
+  const handleCanvasMouseMove = useCallback((event: React.MouseEvent) => {
+    if (selectedTool === 'rectangle' && isDrawingRectangle && rectangleStart) {
+      const position = getCellPosition(event)
+      if (position) {
+        setRectangleEnd(position)
+      }
+    }
+    
+    // 壁ドラッグの処理
+    if (dragStartMouse && dragStart && selectedLayer === 'walls' && selectedTool === 'pen') {
+      const canvas = canvasRef.current
+      if (!canvas) return
+      
+      const rect = canvas.getBoundingClientRect()
+      const mouseX = event.clientX - rect.left
+      const mouseY = event.clientY - rect.top
+      
+      // ドラッグ距離を計算
+      const dragDistance = Math.sqrt(
+        Math.pow(mouseX - dragStartMouse.x, 2) + 
+        Math.pow(mouseY - dragStartMouse.y, 2)
+      )
+      
+      // 閾値（5ピクセル）を超えた場合のみドラッグ開始
+      const DRAG_THRESHOLD = 5
+      if (dragDistance > DRAG_THRESHOLD && !isActuallyDragging) {
+        setIsActuallyDragging(true)
+        setIsDragging(true)
+      }
+      
+      // 実際にドラッグ中の場合のみ更新
+      if (isActuallyDragging) {
+        // 境界線にスナップ
+        const boundaryPos = getWallBoundaryPosition(mouseX, mouseY, cellSize)
+        
+        // 境界線座標からセル座標を直接計算
+        const endCell = convertBoundaryToCell(boundaryPos.x, boundaryPos.y, cellSize)
+        setDragEnd(endCell)
+        setDragEndPixel(boundaryPos)
+      }
+    }
+  }, [selectedTool, isDrawingRectangle, rectangleStart, getCellPosition, isDragging, dragStart, selectedLayer, dragStartMouse, isActuallyDragging, cellSize])
+
+  const handleMouseDown = useCallback((event: React.MouseEvent) => {
+    if (selectedLayer === 'walls' && selectedTool === 'pen') {
+      const canvas = canvasRef.current
+      if (!canvas) return
+      
+      const rect = canvas.getBoundingClientRect()
+      const mouseX = event.clientX - rect.left
+      const mouseY = event.clientY - rect.top
+      
+      // マウス座標を保存してドラッグ開始準備
+      setDragStartMouse({ x: mouseX, y: mouseY })
+      setIsShiftPressed(event.shiftKey)
+      setIsActuallyDragging(false)
+      
+      // 世界樹の迷宮スタイル：最も近い壁境界線にスナップ
+      const boundaryPos = getWallBoundaryPosition(mouseX, mouseY, cellSize)
+      
+      // 境界線座標からセル座標を直接計算
+      const startCell = convertBoundaryToCell(boundaryPos.x, boundaryPos.y, cellSize)
+      setDragStart(startCell)
+      setDragEnd(startCell)
+      setDragStartPixel(boundaryPos)
+      setDragEndPixel(boundaryPos)
+    }
+  }, [selectedLayer, selectedTool, getCellPosition, cellSize])
+
+  const handleMouseUp = useCallback((event: React.MouseEvent) => {
+    // 壁レイヤーのペンツールの処理
+    if (dragStartMouse && dragStart && selectedLayer === 'walls' && selectedTool === 'pen') {
+      if (isActuallyDragging && isDragging && dragEnd) {
+        // 実際にドラッグが行われた場合：壁を描画
+        const wallUpdates = generateWallsAlongLine(dragStart, dragEnd, selectedWallType, isShiftPressed)
+        if (wallUpdates.length > 0) {
+          dispatch(updateCells({
+            floorIndex: currentFloor,
+            updates: wallUpdates
+          }))
+        }
+      } else {
+        // ドラッグしなかった場合：クリック処理として壁の切り替え
+        const position = getCellPosition(event)
+        if (position && floor) {
+          const currentCell = floor.cells[position.y][position.x]
+          const canvas = canvasRef.current!
+          const rect = canvas.getBoundingClientRect()
+          const mouseX = event.clientX - rect.left
+          const mouseY = event.clientY - rect.top
+          
+          const wallDirection = getWallDirectionFromClick(
+            mouseX, mouseY, position.x, position.y, cellSize
+          )
+          
+          // 現在のセルの壁状態をコピー
+          const walls = {
+            north: currentCell.walls.north,
+            east: currentCell.walls.east,
+            south: currentCell.walls.south,
+            west: currentCell.walls.west,
+          }
+          
+          // Shiftキーが押されている場合は削除、そうでなければ切り替え
+          const hasWallInDirection = walls[wallDirection] !== null
+          if (isShiftPressed) {
+            // Shiftキーが押されている場合は強制的に削除
+            walls[wallDirection] = null
+          } else if (hasWallInDirection) {
+            // 既に壁があれば削除
+            walls[wallDirection] = null
+          } else {
+            // 壁がなければ追加
+            walls[wallDirection] = {
+              type: selectedWallType,
+              transparent: getTransparentForWallType(selectedWallType),
+            }
+          }
+
+          dispatch(updateCell({
+            floorIndex: currentFloor,
+            position,
+            cell: { walls }
+          }))
+        }
+      }
+    }
+    
+    // 状態をリセット
+    setIsDragging(false)
+    setIsActuallyDragging(false)
+    setDragStart(null)
+    setDragEnd(null)
+    setDragStartPixel(null)
+    setDragEndPixel(null)
+    setDragStartMouse(null)
+    setIsShiftPressed(false)
+  }, [isDragging, isActuallyDragging, dragStart, dragEnd, dragStartMouse, selectedLayer, selectedTool, selectedWallType, isShiftPressed, dispatch, currentFloor, getCellPosition, floor, cellSize])
 
   useEffect(() => {
-    console.log('🐛 useEffect: redraw依存関係が変更されました')
     redraw()
   }, [redraw])
 
@@ -441,7 +1182,10 @@ const MapEditor2D: React.FC = () => {
         width: '100%',
         height: '100%',
         overflow: 'visible',
-        cursor: selectedTool === 'pen' ? 'crosshair' : 'default',
+        cursor: selectedTool === 'pen' ? 'crosshair' : 
+                selectedTool === 'rectangle' ? 'cell' : 
+                selectedTool === 'eyedropper' ? 'grab' : 
+                selectedTool === 'select' ? 'pointer' : 'default',
         position: 'relative',
         userSelect: 'none',
       }}
@@ -449,13 +1193,12 @@ const MapEditor2D: React.FC = () => {
       <canvas
         ref={canvasRef}
         onClick={handleCanvasClick}
+        onMouseMove={handleCanvasMouseMove}
+        onMouseDown={handleMouseDown}
+        onMouseUp={handleMouseUp}
         onPointerDown={(e) => {
-          console.log('🐛 Pointer down:', e.button, e.clientX, e.clientY)
           e.currentTarget.setPointerCapture(e.pointerId)
         }}
-        onPointerUp={(e) => console.log('🐛 Pointer up:', e.button, e.clientX, e.clientY)}
-        onMouseDown={(e) => console.log('🐛 Mouse down:', e.button, e.clientX, e.clientY)}
-        onMouseUp={(e) => console.log('🐛 Mouse up:', e.button, e.clientX, e.clientY)}
         style={{
           display: 'block',
           imageRendering: 'pixelated',
