@@ -91,7 +91,7 @@ const convertBoundaryToCell = (boundaryX: number, boundaryY: number, cellSize: n
 }
 
 // 世界樹の迷宮スタイルの壁配置関数：ドラッグした線自体が壁になる
-const generateWallsAlongLine = (start: Position, end: Position, selectedWallType: WallType, deleteMode: boolean = false) => {
+const generateWallsAlongLine = (start: Position, end: Position, selectedWallType: WallType, deleteMode: boolean = false, floor?: any) => {
   const updates: Array<{ position: Position; cell: Partial<{ walls: any }> }> = []
   
   // 開始点と終了点が同じ場合は、単一セルのクリック操作として扱う
@@ -106,12 +106,25 @@ const generateWallsAlongLine = (start: Position, end: Position, selectedWallType
     
     // 各セルの間に水平壁を配置/削除
     for (let x = minX; x <= maxX; x++) {
+      // 範囲チェック
+      if (!floor || start.y < 0 || start.y >= floor.height || x < 0 || x >= floor.width) continue
+      
+      // 既存の壁情報を保持
+      const currentCell = floor.cells[start.y][x]
+      const existingWalls = {
+        north: currentCell.walls.north,
+        east: currentCell.walls.east,
+        south: currentCell.walls.south,
+        west: currentCell.walls.west,
+      }
+      
+      // 特定の壁のみを更新
+      existingWalls.south = deleteMode ? null : { type: selectedWallType, transparent: getTransparentForWallType(selectedWallType) }
+      
       updates.push({
         position: { x, y: start.y },
         cell: {
-          walls: {
-            south: deleteMode ? null : { type: selectedWallType, transparent: getTransparentForWallType(selectedWallType) }
-          }
+          walls: existingWalls
         }
       })
     }
@@ -123,13 +136,25 @@ const generateWallsAlongLine = (start: Position, end: Position, selectedWallType
     
     // 各セルの間に垂直壁を配置/削除
     for (let y = minY; y <= maxY; y++) {
-      // 垂直境界線の場合、左側のセルのeast壁として配置
+      // 範囲チェック
+      if (!floor || y < 0 || y >= floor.height || start.x < 0 || start.x >= floor.width) continue
+      
+      // 既存の壁情報を保持
+      const currentCell = floor.cells[y][start.x]
+      const existingWalls = {
+        north: currentCell.walls.north,
+        east: currentCell.walls.east,
+        south: currentCell.walls.south,
+        west: currentCell.walls.west,
+      }
+      
+      // 特定の壁のみを更新
+      existingWalls.east = deleteMode ? null : { type: selectedWallType, transparent: getTransparentForWallType(selectedWallType) }
+      
       updates.push({
         position: { x: start.x, y },
         cell: {
-          walls: {
-            east: deleteMode ? null : { type: selectedWallType, transparent: getTransparentForWallType(selectedWallType) }
-          }
+          walls: existingWalls
         }
       })
     }
@@ -163,6 +188,47 @@ const getWallDirectionFromClick = (
   } else {
     return dy > 0 ? 'south' : 'north'
   }
+}
+
+// 境界線座標から壁方向を判定する関数
+const getWallDirectionFromBoundary = (
+  boundaryX: number,
+  boundaryY: number,
+  cellX: number,
+  cellY: number,
+  cellSize: number
+): 'north' | 'east' | 'south' | 'west' => {
+  // セルの境界座標を計算
+  const cellLeft = cellX * cellSize
+  const cellRight = (cellX + 1) * cellSize
+  const cellTop = cellY * cellSize
+  const cellBottom = (cellY + 1) * cellSize
+  
+  // 境界線がセルのどの辺にあるかを判定
+  const tolerance = 1 // ピクセル単位の許容誤差
+  
+  if (Math.abs(boundaryX - cellLeft) <= tolerance) {
+    return 'west'
+  } else if (Math.abs(boundaryX - cellRight) <= tolerance) {
+    return 'east'
+  } else if (Math.abs(boundaryY - cellTop) <= tolerance) {
+    return 'north'
+  } else if (Math.abs(boundaryY - cellBottom) <= tolerance) {
+    return 'south'
+  }
+  
+  // フォールバック：最も近い境界線
+  const distToLeft = Math.abs(boundaryX - cellLeft)
+  const distToRight = Math.abs(boundaryX - cellRight)
+  const distToTop = Math.abs(boundaryY - cellTop)
+  const distToBottom = Math.abs(boundaryY - cellBottom)
+  
+  const minDist = Math.min(distToLeft, distToRight, distToTop, distToBottom)
+  
+  if (minDist === distToLeft) return 'west'
+  if (minDist === distToRight) return 'east'
+  if (minDist === distToTop) return 'north'
+  return 'south'
 }
 
 // マウス位置から最も適切な壁境界線上の座標を取得する関数（世界樹の迷宮スタイル）
@@ -429,7 +495,7 @@ const MapEditor2D: React.FC = () => {
     
     // 実際に配置される壁のプレビューを描画
     if (dragStart && dragEnd) {
-      const previewUpdates = generateWallsAlongLine(dragStart, dragEnd, selectedWallType, isShiftPressed)
+      const previewUpdates = generateWallsAlongLine(dragStart, dragEnd, selectedWallType, isShiftPressed, floor)
       
       // 削除モードと配置モードで色を変える
       ctx.strokeStyle = isShiftPressed ? '#ff6666' : '#66ff66' // 削除=赤、配置=緑
@@ -953,16 +1019,12 @@ const MapEditor2D: React.FC = () => {
             west: currentCell.walls.west,
           }
           
-          // Shiftキーが押されている場合は削除、そうでなければ切り替え
-          const hasWallInDirection = walls[wallDirection] !== null
+          // Shiftキーが押されている場合は削除、そうでなければ追加
           if (event.shiftKey) {
             // Shiftキーが押されている場合は強制的に削除
             walls[wallDirection] = null
-          } else if (hasWallInDirection) {
-            // 既に壁があれば削除
-            walls[wallDirection] = null
           } else {
-            // 壁がなければ追加
+            // 通常クリックは常に壁を追加
             walls[wallDirection] = {
               type: selectedWallType,
               transparent: getTransparentForWallType(selectedWallType),
@@ -1098,12 +1160,12 @@ const MapEditor2D: React.FC = () => {
     }
   }, [selectedLayer, selectedTool, getCellPosition, cellSize])
 
-  const handleMouseUp = useCallback((event: React.MouseEvent) => {
+  const handleMouseUp = useCallback((_event: React.MouseEvent) => {
     // 壁レイヤーのペンツールの処理
     if (dragStartMouse && dragStart && selectedLayer === 'walls' && selectedTool === 'pen') {
       if (isActuallyDragging && isDragging && dragEnd) {
         // 実際にドラッグが行われた場合：壁を描画
-        const wallUpdates = generateWallsAlongLine(dragStart, dragEnd, selectedWallType, isShiftPressed)
+        const wallUpdates = generateWallsAlongLine(dragStart, dragEnd, selectedWallType, isShiftPressed, floor)
         if (wallUpdates.length > 0) {
           dispatch(updateCells({
             floorIndex: currentFloor,
@@ -1112,17 +1174,11 @@ const MapEditor2D: React.FC = () => {
         }
       } else {
         // ドラッグしなかった場合：クリック処理として壁の切り替え
-        const position = getCellPosition(event)
-        if (position && floor) {
-          const currentCell = floor.cells[position.y][position.x]
-          const canvas = canvasRef.current!
-          const rect = canvas.getBoundingClientRect()
-          const mouseX = event.clientX - rect.left
-          const mouseY = event.clientY - rect.top
+        if (dragStart && floor && dragStartPixel) {
+          const currentCell = floor.cells[dragStart.y][dragStart.x]
           
-          const wallDirection = getWallDirectionFromClick(
-            mouseX, mouseY, position.x, position.y, cellSize
-          )
+          // 境界線座標から壁方向を判定
+          const wallDirection = getWallDirectionFromBoundary(dragStartPixel.x, dragStartPixel.y, dragStart.x, dragStart.y, cellSize)
           
           // 現在のセルの壁状態をコピー
           const walls = {
@@ -1132,16 +1188,12 @@ const MapEditor2D: React.FC = () => {
             west: currentCell.walls.west,
           }
           
-          // Shiftキーが押されている場合は削除、そうでなければ切り替え
-          const hasWallInDirection = walls[wallDirection] !== null
+          // Shiftキーが押されている場合は削除、そうでなければ追加
           if (isShiftPressed) {
             // Shiftキーが押されている場合は強制的に削除
             walls[wallDirection] = null
-          } else if (hasWallInDirection) {
-            // 既に壁があれば削除
-            walls[wallDirection] = null
           } else {
-            // 壁がなければ追加
+            // 通常クリックは常に壁を追加
             walls[wallDirection] = {
               type: selectedWallType,
               transparent: getTransparentForWallType(selectedWallType),
@@ -1150,7 +1202,7 @@ const MapEditor2D: React.FC = () => {
 
           dispatch(updateCell({
             floorIndex: currentFloor,
-            position,
+            position: dragStart,
             cell: { walls }
           }))
         }
