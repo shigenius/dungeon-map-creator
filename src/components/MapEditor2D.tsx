@@ -2,9 +2,10 @@ import React, { useRef, useEffect, useCallback, useState } from 'react'
 import { Box } from '@mui/material'
 import { useSelector, useDispatch } from 'react-redux'
 import { RootState } from '../store'
-import { updateCell, updateCells } from '../store/mapSlice'
-import { setCapturedCellData, setHoveredCellInfo, clearHoveredCellInfo, setHoveredCellPosition, clearHoveredCellPosition, setHoveredWallInfo, clearHoveredWallInfo } from '../store/editorSlice'
-import { Position, WallType } from '../types/map'
+import { updateCell, updateCells, placeTemplate, addDecorationToCell } from '../store/mapSlice'
+import { setCapturedCellData, setHoveredCellInfo, clearHoveredCellInfo, setHoveredCellPosition, clearHoveredCellPosition, setHoveredWallInfo, clearHoveredWallInfo, setTemplatePreviewPosition, disableTemplatePlacementMode, setSelectionStart, setSelectionEnd } from '../store/editorSlice'
+import { rotateTemplate as rotateTemplateUtil } from '../utils/templateUtils'
+import { Position, WallType, DecorationType, Decoration } from '../types/map'
 
 
 // 床タイプに応じた通行可否を決定する関数
@@ -91,6 +92,38 @@ const setLinePattern = (ctx: CanvasRenderingContext2D, pattern: string) => {
     case 'dashed': ctx.setLineDash([5, 5]); break
     case 'dotted': ctx.setLineDash([2, 3]); break
     default: ctx.setLineDash([])
+  }
+}
+
+// 装飾タイプごとの色を取得する関数
+const getDecorationColor = (decorationType: DecorationType) => {
+  switch (decorationType) {
+    case 'furniture': return '#8b4513'
+    case 'statue': return '#a0a0a0'
+    case 'plant': return '#228b22'
+    case 'torch': return '#ff6347'
+    case 'pillar': return '#d2b48c'
+    case 'rug': return '#dc143c'
+    case 'painting': return '#4169e1'
+    case 'crystal': return '#9370db'
+    case 'rubble': return '#696969'
+    default: return '#8b4513'
+  }
+}
+
+// 装飾タイプごとのアイコンを取得する関数
+const getDecorationIcon = (decorationType: DecorationType) => {
+  switch (decorationType) {
+    case 'furniture': return '🪑'
+    case 'statue': return '🗿'
+    case 'plant': return '🌿'
+    case 'torch': return '🔥'
+    case 'pillar': return '🏛️'
+    case 'rug': return '🧿'
+    case 'painting': return '🖼️'
+    case 'crystal': return '💎'
+    case 'rubble': return '🪨'
+    default: return '🪑'
   }
 }
 
@@ -394,7 +427,7 @@ const MapEditor2D: React.FC = () => {
   
   const dungeon = useSelector((state: RootState) => state.map.dungeon)
   const editorState = useSelector((state: RootState) => state.editor)
-  const { currentFloor, selectedTool, selectedLayer, selectedFloorType, selectedWallType, capturedCellData, hoveredCellPosition, hoveredWallInfo, isShiftPressed, zoom, gridVisible } = editorState
+  const { currentFloor, selectedTool, selectedLayer, selectedFloorType, selectedWallType, selectedDecorationType, capturedCellData, hoveredCellPosition, hoveredWallInfo, isShiftPressed, zoom, gridVisible, selectedTemplate, templatePreviewPosition, templateRotation, selectionMode, selectionStart, selectionEnd } = editorState
 
   // セルサイズを整数に丸めて座標のズレを防ぐ
   const cellSize = Math.round(32 * zoom)
@@ -795,6 +828,421 @@ const MapEditor2D: React.FC = () => {
     }
   }, [floor, cellSize])
 
+  const drawDecorations = useCallback((ctx: CanvasRenderingContext2D) => {
+    if (!floor) return
+
+    for (let y = 0; y < floor.height; y++) {
+      for (let x = 0; x < floor.width; x++) {
+        const cell = floor.cells[y][x]
+        if (cell.decorations.length > 0) {
+          cell.decorations.forEach((decoration, index) => {
+            if (!decoration.appearance.visible) return
+
+            const xPos = x * cellSize + cellSize / 8
+            const yPos = y * cellSize + cellSize / 8
+            const size = cellSize * 0.75
+
+            // 装飾の背景円を描画
+            ctx.fillStyle = decoration.appearance.color + '30'
+            ctx.beginPath()
+            ctx.arc(xPos + size / 2, yPos + size / 2, size / 3, 0, Math.PI * 2)
+            ctx.fill()
+
+            // 装飾の外枠
+            ctx.strokeStyle = decoration.appearance.color
+            ctx.lineWidth = 1
+            ctx.beginPath()
+            ctx.arc(xPos + size / 2, yPos + size / 2, size / 3, 0, Math.PI * 2)
+            ctx.stroke()
+
+            // 装飾のアイコンまたはテキスト表示
+            if (cellSize > 16) {
+              ctx.fillStyle = decoration.appearance.color
+              ctx.font = `${Math.min(cellSize / 3, 16)}px Arial`
+              ctx.textAlign = 'center'
+              ctx.fillText(
+                decoration.appearance.icon || decoration.type.charAt(0).toUpperCase(),
+                xPos + size / 2,
+                yPos + size / 2 + Math.min(cellSize / 6, 6)
+              )
+            }
+
+            // 複数の装飾がある場合は番号を表示
+            if (cell.decorations.length > 1 && cellSize > 20) {
+              ctx.fillStyle = '#fff'
+              ctx.font = `${Math.min(cellSize / 8, 8)}px Arial`
+              ctx.textAlign = 'center'
+              ctx.fillText(
+                (index + 1).toString(),
+                xPos + size - 4,
+                yPos + 8
+              )
+            }
+          })
+        }
+      }
+    }
+  }, [floor, cellSize])
+
+  const drawTemplatePreview = useCallback((ctx: CanvasRenderingContext2D) => {
+    if (!selectedTemplate || selectedTool !== 'template') return
+    
+    // マップ全体テンプレートの場合は全体をプレビュー
+    if (selectedTemplate.isFullMap) {
+      const template = selectedTemplate
+      
+      // マップ全体にオーバーレイを描画
+      ctx.fillStyle = 'rgba(255, 165, 0, 0.3)'
+      ctx.fillRect(0, 0, floor!.width * cellSize, floor!.height * cellSize)
+      
+      // 外框を描画
+      ctx.strokeStyle = '#ff8800'
+      ctx.lineWidth = 4
+      ctx.setLineDash([8, 8])
+      ctx.strokeRect(0, 0, floor!.width * cellSize, floor!.height * cellSize)
+      ctx.setLineDash([])
+      
+      // 中央にテキストを表示
+      ctx.fillStyle = '#ff8800'
+      ctx.font = 'bold 16px Arial'
+      ctx.textAlign = 'center'
+      ctx.fillText(
+        `マップ全体テンプレート: ${template.name}`,
+        (floor!.width * cellSize) / 2,
+        (floor!.height * cellSize) / 2
+      )
+      
+      return
+    }
+    
+    // 通常テンプレートのプレビュー
+    if (!templatePreviewPosition) return
+
+    const { x: startX, y: startY } = templatePreviewPosition
+    console.log(`テンプレートプレビュー描画: ${selectedTemplate.name}, 回転: ${templateRotation}°`)
+    // テンプレートを回転させてプレビュー
+    const template = rotateTemplateUtil(selectedTemplate, templateRotation)
+    console.log(`回転後サイズ: ${template.size.width}x${template.size.height}`)
+
+    // テンプレートのサイズをチェック
+    if (startX + template.size.width > floor!.width || startY + template.size.height > floor!.height) {
+      // マップの範囲外の場合は赤で警告表示
+      ctx.fillStyle = 'rgba(255, 0, 0, 0.3)'
+      ctx.strokeStyle = '#ff0000'
+      ctx.lineWidth = 2
+      ctx.setLineDash([4, 4])
+      ctx.fillRect(
+        startX * cellSize,
+        startY * cellSize,
+        template.size.width * cellSize,
+        template.size.height * cellSize
+      )
+      ctx.strokeRect(
+        startX * cellSize,
+        startY * cellSize,
+        template.size.width * cellSize,
+        template.size.height * cellSize
+      )
+      ctx.setLineDash([])
+      return
+    }
+
+    // テンプレートのプレビューを描画
+    ctx.globalAlpha = 0.7
+    
+    for (let ty = 0; ty < template.size.height; ty++) {
+      for (let tx = 0; tx < template.size.width; tx++) {
+        const templateCell = template.cells[ty][tx]
+        const worldX = startX + tx
+        const worldY = startY + ty
+        
+        if (worldX >= floor!.width || worldY >= floor!.height) continue
+        
+        const xPos = worldX * cellSize
+        const yPos = worldY * cellSize
+        
+        // 床のプレビュー（半透明で色分け）
+        let floorColor = '#666'
+        switch (templateCell.floor.type) {
+          case 'normal': floorColor = 'rgba(136, 136, 136, 0.8)'; break
+          case 'damage': floorColor = 'rgba(204, 68, 68, 0.8)'; break
+          case 'slippery': floorColor = 'rgba(68, 136, 204, 0.8)'; break
+          case 'pit': floorColor = 'rgba(34, 34, 34, 0.8)'; break
+          case 'warp': floorColor = 'rgba(204, 136, 68, 0.8)'; break
+        }
+        
+        ctx.fillStyle = floorColor
+        ctx.fillRect(xPos, yPos, cellSize, cellSize)
+        
+        // 床タイプのテキスト表示（セルが十分大きい場合）
+        if (cellSize > 24) {
+          ctx.fillStyle = '#fff'
+          ctx.font = `bold ${Math.min(cellSize / 6, 10)}px Arial`
+          ctx.textAlign = 'center'
+          ctx.textBaseline = 'middle'
+          
+          let floorTypeText = ''
+          switch (templateCell.floor.type) {
+            case 'normal': floorTypeText = '床'; break
+            case 'damage': floorTypeText = 'ダメ'; break
+            case 'slippery': floorTypeText = '滑'; break
+            case 'pit': floorTypeText = '穴'; break
+            case 'warp': floorTypeText = 'ワープ'; break
+          }
+          
+          // 文字の背景（読みやすさのため）
+          const textWidth = ctx.measureText(floorTypeText).width
+          const textHeight = Math.min(cellSize / 6, 10)
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'
+          ctx.fillRect(
+            xPos + cellSize/2 - textWidth/2 - 2,
+            yPos + cellSize/2 - textHeight/2 - 1,
+            textWidth + 4,
+            textHeight + 2
+          )
+          
+          ctx.fillStyle = '#fff'
+          ctx.fillText(floorTypeText, xPos + cellSize/2, yPos + cellSize/2)
+        }
+        
+        // 壁のプレビュー（タイプ別に色分けと厚さを変更）
+        const drawWall = (direction: 'north' | 'east' | 'south' | 'west', wall: any) => {
+          if (!wall) return
+          
+          // 壁タイプに応じた色とスタイル
+          let strokeColor = '#fff'
+          let lineWidth = 3
+          let lineDash: number[] = []
+          
+          switch (wall.type) {
+            case 'normal':
+              strokeColor = '#ffffff'
+              lineWidth = 4
+              break
+            case 'door':
+              strokeColor = '#8B4513'
+              lineWidth = 5
+              break
+            case 'locked_door':
+              strokeColor = '#FFD700'
+              lineWidth = 5
+              break
+            case 'hidden_door':
+              strokeColor = '#888888'
+              lineWidth = 2
+              lineDash = [4, 4]
+              break
+            case 'breakable':
+              strokeColor = '#FF6B35'
+              lineWidth = 3
+              lineDash = [6, 3]
+              break
+            case 'oneway':
+              strokeColor = '#00CED1'
+              lineWidth = 4
+              break
+            case 'invisible':
+              strokeColor = '#666666'
+              lineWidth = 1
+              lineDash = [2, 6]
+              break
+            case 'event':
+              strokeColor = '#FF1493'
+              lineWidth = 3
+              lineDash = [3, 3]
+              break
+          }
+          
+          ctx.strokeStyle = strokeColor
+          ctx.lineWidth = lineWidth
+          ctx.setLineDash(lineDash)
+          
+          ctx.beginPath()
+          switch (direction) {
+            case 'north':
+              ctx.moveTo(xPos, yPos)
+              ctx.lineTo(xPos + cellSize, yPos)
+              break
+            case 'east':
+              ctx.moveTo(xPos + cellSize, yPos)
+              ctx.lineTo(xPos + cellSize, yPos + cellSize)
+              break
+            case 'south':
+              ctx.moveTo(xPos, yPos + cellSize)
+              ctx.lineTo(xPos + cellSize, yPos + cellSize)
+              break
+            case 'west':
+              ctx.moveTo(xPos, yPos)
+              ctx.lineTo(xPos, yPos + cellSize)
+              break
+          }
+          ctx.stroke()
+          ctx.setLineDash([]) // リセット
+        }
+        
+        drawWall('north', templateCell.walls.north)
+        drawWall('east', templateCell.walls.east)
+        drawWall('south', templateCell.walls.south)
+        drawWall('west', templateCell.walls.west)
+        
+        // イベントのプレビュー（より詳細に）
+        if (templateCell.events.length > 0) {
+          const event = templateCell.events[0] // 最初のイベントを表示
+          
+          // イベントタイプに応じた色とアイコン
+          let eventColor = '#ffd700'
+          let eventIcon = '?'
+          
+          switch (event.type) {
+            case 'treasure':
+              eventColor = '#ffd700'
+              eventIcon = '宝'
+              break
+            case 'enemy':
+              eventColor = '#ff4444'
+              eventIcon = '敵'
+              break
+            case 'npc':
+              eventColor = '#44ff44'
+              eventIcon = '人'
+              break
+            case 'stairs':
+              eventColor = '#888888'
+              eventIcon = '階'
+              break
+            case 'teleport':
+              eventColor = '#ff44ff'
+              eventIcon = 'テ'
+              break
+            case 'trigger':
+              eventColor = '#ffaa44'
+              eventIcon = 'ト'
+              break
+            case 'healing':
+              eventColor = '#44ffff'
+              eventIcon = '回'
+              break
+            case 'shop':
+              eventColor = '#aa44ff'
+              eventIcon = '店'
+              break
+            case 'save':
+              eventColor = '#44aaff'
+              eventIcon = 'S'
+              break
+            case 'info':
+              eventColor = '#aaaaaa'
+              eventIcon = '情'
+              break
+          }
+          
+          // イベントの背景円
+          ctx.fillStyle = eventColor + '99' // 半透明
+          ctx.beginPath()
+          ctx.arc(xPos + cellSize * 0.75, yPos + cellSize * 0.25, cellSize / 8, 0, Math.PI * 2)
+          ctx.fill()
+          
+          // イベントの枠線
+          ctx.strokeStyle = eventColor
+          ctx.lineWidth = 2
+          ctx.beginPath()
+          ctx.arc(xPos + cellSize * 0.75, yPos + cellSize * 0.25, cellSize / 8, 0, Math.PI * 2)
+          ctx.stroke()
+          
+          // イベントアイコン
+          if (cellSize > 16) {
+            ctx.fillStyle = '#000'
+            ctx.font = `bold ${Math.min(cellSize / 8, 8)}px Arial`
+            ctx.textAlign = 'center'
+            ctx.textBaseline = 'middle'
+            ctx.fillText(eventIcon, xPos + cellSize * 0.75, yPos + cellSize * 0.25)
+          }
+          
+          // 複数イベントがある場合の数字表示
+          if (templateCell.events.length > 1 && cellSize > 20) {
+            ctx.fillStyle = '#fff'
+            ctx.font = `bold ${Math.min(cellSize / 12, 6)}px Arial`
+            ctx.textAlign = 'center'
+            ctx.fillText(
+              templateCell.events.length.toString(),
+              xPos + cellSize * 0.9,
+              yPos + cellSize * 0.1
+            )
+          }
+        }
+        
+        // 装飾のプレビュー
+        if (templateCell.decorations.length > 0) {
+          const decoration = templateCell.decorations[0]
+          
+          // 装飾タイプに応じた色とアイコン
+          let decorationColor = decoration.appearance.color || '#888888'
+          let decorationIcon = decoration.appearance.icon || decoration.type.charAt(0).toUpperCase()
+          
+          // 装飾の背景
+          ctx.fillStyle = decorationColor + '66' // 半透明
+          ctx.beginPath()
+          ctx.arc(xPos + cellSize * 0.25, yPos + cellSize * 0.75, cellSize / 10, 0, Math.PI * 2)
+          ctx.fill()
+          
+          // 装飾の枠線
+          ctx.strokeStyle = decorationColor
+          ctx.lineWidth = 1
+          ctx.beginPath()
+          ctx.arc(xPos + cellSize * 0.25, yPos + cellSize * 0.75, cellSize / 10, 0, Math.PI * 2)
+          ctx.stroke()
+          
+          // 装飾アイコン
+          if (cellSize > 16) {
+            ctx.fillStyle = '#000'
+            ctx.font = `${Math.min(cellSize / 12, 6)}px Arial`
+            ctx.textAlign = 'center'
+            ctx.textBaseline = 'middle'
+            ctx.fillText(decorationIcon, xPos + cellSize * 0.25, yPos + cellSize * 0.75)
+          }
+        }
+      }
+    }
+    
+    // テンプレートの外框を描画（より目立つように）
+    ctx.strokeStyle = '#00ff88'
+    ctx.lineWidth = 4
+    ctx.setLineDash([10, 5])
+    ctx.strokeRect(
+      startX * cellSize - 2,
+      startY * cellSize - 2,
+      template.size.width * cellSize + 4,
+      template.size.height * cellSize + 4
+    )
+    ctx.setLineDash([])
+    
+    // テンプレート情報の表示
+    const templateWidth = template.size.width * cellSize
+    const templateHeight = template.size.height * cellSize
+    
+    // テンプレート名とサイズの背景
+    ctx.fillStyle = 'rgba(0, 255, 136, 0.9)'
+    ctx.fillRect(
+      startX * cellSize,
+      startY * cellSize - 20,
+      Math.max(templateWidth, 120),
+      18
+    )
+    
+    // テンプレート名とサイズのテキスト
+    ctx.fillStyle = '#000'
+    ctx.font = 'bold 12px Arial'
+    ctx.textAlign = 'left'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(
+      `${template.name} (${template.size.width}×${template.size.height}) ${templateRotation}°`,
+      startX * cellSize + 4,
+      startY * cellSize - 11
+    )
+    
+    ctx.globalAlpha = 1
+  }, [selectedTemplate, templatePreviewPosition, selectedTool, cellSize, floor, templateRotation])
+
   const drawRectanglePreview = useCallback((ctx: CanvasRenderingContext2D) => {
     if (!isDrawingRectangle || !rectangleStart || !rectangleEnd) return
 
@@ -831,6 +1279,49 @@ const MapEditor2D: React.FC = () => {
     )
     ctx.lineWidth = 1
   }, [selectedCell, cellSize])
+
+  const drawSelection = useCallback((ctx: CanvasRenderingContext2D) => {
+    if (!selectionMode || !selectionStart || !selectionEnd) return
+
+    const minX = Math.min(selectionStart.x, selectionEnd.x)
+    const maxX = Math.max(selectionStart.x, selectionEnd.x)
+    const minY = Math.min(selectionStart.y, selectionEnd.y)
+    const maxY = Math.max(selectionStart.y, selectionEnd.y)
+
+    // 選択範囲の背景を描画
+    ctx.fillStyle = 'rgba(0, 150, 255, 0.2)'
+    ctx.fillRect(
+      minX * cellSize,
+      minY * cellSize,
+      (maxX - minX + 1) * cellSize,
+      (maxY - minY + 1) * cellSize
+    )
+
+    // 選択範囲の枠線を描画
+    ctx.strokeStyle = '#0096ff'
+    ctx.lineWidth = 2
+    ctx.setLineDash([5, 5])
+    ctx.strokeRect(
+      minX * cellSize,
+      minY * cellSize,
+      (maxX - minX + 1) * cellSize,
+      (maxY - minY + 1) * cellSize
+    )
+    ctx.setLineDash([])
+    ctx.lineWidth = 1
+
+    // 選択範囲の情報を表示
+    const width = maxX - minX + 1
+    const height = maxY - minY + 1
+    ctx.fillStyle = '#0096ff'
+    ctx.font = 'bold 14px Arial'
+    ctx.textAlign = 'center'
+    ctx.fillText(
+      `${width}×${height}`,
+      (minX + maxX + 1) * cellSize / 2,
+      (minY + maxY + 1) * cellSize / 2
+    )
+  }, [selectionMode, selectionStart, selectionEnd, cellSize])
 
   const drawHoveredCell = useCallback((ctx: CanvasRenderingContext2D) => {
     // ペンツールで床または壁レイヤーが選択されている場合のみハイライト表示
@@ -924,9 +1415,15 @@ const MapEditor2D: React.FC = () => {
     if (layerVisibility.events) {
       drawEvents(ctx)
     }
+    if (layerVisibility.decorations) {
+      drawDecorations(ctx)
+    }
     
     // 矩形プレビューを描画
     drawRectanglePreview(ctx)
+    
+    // テンプレートプレビューを描画
+    drawTemplatePreview(ctx)
     
     // ドラッグプレビューを描画
     drawDragPreview(ctx)
@@ -937,8 +1434,11 @@ const MapEditor2D: React.FC = () => {
     // ホバー中のセルをハイライト
     drawHoveredCell(ctx)
     
+    // 範囲選択を描画
+    drawSelection(ctx)
+    
     drawGrid(ctx)
-  }, [floor, cellSize, drawFloor, drawWalls, drawEvents, drawGrid, drawRectanglePreview, drawDragPreview, drawSelectedCell, drawHoveredCell, editorState])
+  }, [floor, cellSize, drawFloor, drawWalls, drawEvents, drawDecorations, drawGrid, drawRectanglePreview, drawTemplatePreview, drawDragPreview, drawSelectedCell, drawHoveredCell, drawSelection, editorState, templateRotation])
 
   const getCellPosition = useCallback((event: React.MouseEvent): Position | null => {
     const canvas = canvasRef.current
@@ -1034,7 +1534,12 @@ const MapEditor2D: React.FC = () => {
         }
       }
     }
-  }, [floor, dispatch, selectedTool, selectedLayer, getActualWallInfo, getClosestWallFromMouse])
+    
+    // テンプレートツールのプレビュー位置更新
+    if (selectedTool === 'template' && selectedTemplate && !selectedTemplate.isFullMap) {
+      dispatch(setTemplatePreviewPosition(position))
+    }
+  }, [floor, dispatch, selectedTool, selectedLayer, getActualWallInfo, getClosestWallFromMouse, selectedTemplate])
 
 
 
@@ -1043,6 +1548,7 @@ const MapEditor2D: React.FC = () => {
     dispatch(clearHoveredCellInfo())
     dispatch(clearHoveredCellPosition())
     dispatch(clearHoveredWallInfo())
+    dispatch(setTemplatePreviewPosition(null))
   }, [dispatch])
 
   const handleCanvasClick = useCallback((event: React.MouseEvent) => {
@@ -1056,6 +1562,32 @@ const MapEditor2D: React.FC = () => {
 
     // ドラッグ操作中、または壁レイヤーのペンツール（handleMouseUpで処理済み）、または床レイヤーのペンツール（handleMouseUpで処理済み）はクリック処理をスキップ
     if (isDragging || isActuallyDragging || (selectedLayer === 'walls' && selectedTool === 'pen') || (selectedLayer === 'floor' && selectedTool === 'pen')) {
+      return
+    }
+
+    // テンプレートツールの処理
+    if (selectedTool === 'template' && selectedTemplate) {
+      // マップ全体テンプレートの場合はボタンからのみ配置可能
+      if (selectedTemplate.isFullMap) {
+        return
+      }
+      
+      // 通常のテンプレートは指定位置に配置
+      console.log('テンプレート配置:', {
+        templateName: selectedTemplate.name,
+        templateId: selectedTemplate.id,
+        position,
+        rotation: templateRotation
+      })
+      dispatch(placeTemplate({
+        template: selectedTemplate,
+        position,
+        floorIndex: currentFloor,
+        rotation: templateRotation
+      }))
+      
+      // テンプレート配置後はプレビュー位置のみクリア（連続配置のため）
+      dispatch(setTemplatePreviewPosition(null))
       return
     }
 
@@ -1121,6 +1653,13 @@ const MapEditor2D: React.FC = () => {
           floorIndex: currentFloor,
           position,
           cell: { events: [] }
+        }))
+      } else if (selectedLayer === 'decorations') {
+        // 装飾を消去
+        dispatch(updateCell({
+          floorIndex: currentFloor,
+          position,
+          cell: { decorations: [] }
         }))
       } else if (selectedLayer === 'floor') {
         // 床を通常床にリセット
@@ -1192,6 +1731,12 @@ const MapEditor2D: React.FC = () => {
                   updates.push({
                     position: cellPosition,
                     cell: { events: [] }
+                  })
+                } else if (selectedLayer === 'decorations') {
+                  // 装飾を消去
+                  updates.push({
+                    position: cellPosition,
+                    cell: { decorations: [] }
                   })
                 }
               } else {
@@ -1281,6 +1826,28 @@ const MapEditor2D: React.FC = () => {
                   updates.push({
                     position: cellPosition,
                     cell: { events: newEvents }
+                  })
+                } else if (selectedLayer === 'decorations') {
+                  const hasDecoration = cell.decorations.length > 0
+                  const newDecorations = hasDecoration ? [] : [{
+                    id: crypto.randomUUID(),
+                    type: selectedDecorationType,
+                    name: `${getDecorationIcon(selectedDecorationType)} ${selectedDecorationType}`,
+                    position: cellPosition,
+                    appearance: {
+                      visible: true,
+                      color: getDecorationColor(selectedDecorationType),
+                      icon: getDecorationIcon(selectedDecorationType),
+                      layer: 0,
+                      rotation: 0,
+                      scale: 1.0
+                    },
+                    properties: {},
+                    interactable: false
+                  }]
+                  updates.push({
+                    position: cellPosition,
+                    cell: { decorations: newDecorations }
                   })
                 }
               }
@@ -1468,10 +2035,58 @@ const MapEditor2D: React.FC = () => {
           }
         }))
       }
+    } else if (selectedLayer === 'decorations') {
+      if (selectedTool === 'pen') {
+        // 装飾の追加/削除
+        const hasDecoration = currentCell.decorations.length > 0
+        if (hasDecoration) {
+          // 装飾がある場合は削除
+          dispatch(updateCell({
+            floorIndex: currentFloor,
+            position,
+            cell: {
+              decorations: [],
+            }
+          }))
+        } else {
+          // 装飾がない場合は追加
+          const newDecoration: Decoration = {
+            id: crypto.randomUUID(),
+            type: selectedDecorationType,
+            name: `${getDecorationIcon(selectedDecorationType)} ${selectedDecorationType}`,
+            position: position,
+            appearance: {
+              visible: true,
+              color: getDecorationColor(selectedDecorationType),
+              icon: getDecorationIcon(selectedDecorationType),
+              layer: 0,
+              rotation: 0,
+              scale: 1.0
+            },
+            properties: {},
+            interactable: false
+          }
+
+          dispatch(addDecorationToCell({
+            x: position.x,
+            y: position.y,
+            decoration: newDecoration
+          }))
+        }
+      }
     }
-  }, [getCellPosition, floor, selectedLayer, selectedTool, selectedFloorType, selectedWallType, dispatch, currentFloor, isDrawingRectangle, rectangleStart, isDragging, capturedCellData])
+  }, [getCellPosition, floor, selectedLayer, selectedTool, selectedFloorType, selectedWallType, selectedDecorationType, dispatch, currentFloor, isDrawingRectangle, rectangleStart, isDragging, capturedCellData, selectedTemplate, templateRotation])
 
   const handleCanvasMouseMove = useCallback((event: React.MouseEvent) => {
+    // 範囲選択モードでのマウスムーブ処理
+    if (selectionMode && selectionStart) {
+      const position = getCellPosition(event)
+      if (position) {
+        dispatch(setSelectionEnd(position))
+      }
+      return
+    }
+    
     // ホバー情報の更新（ドラッグ中でない場合のみ）
     if (!isDragging && !isActuallyDragging) {
       const position = getCellPosition(event)
@@ -1557,9 +2172,23 @@ const MapEditor2D: React.FC = () => {
         }
       }
     }
-  }, [selectedTool, isDrawingRectangle, rectangleStart, getCellPosition, isDragging, dragStart, selectedLayer, dragStartMouse, isActuallyDragging, cellSize, floor, dispatch, updateHoverInfo, getClosestWallFromMouse])
+  }, [selectionMode, selectionStart, dispatch, selectedTool, isDrawingRectangle, rectangleStart, getCellPosition, isDragging, dragStart, selectedLayer, dragStartMouse, isActuallyDragging, cellSize, floor, updateHoverInfo, getClosestWallFromMouse])
 
   const handleMouseDown = useCallback((event: React.MouseEvent) => {
+    // 範囲選択モードの処理
+    if (selectionMode) {
+      const position = getCellPosition(event)
+      if (!position) return
+      
+      if (!selectionStart) {
+        dispatch(setSelectionStart(position))
+        dispatch(setSelectionEnd(position))
+      } else {
+        dispatch(setSelectionEnd(position))
+      }
+      return
+    }
+    
     if (selectedLayer === 'walls' && selectedTool === 'pen') {
       const canvas = canvasRef.current
       if (!canvas) return
@@ -1601,7 +2230,7 @@ const MapEditor2D: React.FC = () => {
       setDragStart(position)
       setDragEnd(position)
     }
-  }, [selectedLayer, selectedTool, getCellPosition, cellSize])
+  }, [selectionMode, selectionStart, dispatch, getCellPosition, selectedLayer, selectedTool, cellSize])
 
   const handleMouseUp = useCallback((_event: React.MouseEvent) => {
     // 壁レイヤーのペンツールの処理
@@ -1694,6 +2323,47 @@ const MapEditor2D: React.FC = () => {
         }
       }
     }
+
+    // 装飾レイヤーのペンツールの処理
+    if (dragStartMouse && dragStart && selectedLayer === 'decorations' && selectedTool === 'pen') {
+      if (!isActuallyDragging) {
+        // クリック処理として装飾を配置
+        if (dragStart && floor) {
+          if (isShiftPressed) {
+            // Shift+クリックで装飾を削除
+            dispatch(updateCell({
+              floorIndex: currentFloor,
+              position: dragStart,
+              cell: { decorations: [] }
+            }))
+          } else {
+            // 新しい装飾を作成
+            const newDecoration: Decoration = {
+              id: crypto.randomUUID(),
+              type: selectedDecorationType,
+              name: `${getDecorationIcon(selectedDecorationType)} ${selectedDecorationType}`,
+              position: { x: dragStart.x, y: dragStart.y },
+              appearance: {
+                visible: true,
+                color: getDecorationColor(selectedDecorationType),
+                icon: getDecorationIcon(selectedDecorationType),
+                layer: 0,
+                rotation: 0,
+                scale: 1.0
+              },
+              properties: {},
+              interactable: false
+            }
+
+            dispatch(addDecorationToCell({
+              x: dragStart.x,
+              y: dragStart.y,
+              decoration: newDecoration
+            }))
+          }
+        }
+      }
+    }
     
     // 状態をリセット
     setIsDragging(false)
@@ -1709,6 +2379,7 @@ const MapEditor2D: React.FC = () => {
     redraw()
   }, [redraw])
 
+
   if (!floor) {
     return <Box>フロアデータが見つかりません</Box>
   }
@@ -1722,7 +2393,8 @@ const MapEditor2D: React.FC = () => {
         cursor: selectedTool === 'pen' ? 'crosshair' : 
                 selectedTool === 'rectangle' ? 'cell' : 
                 selectedTool === 'eyedropper' ? 'grab' : 
-                selectedTool === 'select' ? 'pointer' : 'default',
+                selectedTool === 'select' ? 'pointer' :
+                selectedTool === 'template' ? 'copy' : 'default',
         position: 'relative',
         userSelect: 'none',
       }}

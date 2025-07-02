@@ -2,8 +2,8 @@ import { useEffect } from 'react'
 import { Box } from '@mui/material'
 import { useSelector, useDispatch } from 'react-redux'
 import { RootState } from './store'
-import { undo, redo, loadDungeon } from './store/mapSlice'
-import { setSelectedTool, setSelectedLayer, toggleGrid, setZoom, openNewProjectDialog, setShiftPressed } from './store/editorSlice'
+import { undo, redo, loadDungeon, addEventToCell, updateEventInCell, removeEventFromCell } from './store/mapSlice'
+import { setSelectedTool, setSelectedLayer, toggleGrid, setZoom, openNewProjectDialog, setShiftPressed, closeEventEditDialog, rotateTemplate, rotateTemplateLeft, openCreateTemplateDialog, closeHelpDialog } from './store/editorSlice'
 import { downloadDungeonAsJSON, openDungeonFromFile } from './utils/fileUtils'
 import MenuBar from './components/MenuBar'
 import ToolBar from './components/ToolBar'
@@ -12,17 +12,32 @@ import RightPanel from './components/RightPanel'
 import MainCanvas from './components/MainCanvas'
 import BottomPanel from './components/BottomPanel'
 import NewProjectDialog from './components/NewProjectDialog'
+import CustomTypeDialog from './components/CustomTypeDialog'
+import EventEditDialog from './components/EventEditDialog'
+import CreateTemplateDialog from './components/CreateTemplateDialog'
+import HelpDialog from './components/HelpDialog'
 
 function App() {
   const dispatch = useDispatch()
   const dungeon = useSelector((state: RootState) => state.map.dungeon)
-  const { zoom, selectedLayer, showNewProjectDialog } = useSelector((state: RootState) => state.editor)
+  const { zoom, selectedLayer, showNewProjectDialog, showEventEditDialog, editingEvent, selectedTool, selectedTemplate, selectionMode, selectionStart, selectionEnd, showHelpDialog } = useSelector((state: RootState) => state.editor)
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       // Shiftキーの状態を追跡
       if (event.key === 'Shift') {
         dispatch(setShiftPressed(true))
+      }
+
+      // キーイベント情報をログ出力（QとRのみ）
+      if (event.key === 'q' || event.key === 'r') {
+        console.log('キーイベント受信:', {
+          key: event.key,
+          dungeon: !!dungeon,
+          target: (event.target as HTMLElement).tagName,
+          hasCtrlKey: event.ctrlKey,
+          hasMetaKey: event.metaKey
+        })
       }
 
       // ダイアログが開いている時はショートカットを無効化
@@ -146,6 +161,31 @@ function App() {
             // スペースキーでグリッド切り替え
             dispatch(toggleGrid())
             break
+          case 'q':
+            // Qキーでテンプレート左回転
+            console.log('Qキー押下:', { selectedTool, selectedTemplate: selectedTemplate?.name, isFullMap: selectedTemplate?.isFullMap })
+            if (selectedTool === 'template' && selectedTemplate && !selectedTemplate.isFullMap) {
+              event.preventDefault()
+              console.log('テンプレート左回転実行')
+              dispatch(rotateTemplateLeft())
+            }
+            break
+          case 'r':
+            // Rキーでテンプレート右回転
+            console.log('Rキー押下:', { selectedTool, selectedTemplate: selectedTemplate?.name, isFullMap: selectedTemplate?.isFullMap })
+            if (selectedTool === 'template' && selectedTemplate && !selectedTemplate.isFullMap) {
+              event.preventDefault()
+              console.log('テンプレート右回転実行')
+              dispatch(rotateTemplate())
+            }
+            break
+          case 'Enter':
+            // Enterキーで範囲選択からテンプレート作成
+            if (selectionMode && selectionStart && selectionEnd) {
+              event.preventDefault()
+              dispatch(openCreateTemplateDialog())
+            }
+            break
         }
       }
     }
@@ -163,7 +203,7 @@ function App() {
       document.removeEventListener('keydown', handleKeyDown)
       document.removeEventListener('keyup', handleKeyUp)
     }
-  }, [dispatch, dungeon, zoom, selectedLayer])
+  }, [dispatch, dungeon, zoom, selectedLayer, selectedTool, selectedTemplate, selectionMode, selectionStart, selectionEnd])
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
@@ -182,6 +222,43 @@ function App() {
       </Box>
       
       {(!dungeon || showNewProjectDialog) && <NewProjectDialog />}
+      <CustomTypeDialog />
+      <CreateTemplateDialog />
+      <HelpDialog 
+        open={showHelpDialog}
+        onClose={() => dispatch(closeHelpDialog())}
+      />
+      <EventEditDialog 
+        open={showEventEditDialog}
+        event={editingEvent}
+        onClose={() => dispatch(closeEventEditDialog())}
+        onSave={(event) => {
+          if (editingEvent) {
+            // 既存イベントの更新
+            dispatch(updateEventInCell({
+              x: event.position.x,
+              y: event.position.y,
+              event
+            }))
+          } else {
+            // 新しいイベントの追加
+            dispatch(addEventToCell({
+              x: event.position.x,
+              y: event.position.y,
+              event
+            }))
+          }
+        }}
+        onDelete={(eventId) => {
+          if (editingEvent) {
+            dispatch(removeEventFromCell({
+              x: editingEvent.position.x,
+              y: editingEvent.position.y,
+              eventId
+            }))
+          }
+        }}
+      />
     </Box>
   )
 }

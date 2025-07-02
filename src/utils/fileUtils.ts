@@ -31,15 +31,23 @@ export const openDungeonFromFile = (onLoad: (dungeon: Dungeon) => void, onError?
   document.body.appendChild(fileInput)
   
   fileInput.addEventListener('change', (event) => {
+    console.log('ファイル選択イベントが発生しました')
     const target = event.target as HTMLInputElement
     const file = target.files?.[0]
+    console.log('選択されたファイル:', file)
     if (file) {
+      console.log('ファイル読み込み開始:', file.name)
       const reader = new FileReader()
       reader.onload = (e) => {
+        console.log('ファイル読み込み完了')
         try {
-          const dungeonData = JSON.parse(e.target?.result as string) as Dungeon
+          const content = e.target?.result as string
+          console.log('ファイル内容:', content.substring(0, 200) + '...')
+          const dungeonData = JSON.parse(content) as Dungeon
+          console.log('JSONパース成功:', dungeonData)
           onLoad(dungeonData)
         } catch (error) {
+          console.error('JSONパースエラー:', error)
           if (onError) {
             onError(error as Error)
           } else {
@@ -47,8 +55,16 @@ export const openDungeonFromFile = (onLoad: (dungeon: Dungeon) => void, onError?
           }
         }
       }
+      reader.onerror = (error) => {
+        console.error('ファイル読み込みエラー:', error)
+      }
       reader.readAsText(file)
+    } else {
+      console.log('ファイルが選択されていません')
     }
+    
+    // ファイル入力をクリーンアップ
+    document.body.removeChild(fileInput)
   })
   
   fileInput.click()

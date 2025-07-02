@@ -23,7 +23,7 @@ import {
 } from '@mui/icons-material'
 import { useDispatch, useSelector } from 'react-redux'
 import { RootState } from '../store'
-import { setSelectedTool, setZoom, toggleGrid } from '../store/editorSlice'
+import { setSelectedTool, setZoom, toggleGrid, setSelectedTemplate } from '../store/editorSlice'
 import { undo, redo } from '../store/mapSlice'
 import { DrawingTool } from '../types/map'
 
@@ -35,6 +35,10 @@ const ToolBar: React.FC = () => {
   const handleToolChange = (_: React.MouseEvent<HTMLElement>, newTool: DrawingTool | null) => {
     if (newTool) {
       dispatch(setSelectedTool(newTool))
+      // テンプレート以外のツールが選択された場合はテンプレート選択を解除
+      if (newTool !== 'template') {
+        dispatch(setSelectedTemplate(null))
+      }
     }
   }
 

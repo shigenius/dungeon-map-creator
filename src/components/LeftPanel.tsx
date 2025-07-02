@@ -7,15 +7,16 @@ import {
   ListItemIcon,
   ListItemText,
   ListItemButton,
-  Checkbox,
   Divider,
   Accordion,
   AccordionSummary,
   AccordionDetails,
+  IconButton,
+  Tooltip,
+  Button,
 } from '@mui/material'
 import {
   ExpandMore as ExpandMoreIcon,
-  Layers as LayersIcon,
   ViewList as ObjectListIcon,
   Terrain as FloorIcon,
   CropSquare as WallIcon,
@@ -23,15 +24,16 @@ import {
   Palette as DecorationIcon,
   Colorize as EyedropperIcon,
   Clear as ClearIcon,
+  Add as AddIcon,
 } from '@mui/icons-material'
 import { useDispatch, useSelector } from 'react-redux'
 import { RootState } from '../store'
-import { setSelectedLayer, toggleLayerVisibility, setSelectedFloorType, setSelectedWallType, clearCapturedCellData, toggleFloorTypeAccordion, toggleWallTypeAccordion } from '../store/editorSlice'
-import { Layer, FloorType, WallType } from '../types/map'
+import { setSelectedFloorType, setSelectedWallType, setSelectedDecorationType, clearCapturedCellData, toggleFloorTypeAccordion, toggleWallTypeAccordion, openCustomTypeDialog, openEventEditDialog, setSelectedTemplate } from '../store/editorSlice'
+import { Layer, FloorType, WallType, DecorationType } from '../types/map'
 
 const LeftPanel: React.FC = () => {
   const dispatch = useDispatch()
-  const { selectedLayer, layerVisibility, selectedFloorType, selectedWallType, capturedCellData, accordionStates } = useSelector((state: RootState) => state.editor)
+  const { selectedLayer, selectedFloorType, selectedWallType, selectedDecorationType, capturedCellData, accordionStates, customFloorTypes, customWallTypes } = useSelector((state: RootState) => state.editor)
   const dungeon = useSelector((state: RootState) => state.map.dungeon)
 
   const layers: Array<{ key: Layer; name: string; icon: React.ReactNode }> = [
@@ -60,20 +62,29 @@ const LeftPanel: React.FC = () => {
     { key: 'event', name: 'イベント壁', color: '#ff69b4', description: 'イベント付き壁' },
   ]
 
-  const handleLayerSelect = (layer: Layer) => {
-    dispatch(setSelectedLayer(layer))
-  }
+  const decorationTypes: Array<{ key: DecorationType; name: string; color: string; description: string; icon: string }> = [
+    { key: 'furniture', name: '家具', color: '#8b4513', description: 'テーブル、椅子、棚など', icon: '🪑' },
+    { key: 'statue', name: '彫像', color: '#a0a0a0', description: '石像や装飾品', icon: '🗿' },
+    { key: 'plant', name: '植物', color: '#228b22', description: '観葉植物や花', icon: '🌿' },
+    { key: 'torch', name: '松明', color: '#ff6347', description: '照明用の松明', icon: '🔥' },
+    { key: 'pillar', name: '柱', color: '#d2b48c', description: '支柱や装飾柱', icon: '🏛️' },
+    { key: 'rug', name: '絨毯', color: '#dc143c', description: '床に敷く絨毯', icon: '🧿' },
+    { key: 'painting', name: '絵画', color: '#4169e1', description: '壁に掛ける絵', icon: '🖼️' },
+    { key: 'crystal', name: 'クリスタル', color: '#9370db', description: '魔法のクリスタル', icon: '💎' },
+    { key: 'rubble', name: '瓦礫', color: '#696969', description: '石くずや破片', icon: '🪨' },
+  ]
 
-  const handleLayerVisibilityToggle = (layer: Layer) => {
-    dispatch(toggleLayerVisibility(layer))
-  }
 
   const handleFloorTypeSelect = (floorType: FloorType) => {
     dispatch(setSelectedFloorType(floorType))
+    // テンプレート選択を解除
+    dispatch(setSelectedTemplate(null))
   }
 
   const handleWallTypeSelect = (wallType: WallType) => {
     dispatch(setSelectedWallType(wallType))
+    // テンプレート選択を解除
+    dispatch(setSelectedTemplate(null))
   }
   
   const handleClearCapturedData = () => {
@@ -86,6 +97,20 @@ const LeftPanel: React.FC = () => {
 
   const handleWallTypeAccordionToggle = () => {
     dispatch(toggleWallTypeAccordion())
+  }
+
+  const handleAddCustomFloorType = () => {
+    dispatch(openCustomTypeDialog('floor'))
+  }
+
+  const handleAddCustomWallType = () => {
+    dispatch(openCustomTypeDialog('wall'))
+  }
+
+  const handleDecorationTypeSelect = (decorationType: DecorationType) => {
+    dispatch(setSelectedDecorationType(decorationType))
+    // テンプレート選択を解除
+    dispatch(setSelectedTemplate(null))
   }
 
   return (
@@ -108,126 +133,333 @@ const LeftPanel: React.FC = () => {
           overflowX: 'hidden',
         }}
       >
-      {/* レイヤー管理 */}
-      <Accordion defaultExpanded>
-        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-          <LayersIcon sx={{ mr: 1 }} />
-          <Typography>レイヤー管理</Typography>
-        </AccordionSummary>
-        <AccordionDetails sx={{ p: 0 }}>
-          <List dense>
-            {layers.map((layer) => (
-              <ListItem key={layer.key} disablePadding>
-                <ListItemButton
-                  selected={selectedLayer === layer.key}
-                  onClick={() => handleLayerSelect(layer.key)}
-                  disabled={!dungeon}
-                  sx={{ pl: 2 }}
-                >
-                  <ListItemIcon sx={{ minWidth: 32 }}>
-                    <Checkbox
-                      edge="start"
-                      checked={layerVisibility[layer.key]}
-                      onChange={() => handleLayerVisibilityToggle(layer.key)}
-                      size="small"
+      {/* 現在のレイヤー表示 */}  
+      <Box sx={{ p: 2, bgcolor: 'primary.main', color: 'primary.contrastText' }}>
+        <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center' }}>
+          {layers.find(layer => layer.key === selectedLayer)?.icon}
+          <Box component="span" sx={{ ml: 1 }}>
+            編集中: {layers.find(layer => layer.key === selectedLayer)?.name}
+          </Box>
+        </Typography>
+      </Box>
+
+      <Divider />
+
+      {/* 床レイヤー関連 */}
+      {selectedLayer === 'floor' && (
+        <>
+          <Accordion expanded={accordionStates.floorTypeAccordion} onChange={handleFloorTypeAccordionToggle}>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <FloorIcon sx={{ mr: 1 }} />
+              <Typography>床タイプ選択</Typography>
+              <Box sx={{ ml: 'auto', mr: 1 }}>
+                <Tooltip title="カスタム床タイプを追加">
+                  <IconButton size="small" onClick={handleAddCustomFloorType}>
+                    <AddIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              </Box>
+            </AccordionSummary>
+            <AccordionDetails sx={{ p: 0 }}>
+              <List dense>
+                {floorTypes.map((floorType) => (
+                  <ListItem key={floorType.key} disablePadding>
+                    <ListItemButton
+                      selected={selectedFloorType === floorType.key}
+                      onClick={() => handleFloorTypeSelect(floorType.key)}
                       disabled={!dungeon}
-                      onClick={(e) => e.stopPropagation()}
-                    />
-                  </ListItemIcon>
-                  <ListItemIcon sx={{ minWidth: 32 }}>
-                    {layer.icon}
-                  </ListItemIcon>
-                  <ListItemText primary={layer.name} />
-                </ListItemButton>
-              </ListItem>
-            ))}
-          </List>
-        </AccordionDetails>
-      </Accordion>
+                      sx={{ pl: 2 }}
+                    >
+                      <ListItemIcon sx={{ minWidth: 32 }}>
+                        <Box
+                          sx={{
+                            width: 16,
+                            height: 16,
+                            bgcolor: floorType.color,
+                            border: '1px solid #ccc',
+                            borderRadius: '2px',
+                          }}
+                        />
+                      </ListItemIcon>
+                      <ListItemText 
+                        primary={floorType.name}
+                        secondary={floorType.description}
+                      />
+                    </ListItemButton>
+                  </ListItem>
+                ))}
+                
+                {/* カスタム床タイプ */}
+                {customFloorTypes.map((customType) => (
+                  <ListItem key={customType.id} disablePadding>
+                    <ListItemButton
+                      selected={selectedFloorType === 'custom'}
+                      onClick={() => handleFloorTypeSelect('custom')}
+                      disabled={!dungeon}
+                      sx={{ pl: 2 }}
+                    >
+                      <ListItemIcon sx={{ minWidth: 32 }}>
+                        <Box
+                          sx={{
+                            width: 16,
+                            height: 16,
+                            bgcolor: customType.color,
+                            border: '1px solid #ccc',
+                            borderRadius: '2px',
+                          }}
+                        />
+                      </ListItemIcon>
+                      <ListItemText 
+                        primary={customType.name}
+                        secondary={customType.description}
+                      />
+                    </ListItemButton>
+                  </ListItem>
+                ))}
+              </List>
+            </AccordionDetails>
+          </Accordion>
+          <Divider />
+        </>
+      )}
 
-      <Divider />
+      {/* 壁レイヤー関連 */}
+      {selectedLayer === 'walls' && (
+        <>
+          <Accordion expanded={accordionStates.wallTypeAccordion} onChange={handleWallTypeAccordionToggle}>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <WallIcon sx={{ mr: 1 }} />
+              <Typography>壁タイプ選択</Typography>
+              <Box sx={{ ml: 'auto', mr: 1 }}>
+                <Tooltip title="カスタム壁タイプを追加">
+                  <IconButton size="small" onClick={handleAddCustomWallType}>
+                    <AddIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              </Box>
+            </AccordionSummary>
+            <AccordionDetails sx={{ p: 0 }}>
+              <List dense>
+                {wallTypes.map((wallType) => (
+                  <ListItem key={wallType.key} disablePadding>
+                    <ListItemButton
+                      selected={selectedWallType === wallType.key}
+                      onClick={() => handleWallTypeSelect(wallType.key)}
+                      disabled={!dungeon}
+                      sx={{ pl: 2 }}
+                    >
+                      <ListItemIcon sx={{ minWidth: 32 }}>
+                        <Box
+                          sx={{
+                            width: 16,
+                            height: 16,
+                            bgcolor: wallType.color,
+                            border: '1px solid #ccc',
+                            borderRadius: '2px',
+                          }}
+                        />
+                      </ListItemIcon>
+                      <ListItemText 
+                        primary={wallType.name}
+                        secondary={wallType.description}
+                      />
+                    </ListItemButton>
+                  </ListItem>
+                ))}
+                
+                {/* カスタム壁タイプ */}
+                {customWallTypes.map((customType) => (
+                  <ListItem key={customType.id} disablePadding>
+                    <ListItemButton
+                      selected={selectedWallType === 'custom'}
+                      onClick={() => handleWallTypeSelect('custom')}
+                      disabled={!dungeon}
+                      sx={{ pl: 2 }}
+                    >
+                      <ListItemIcon sx={{ minWidth: 32 }}>
+                        <Box
+                          sx={{
+                            width: 16,
+                            height: 16,
+                            bgcolor: customType.color,
+                            border: '1px solid #ccc',
+                            borderRadius: '2px',
+                          }}
+                        />
+                      </ListItemIcon>
+                      <ListItemText 
+                        primary={customType.name}
+                        secondary={customType.description}
+                      />
+                    </ListItemButton>
+                  </ListItem>
+                ))}
+              </List>
+            </AccordionDetails>
+          </Accordion>
+          <Divider />
+        </>
+      )}
 
-      {/* 床タイプ選択 */}
-      <Accordion expanded={accordionStates.floorTypeAccordion} onChange={handleFloorTypeAccordionToggle}>
-        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-          <FloorIcon sx={{ mr: 1 }} />
-          <Typography>床タイプ選択</Typography>
-        </AccordionSummary>
-        <AccordionDetails sx={{ p: 0 }}>
-          <List dense>
-            {floorTypes.map((floorType) => (
-              <ListItem key={floorType.key} disablePadding>
-                <ListItemButton
-                  selected={selectedFloorType === floorType.key}
-                  onClick={() => handleFloorTypeSelect(floorType.key)}
-                  disabled={!dungeon || selectedLayer !== 'floor'}
-                  sx={{ pl: 2 }}
+      {/* イベントレイヤー関連 */}
+      {selectedLayer === 'events' && (
+        <>
+          <Accordion>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <EventIcon sx={{ mr: 1 }} />
+              <Typography>イベント管理</Typography>
+            </AccordionSummary>
+            <AccordionDetails sx={{ p: 2 }}>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <Typography variant="body2" color="text.secondary" gutterBottom>
+                  現在の階にあるイベント一覧です
+                </Typography>
+                
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    イベント数: {dungeon?.floors[0]?.cells?.flat().reduce((count, cell) => count + cell.events.length, 0) || 0}
+                  </Typography>
+                </Box>
+                
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<AddIcon />}
+                  fullWidth
+                  sx={{ mb: 1 }}
+                  onClick={() => dispatch(openEventEditDialog(null))}
                 >
-                  <ListItemIcon sx={{ minWidth: 32 }}>
-                    <Box
-                      sx={{
-                        width: 16,
-                        height: 16,
-                        bgcolor: floorType.color,
-                        border: '1px solid #ccc',
-                        borderRadius: '2px',
-                      }}
-                    />
-                  </ListItemIcon>
-                  <ListItemText 
-                    primary={floorType.name}
-                    secondary={floorType.description}
-                  />
-                </ListItemButton>
-              </ListItem>
-            ))}
-          </List>
-        </AccordionDetails>
-      </Accordion>
+                  新しいイベント
+                </Button>
+                
+                <List dense sx={{ maxHeight: 200, overflow: 'auto' }}>
+                  {dungeon?.floors[0]?.cells?.flat().map(cell => 
+                    cell.events.map(event => (
+                      <ListItem key={event.id} disablePadding>
+                        <ListItemButton 
+                          onClick={() => dispatch(openEventEditDialog(event))}
+                        >
+                          <ListItemIcon sx={{ minWidth: 28 }}>
+                            <Box
+                              sx={{
+                                width: 12,
+                                height: 12,
+                                bgcolor: event.appearance.color || '#ffd700',
+                                border: '1px solid #ccc',
+                                borderRadius: '50%',
+                              }}
+                            />
+                          </ListItemIcon>
+                          <ListItemText 
+                            primary={event.name}
+                            secondary={`(${cell.x}, ${cell.y}) ${event.type}`}
+                            primaryTypographyProps={{ variant: 'body2' }}
+                            secondaryTypographyProps={{ variant: 'caption' }}
+                          />
+                        </ListItemButton>
+                      </ListItem>
+                    ))
+                  ) || []}
+                </List>
+                
+                {(!dungeon?.floors[0]?.cells?.flat().some(cell => cell.events.length > 0)) && (
+                  <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 2 }}>
+                    イベントがありません
+                  </Typography>
+                )}
+              </Box>
+            </AccordionDetails>
+          </Accordion>
+          <Divider />
+        </>
+      )}
 
-      <Divider />
+      {/* 装飾レイヤー関連 */}
+      {selectedLayer === 'decorations' && (
+        <>
+          <Accordion>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <DecorationIcon sx={{ mr: 1 }} />
+              <Typography>装飾タイプ選択</Typography>
+            </AccordionSummary>
+            <AccordionDetails sx={{ p: 0 }}>
+              <List dense>
+                {decorationTypes.map((decorationType) => (
+                  <ListItem key={decorationType.key} disablePadding>
+                    <ListItemButton
+                      selected={selectedDecorationType === decorationType.key}
+                      onClick={() => handleDecorationTypeSelect(decorationType.key)}
+                      disabled={!dungeon}
+                      sx={{ pl: 2 }}
+                    >
+                      <ListItemIcon sx={{ minWidth: 32 }}>
+                        <Typography sx={{ fontSize: '16px' }}>
+                          {decorationType.icon}
+                        </Typography>
+                      </ListItemIcon>
+                      <ListItemText 
+                        primary={decorationType.name}
+                        secondary={decorationType.description}
+                      />
+                    </ListItemButton>
+                  </ListItem>
+                ))}
+              </List>
+            </AccordionDetails>
+          </Accordion>
+          
+          <Accordion>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <DecorationIcon sx={{ mr: 1 }} />
+              <Typography>装飾管理</Typography>
+            </AccordionSummary>
+            <AccordionDetails sx={{ p: 2 }}>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <Typography variant="body2" color="text.secondary" gutterBottom>
+                  現在の階にある装飾一覧です
+                </Typography>
+                
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    装飾数: {dungeon?.floors[0]?.cells?.flat().reduce((count, cell) => count + cell.decorations.length, 0) || 0}
+                  </Typography>
+                </Box>
+                
+                <List dense sx={{ maxHeight: 200, overflow: 'auto' }}>
+                  {dungeon?.floors[0]?.cells?.flat().map(cell => 
+                    cell.decorations.map(decoration => (
+                      <ListItem key={decoration.id} disablePadding>
+                        <ListItemButton>
+                          <ListItemIcon sx={{ minWidth: 28 }}>
+                            <Typography sx={{ fontSize: '12px' }}>
+                              {decoration.appearance.icon}
+                            </Typography>
+                          </ListItemIcon>
+                          <ListItemText 
+                            primary={decoration.name}
+                            secondary={`(${cell.x}, ${cell.y}) ${decoration.type}`}
+                            primaryTypographyProps={{ variant: 'body2' }}
+                            secondaryTypographyProps={{ variant: 'caption' }}
+                          />
+                        </ListItemButton>
+                      </ListItem>
+                    ))
+                  ) || []}
+                </List>
+                
+                {(!dungeon?.floors[0]?.cells?.flat().some(cell => cell.decorations.length > 0)) && (
+                  <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 2 }}>
+                    装飾がありません
+                  </Typography>
+                )}
+              </Box>
+            </AccordionDetails>
+          </Accordion>
+          <Divider />
+        </>
+      )}
 
-      {/* 壁タイプ選択 */}
-      <Accordion expanded={accordionStates.wallTypeAccordion} onChange={handleWallTypeAccordionToggle}>
-        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-          <WallIcon sx={{ mr: 1 }} />
-          <Typography>壁タイプ選択</Typography>
-        </AccordionSummary>
-        <AccordionDetails sx={{ p: 0 }}>
-          <List dense>
-            {wallTypes.map((wallType) => (
-              <ListItem key={wallType.key} disablePadding>
-                <ListItemButton
-                  selected={selectedWallType === wallType.key}
-                  onClick={() => handleWallTypeSelect(wallType.key)}
-                  disabled={!dungeon || selectedLayer !== 'walls'}
-                  sx={{ pl: 2 }}
-                >
-                  <ListItemIcon sx={{ minWidth: 32 }}>
-                    <Box
-                      sx={{
-                        width: 16,
-                        height: 16,
-                        bgcolor: wallType.color,
-                        border: '1px solid #ccc',
-                        borderRadius: '2px',
-                      }}
-                    />
-                  </ListItemIcon>
-                  <ListItemText 
-                    primary={wallType.name}
-                    secondary={wallType.description}
-                  />
-                </ListItemButton>
-              </ListItem>
-            ))}
-          </List>
-        </AccordionDetails>
-      </Accordion>
-
-      <Divider />
-
-      {/* キャプチャされたセル情報 */}
+      {/* キャプチャされたセル情報（全レイヤー共通） */}
       {capturedCellData && (
         <>
           <Accordion>

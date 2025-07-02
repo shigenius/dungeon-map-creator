@@ -1,5 +1,6 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit'
-import { Dungeon, Cell, Position } from '../types/map'
+import { Dungeon, Cell, Position, DungeonEvent, TemplateCategory, Template, Decoration } from '../types/map'
+import { rotateTemplate as rotateTemplateUtil } from '../utils/templateUtils'
 
 interface MapState {
   dungeon: Dungeon | null
@@ -150,8 +151,315 @@ const mapSlice = createSlice({
         state.dungeon = JSON.parse(JSON.stringify(state.history[state.historyIndex]))
       }
     },
+
+    placeTemplate: (state, action: PayloadAction<{ template: Template; position?: Position; floorIndex: number; rotation?: 0 | 90 | 180 | 270 }>) => {
+      if (!state.dungeon) return
+      
+      const { template: inputTemplate, position, floorIndex, rotation = 0 } = action.payload
+      const floor = state.dungeon.floors[floorIndex]
+      if (!floor) return
+      
+      // 渡されたテンプレートを使用
+      let template = inputTemplate
+      
+      // テンプレートを指定角度回転
+      if (rotation !== 0) {
+        template = rotateTemplateUtil(template, rotation)
+      }
+
+      // マップ全体テンプレートの判定
+      const isFullMapTemplate = template.isFullMap || template.category === 'fullmap'
+      
+      if (isFullMapTemplate) {
+        // マップ全体を置き換え
+        // マップサイズをテンプレートに合わせて変更
+        floor.width = template.size.width
+        floor.height = template.size.height
+        
+        // 新しいセル配列を作成
+        const newCells = []
+        for (let y = 0; y < template.size.height; y++) {
+          const row = []
+          for (let x = 0; x < template.size.width; x++) {
+            const templateCell = template.cells[y][x]
+            row.push({
+              x,
+              y,
+              floor: { ...templateCell.floor },
+              walls: {
+                north: templateCell.walls.north ? { ...templateCell.walls.north } : null,
+                east: templateCell.walls.east ? { ...templateCell.walls.east } : null,
+                south: templateCell.walls.south ? { ...templateCell.walls.south } : null,
+                west: templateCell.walls.west ? { ...templateCell.walls.west } : null,
+              },
+              events: [...templateCell.events],
+              decorations: [...templateCell.decorations],
+              properties: {}
+            })
+          }
+          newCells.push(row)
+        }
+        
+        floor.cells = newCells
+      } else {
+        // 通常の部分的テンプレート配置
+        if (!position) return
+        
+        // テンプレートの範囲がマップ内に収まるかチェック
+        const endX = position.x + template.size.width
+        const endY = position.y + template.size.height
+        if (endX > floor.width || endY > floor.height) return
+
+        // テンプレートのセルを配置
+        for (let ty = 0; ty < template.size.height; ty++) {
+          for (let tx = 0; tx < template.size.width; tx++) {
+            const mapX = position.x + tx
+            const mapY = position.y + ty
+            const templateCell = template.cells[ty][tx]
+            
+            if (mapX < floor.width && mapY < floor.height) {
+              const targetCell = floor.cells[mapY][mapX]
+              
+              // テンプレートのセルデータをマップのセルにコピー
+              targetCell.floor = { ...templateCell.floor }
+              targetCell.walls = {
+                north: templateCell.walls.north ? { ...templateCell.walls.north } : null,
+                east: templateCell.walls.east ? { ...templateCell.walls.east } : null,
+                south: templateCell.walls.south ? { ...templateCell.walls.south } : null,
+                west: templateCell.walls.west ? { ...templateCell.walls.west } : null,
+              }
+              targetCell.events = [...templateCell.events]
+              targetCell.decorations = [...templateCell.decorations]
+            }
+          }
+        }
+      }
+
+      // 履歴に追加
+      const newHistory = state.history.slice(0, state.historyIndex + 1)
+      newHistory.push(JSON.parse(JSON.stringify(state.dungeon)))
+      
+      if (newHistory.length > state.maxHistory) {
+        newHistory.shift()
+      } else {
+        state.historyIndex++
+      }
+      
+      state.history = newHistory
+    },
+
+    // イベント関連のアクション
+    addEventToCell: (state, action: PayloadAction<{ x: number; y: number; event: DungeonEvent }>) => {
+      if (!state.dungeon) return
+      
+      const { x, y, event } = action.payload
+      const cell = state.dungeon.floors[0].cells[y]?.[x]
+      if (cell) {
+        // イベントの位置をセルの座標に合わせる
+        const eventWithPosition = { ...event, position: { x, y } }
+        cell.events.push(eventWithPosition)
+        // 履歴に追加
+        const newHistory = state.history.slice(0, state.historyIndex + 1)
+        newHistory.push(JSON.parse(JSON.stringify(state.dungeon)))
+        
+        if (newHistory.length > state.maxHistory) {
+          newHistory.shift()
+        } else {
+          state.historyIndex++
+        }
+        
+        state.history = newHistory
+      }
+    },
+
+    updateEventInCell: (state, action: PayloadAction<{ x: number; y: number; event: DungeonEvent }>) => {
+      if (!state.dungeon) return
+      
+      const { x, y, event } = action.payload
+      const cell = state.dungeon.floors[0].cells[y]?.[x]
+      if (cell) {
+        const eventIndex = cell.events.findIndex(e => e.id === event.id)
+        if (eventIndex !== -1) {
+          // イベントの位置をセルの座標に合わせる
+          const eventWithPosition = { ...event, position: { x, y } }
+          cell.events[eventIndex] = eventWithPosition
+          // 履歴に追加
+          const newHistory = state.history.slice(0, state.historyIndex + 1)
+          newHistory.push(JSON.parse(JSON.stringify(state.dungeon)))
+          
+          if (newHistory.length > state.maxHistory) {
+            newHistory.shift()
+          } else {
+            state.historyIndex++
+          }
+          
+          state.history = newHistory
+        }
+      }
+    },
+
+    removeEventFromCell: (state, action: PayloadAction<{ x: number; y: number; eventId: string }>) => {
+      if (!state.dungeon) return
+      
+      const { x, y, eventId } = action.payload
+      const cell = state.dungeon.floors[0].cells[y]?.[x]
+      if (cell) {
+        cell.events = cell.events.filter(event => event.id !== eventId)
+        // 履歴に追加
+        const newHistory = state.history.slice(0, state.historyIndex + 1)
+        newHistory.push(JSON.parse(JSON.stringify(state.dungeon)))
+        
+        if (newHistory.length > state.maxHistory) {
+          newHistory.shift()
+        } else {
+          state.historyIndex++
+        }
+        
+        state.history = newHistory
+      }
+    },
+
+    // 装飾関連のアクション
+    addDecorationToCell: (state, action: PayloadAction<{ x: number; y: number; decoration: Decoration }>) => {
+      if (!state.dungeon) return
+      
+      const { x, y, decoration } = action.payload
+      const cell = state.dungeon.floors[0].cells[y]?.[x]
+      if (cell) {
+        // 装飾の位置をセルの座標に合わせる
+        const decorationWithPosition = { ...decoration, position: { x, y } }
+        cell.decorations.push(decorationWithPosition)
+        // 履歴に追加
+        const newHistory = state.history.slice(0, state.historyIndex + 1)
+        newHistory.push(JSON.parse(JSON.stringify(state.dungeon)))
+        
+        if (newHistory.length > state.maxHistory) {
+          newHistory.shift()
+        } else {
+          state.historyIndex++
+        }
+        
+        state.history = newHistory
+      }
+    },
+
+    updateDecorationInCell: (state, action: PayloadAction<{ x: number; y: number; decoration: Decoration }>) => {
+      if (!state.dungeon) return
+      
+      const { x, y, decoration } = action.payload
+      const cell = state.dungeon.floors[0].cells[y]?.[x]
+      if (cell) {
+        const decorationIndex = cell.decorations.findIndex(d => d.id === decoration.id)
+        if (decorationIndex !== -1) {
+          // 装飾の位置をセルの座標に合わせる
+          const decorationWithPosition = { ...decoration, position: { x, y } }
+          cell.decorations[decorationIndex] = decorationWithPosition
+          // 履歴に追加
+          const newHistory = state.history.slice(0, state.historyIndex + 1)
+          newHistory.push(JSON.parse(JSON.stringify(state.dungeon)))
+          
+          if (newHistory.length > state.maxHistory) {
+            newHistory.shift()
+          } else {
+            state.historyIndex++
+          }
+          
+          state.history = newHistory
+        }
+      }
+    },
+
+    removeDecorationFromCell: (state, action: PayloadAction<{ x: number; y: number; decorationId: string }>) => {
+      if (!state.dungeon) return
+      
+      const { x, y, decorationId } = action.payload
+      const cell = state.dungeon.floors[0].cells[y]?.[x]
+      if (cell) {
+        cell.decorations = cell.decorations.filter(decoration => decoration.id !== decorationId)
+        // 履歴に追加
+        const newHistory = state.history.slice(0, state.historyIndex + 1)
+        newHistory.push(JSON.parse(JSON.stringify(state.dungeon)))
+        
+        if (newHistory.length > state.maxHistory) {
+          newHistory.shift()
+        } else {
+          state.historyIndex++
+        }
+        
+        state.history = newHistory
+      }
+    },
+
+    // ユーザーテンプレート作成アクション
+    createTemplateFromSelection: (state, action: PayloadAction<{ 
+      floorIndex: number; 
+      startPos: { x: number; y: number }; 
+      endPos: { x: number; y: number };
+      templateName: string;
+      templateDescription?: string;
+      templateCategory: TemplateCategory;
+    }>) => {
+      if (!state.dungeon) return
+      
+      const { floorIndex, startPos, endPos, templateName, templateDescription = '', templateCategory } = action.payload
+      const floor = state.dungeon.floors[floorIndex]
+      if (!floor) return
+      
+      // 選択範囲の正規化
+      const minX = Math.min(startPos.x, endPos.x)
+      const maxX = Math.max(startPos.x, endPos.x)
+      const minY = Math.min(startPos.y, endPos.y)
+      const maxY = Math.max(startPos.y, endPos.y)
+      
+      const width = maxX - minX + 1
+      const height = maxY - minY + 1
+      
+      // テンプレートセルを作成
+      const templateCells = []
+      for (let y = 0; y < height; y++) {
+        const row = []
+        for (let x = 0; x < width; x++) {
+          const sourceCell = floor.cells[minY + y]?.[minX + x]
+          if (sourceCell) {
+            row.push({
+              floor: { ...sourceCell.floor },
+              walls: {
+                north: sourceCell.walls.north ? { ...sourceCell.walls.north } : null,
+                east: sourceCell.walls.east ? { ...sourceCell.walls.east } : null,
+                south: sourceCell.walls.south ? { ...sourceCell.walls.south } : null,
+                west: sourceCell.walls.west ? { ...sourceCell.walls.west } : null,
+              },
+              events: [...sourceCell.events],
+              decorations: [...sourceCell.decorations]
+            })
+          } else {
+            // デフォルトセル
+            row.push({
+              floor: { type: 'normal' as const, passable: true },
+              walls: { north: null, east: null, south: null, west: null },
+              events: [],
+              decorations: []
+            })
+          }
+        }
+        templateCells.push(row)
+      }
+      
+      // テンプレートをリソースに保存（実際の実装では外部ストレージに保存）
+      console.log('ユーザーテンプレートを作成しました:', {
+        id: crypto.randomUUID(),
+        name: templateName,
+        description: templateDescription,
+        category: templateCategory,
+        size: { width, height },
+        cells: templateCells,
+        isCustom: true,
+        author: state.dungeon.author,
+        created: new Date().toISOString()
+      })
+    },
   },
 })
 
-export const { createNewDungeon, loadDungeon, updateCell, updateCells, undo, redo } = mapSlice.actions
+export const { createNewDungeon, loadDungeon, updateCell, updateCells, undo, redo, placeTemplate, addEventToCell, updateEventInCell, removeEventFromCell, addDecorationToCell, updateDecorationInCell, removeDecorationFromCell, createTemplateFromSelection } = mapSlice.actions
 export default mapSlice.reducer

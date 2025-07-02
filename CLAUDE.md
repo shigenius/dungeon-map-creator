@@ -23,21 +23,25 @@ This is a 3D Dungeon RPG mapping tool - a fully implemented web-based map editor
 The application is built with a component-based React architecture:
 
 1. **State Management**: Redux Toolkit with two main slices:
-   - `mapSlice`: Manages dungeon data, cell modifications, and undo/redo history
-   - `editorSlice`: Manages UI state (selected tools, layers, zoom, view modes)
+   - `mapSlice`: Manages dungeon data, cell modifications, undo/redo history (50 steps)
+   - `editorSlice`: Manages UI state (tools, layers, zoom, view modes, hover information)
 
 2. **Component Structure**:
-   - `App.tsx`: Main application with keyboard shortcuts and layout
-   - `MapEditor2D.tsx`: Core canvas-based map editing with tool logic
+   - `App.tsx`: Main application with comprehensive keyboard shortcuts and layout
+   - `MainCanvas.tsx`: Central component managing 2D/3D view mode switching
+   - `MapEditor2D.tsx`: Core canvas-based map editing with detailed tool implementations
    - Panel components: MenuBar, ToolBar, LeftPanel, RightPanel, BottomPanel
-   - `NewProjectDialog.tsx`: Initial project creation workflow
+   - `NewProjectDialog.tsx`: Project creation workflow with size validation
 
 3. **Data Flow**: 
    - User interactions → Redux actions → State updates → Canvas redraw
-   - Keyboard shortcuts managed at App level
-   - Layer visibility controls affect rendering logic
+   - Keyboard shortcuts (App level) → Direct Redux dispatch
+   - Hover events → editorSlice → Real-time UI updates
+   - Batch operations → `updateCells` action → Performance optimization
 
-4. **Map Structure**: Hierarchical data model with Dungeon → Floors → Cells → (Floor/Walls/Events)
+4. **Map Structure**: Complex hierarchical data model:
+   - Dungeon → Floors → Cells → (Floor properties/Wall configurations/Events/Decorations)
+   - Each cell supports detailed properties, multiple event types, and custom flags
 
 ## Key Data Structures
 
@@ -85,28 +89,45 @@ npm run test        # Run browser tests
 ## Implemented Features
 
 ### ✅ Core Map Editor
-- Grid-based 2D map editing with HTML5 Canvas
-- Multiple drawing tools: pen, rectangle, fill, eyedropper, select
+- Grid-based 2D map editing with HTML5 Canvas and precise coordinate calculation
+- Multiple drawing tools: pen, rectangle, fill, eyedropper, select with Shift-key modifiers
 - Multi-layer system: floor, walls, events, decorations with visibility toggles
-- Real-time canvas redrawing with zoom (10%-400%)
-- Undo/Redo system with 50-step history
+- Real-time canvas redrawing with zoom (10%-400%) and grid toggle
+- Undo/Redo system with 50-step history using deep cloning
+- Batch cell updates for performance optimization
+- Advanced hover system with cell content preview and highlighting
 
 ### ✅ User Interface
-- Material-UI dark theme with responsive layout
-- Keyboard shortcuts (Ctrl+Z/Y, 1-5 for tools, Ctrl+S)
+- Material-UI dark theme with responsive Flexbox layout
+- Comprehensive keyboard shortcuts (20+ combinations including layer switching)
 - Project creation dialog with configurable map size (5×5 to 100×100)
-- Panel-based layout: MenuBar, ToolBar, LeftPanel, RightPanel, BottomPanel
+- Panel-based layout with accordion components for floor/wall type management
+- Real-time cell information display with hover highlighting
+- 2D/3D view mode switching (3D prepared)
+- Template creation dialog with category selection and description
 
 ### ✅ Data Management
-- JSON export functionality
-- Redux state persistence with structured data model
-- Cell-based editing with floor passability and wall placement
+- JSON import/export functionality with fileUtils integration
+- Redux state persistence with two main slices (mapSlice, editorSlice)
+- Complex hierarchical data model: Dungeon → Floors → Cells → Properties
+- Structured cell editing with detailed floor types (8) and wall configurations
+- Event system data structures supporting 10+ trigger types and 12+ action types
+- User-created template system with range selection and persistent storage
+
+### ✅ Template System
+- Comprehensive template management with preset and user-created templates
+- Category-based organization (room, corridor, junction, trap, puzzle, decoration, fullmap, custom)
+- Template placement tool with real-time preview and rotation (0°, 90°, 180°, 270°)
+- Range selection mode for creating templates from existing map areas
+- Full map templates that replace entire dungeon layouts
+- Template creation dialog with name, description, and category selection
+- Template rotation utilities with proper wall orientation handling
 
 ### 🚧 Pending Implementation
 - Three.js 3D preview system
 - Advanced event system with complex triggers
-- Template management system
 - Map validation and balance checking
+- Decoration system implementation
 
 ## Performance Constraints
 
@@ -152,11 +173,12 @@ The interface consists of:
 - **Tab**: Cycle through layers
 
 ### View Controls
-- **Ctrl+G**: Toggle grid display
-- **Space**: Toggle grid display
+- **Ctrl+G** / **Space**: Toggle grid display
 - **Ctrl++ / Ctrl+=**: Zoom in
 - **Ctrl+-**: Zoom out
 - **Ctrl+0**: Reset zoom to 100%
+- **Ctrl+1**: Switch to 2D view mode
+- **Ctrl+2**: Switch to 3D view mode (prepared)
 
 ### Edit Operations
 - **Ctrl+Z**: Undo
@@ -164,5 +186,10 @@ The interface consists of:
 - **Ctrl+S**: Save (prepared, shows console log)
 - **Ctrl+N**: New project (prepared, shows console log)
 - **Ctrl+O**: Open file (prepared, shows console log)
+
+### Template Operations
+- **Q**: Rotate template left (90° counter-clockwise)
+- **R**: Rotate template right (90° clockwise)
+- **Enter**: Confirm range selection and open template creation dialog
 
 Note: Shortcuts are disabled during text input and when no project is loaded.

@@ -7,6 +7,7 @@ export type FloorType =
   | 'switch'      // スイッチ床
   | 'warp'        // ワープ床
   | 'rotate'      // 回転床
+  | 'custom'      // カスタム床
 
 export type WallType = 
   | 'normal'      // 通常壁
@@ -17,6 +18,7 @@ export type WallType =
   | 'oneway'      // 片面壁
   | 'invisible'   // 透明壁
   | 'event'       // イベント壁
+  | 'custom'      // カスタム壁
 
 export type EventType = 
   | 'treasure'    // 宝箱
@@ -30,7 +32,124 @@ export type EventType =
   | 'harvest'     // 採取ポイント
   | 'custom'      // カスタムイベント
 
+export type DecorationType = 
+  | 'furniture'   // 家具
+  | 'statue'      // 彫像
+  | 'plant'       // 植物
+  | 'torch'       // 松明
+  | 'pillar'      // 柱
+  | 'rug'         // 絨毯
+  | 'painting'    // 絵画
+  | 'crystal'     // クリスタル
+  | 'rubble'      // 瓦礫
+  | 'custom'      // カスタム装飾
+
 export type Direction = 'north' | 'east' | 'south' | 'west'
+
+// 装飾関連の型定義
+export interface Decoration {
+  id: string
+  type: DecorationType
+  name: string
+  description?: string
+  position: {
+    x: number
+    y: number
+  }
+  appearance: {
+    visible: boolean
+    color: string
+    icon: string
+    layer: number // 重ね順（0が最背面）
+    rotation?: number // 回転角度（0-359）
+    scale?: number // スケール（0.1-3.0、デフォルト1.0）
+  }
+  properties: Record<string, any>
+  interactable?: boolean
+  script?: string
+}
+
+// カスタムタイプ関連の型定義
+export interface CustomFloorType {
+  id: string
+  name: string
+  description: string
+  color: string
+  texture?: string
+  passable: boolean
+  properties: Record<string, any>
+  effects?: Array<{
+    type: 'damage' | 'heal' | 'teleport' | 'transform' | 'custom'
+    value?: number
+    targetX?: number
+    targetY?: number
+    targetFloor?: number
+    script?: string
+  }>
+}
+
+export interface CustomWallType {
+  id: string
+  name: string
+  description: string
+  color: string
+  texture?: string
+  transparent: boolean
+  passable: boolean
+  properties: Record<string, any>
+  behavior?: {
+    type: 'door' | 'switch' | 'breakable' | 'teleport' | 'custom'
+    requiresKey?: string
+    durability?: number
+    script?: string
+  }
+}
+
+// テンプレート関連の型定義
+export type TemplateCategory = 
+  | 'room'        // 部屋
+  | 'corridor'    // 廊下
+  | 'junction'    // 交差点
+  | 'trap'        // トラップ
+  | 'puzzle'      // パズル
+  | 'decoration'  // 装飾
+  | 'fullmap'     // マップ全体
+  | 'custom'      // カスタム
+
+export interface TemplateCell {
+  floor: Floor
+  walls: {
+    north: Wall | null
+    east: Wall | null
+    south: Wall | null
+    west: Wall | null
+  }
+  events: DungeonEvent[]
+  decorations: Decoration[]
+}
+
+export interface Template {
+  id: string
+  name: string
+  description: string
+  category: TemplateCategory
+  size: {
+    width: number
+    height: number
+  }
+  cells: TemplateCell[][]
+  thumbnail?: string // Base64エンコードされた画像
+  tags: string[]
+  createdAt: Date
+  isBuiltIn: boolean // プリセットテンプレートかどうか
+  isFullMap?: boolean // マップ全体を置き換えるテンプレートかどうか
+}
+
+export interface TemplateGroup {
+  category: TemplateCategory
+  name: string
+  templates: Template[]
+}
 
 export interface Position {
   x: number
@@ -135,7 +254,7 @@ export interface DungeonEvent {
     created: string
     modified: string
     author?: string
-    version: number
+    version?: number
   }
 }
 
@@ -150,7 +269,7 @@ export interface Cell {
     west: Wall | null
   }
   events: DungeonEvent[]
-  decorations: any[]
+  decorations: Decoration[]
   properties: Record<string, any>
 }
 
@@ -204,6 +323,6 @@ export interface MapEditorState {
   viewMode: ViewMode
 }
 
-export type DrawingTool = 'pen' | 'rectangle' | 'fill' | 'eyedropper' | 'select' | 'eraser'
+export type DrawingTool = 'pen' | 'rectangle' | 'fill' | 'eyedropper' | 'select' | 'eraser' | 'template'
 export type Layer = 'floor' | 'walls' | 'events' | 'decorations'
 export type ViewMode = '2d' | '3d' | 'preview'
