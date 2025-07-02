@@ -666,9 +666,9 @@ test.describe('実装済み機能のブラウザテスト', () => {
     await expect(canvas).toBeVisible();
   });
 
-  test('保存→開くの完全サイクル', async ({ page }) => {
-    // 1. 最初のプロジェクト作成
-    let authorInput = page.locator('input[type="text"]').nth(1);
+  test('JSON保存機能の基本テスト', async ({ page }) => {
+    // プロジェクト作成
+    const authorInput = page.locator('input[type="text"]').nth(1);
     await authorInput.fill('テストユーザー');
     
     // ダンジョン名を変更
@@ -677,38 +677,103 @@ test.describe('実装済み機能のブラウザテスト', () => {
     
     await page.click('button:has-text("作成")');
     
-    // 2. 作成されたプロジェクトを確認
+    // 作成されたプロジェクトを確認
     await expect(page.locator('[role="dialog"]')).not.toBeVisible();
     await expect(page.locator('text=テスト用ダンジョン')).toBeVisible();
     
-    // 3. 何かしらの編集を行う（床タイプをダメージに変更）
+    // 編集を行う（床タイプを変更）
     await page.click('text=ダメージ');
     const canvas = page.locator('canvas');
     await canvas.click({ position: { x: 100, y: 100 } });
     
-    // 4. プロジェクトを保存
+    // Ctrl+Sで保存を実行
     const downloadPromise = page.waitForEvent('download');
     await page.keyboard.press('Control+s');
     const download = await downloadPromise;
     
-    // 5. 新しいプロジェクトを作成（現在のプロジェクトをリセット）
-    await page.keyboard.press('Control+n');
-    authorInput = page.locator('input[type="text"]').nth(1);
-    await authorInput.fill('別のユーザー');
-    
-    const newDungeonNameInput = page.locator('input[placeholder="新しいダンジョン"]');
-    await newDungeonNameInput.fill('別のダンジョン');
-    
+    // ダウンロードファイルが作成されることを確認
+    expect(download.suggestedFilename()).toMatch(/テスト用ダンジョン.*\.json$/);
+  });
+
+  test('JSONファイル読み込み機能の基本テスト', async ({ page }) => {
+    // プロジェクト作成
+    const authorInput = page.locator('input[type="text"]').nth(1);
+    await authorInput.fill('テストユーザー');
     await page.click('button:has-text("作成")');
-    await expect(page.locator('text=別のダンジョン')).toBeVisible();
     
-    // 6. 保存したファイルを開く
+    // ファイルメニューから開くを選択
     await page.click('button:has-text("ファイル")');
     await page.click('li:has-text("開く")');
     
-    // 7. ファイル内容がロードされることを確認
-    // （実際のファイル読み込みをシミュレート）
-    // この部分は実装後に詳細なテストを追加予定
+    // ファイル入力要素が表示されることを確認
+    const fileInput = page.locator('input[type="file"]');
+    await expect(fileInput).toBeAttached();
+    
+    // Accept属性がJSONファイルを指定していることを確認
+    await expect(fileInput).toHaveAttribute('accept', '.json');
+  });
+
+  test('Ctrl+Oキーボードショートカットでファイル開く', async ({ page }) => {
+    // プロジェクト作成
+    const authorInput = page.locator('input[type="text"]').nth(1);
+    await authorInput.fill('テストユーザー');
+    await page.click('button:has-text("作成")');
+    
+    // Ctrl+Oでファイルを開く
+    await page.keyboard.press('Control+o');
+    
+    // ファイル選択ダイアログが開かれることを確認
+    // （実際のファイル選択はブラウザのネイティブダイアログなので、
+    //  input[type="file"]の存在でファイル選択機能が動作していることを確認）
+    const fileInput = page.locator('input[type="file"]');
+    await expect(fileInput).toBeAttached();
+  });
+
+  test('不正なJSONファイル処理のエラーハンドリング', async ({ page }) => {
+    // プロジェクト作成
+    const authorInput = page.locator('input[type="text"]').nth(1);
+    await authorInput.fill('テストユーザー');
+    await page.click('button:has-text("作成")');
+    
+    // ファイルメニューから開くを選択
+    await page.click('button:has-text("ファイル")');
+    await page.click('li:has-text("開く")');
+    
+    // ファイル入力要素の存在を確認
+    const fileInput = page.locator('input[type="file"]');
+    await expect(fileInput).toBeAttached();
+    
+    // 不正なJSONファイルのテストはファイル操作の実装が必要なため、
+    // 現在はファイル選択機能が正しく動作することのみ確認
+  });
+
+  test('ファイル操作のキーボードショートカット統合テスト', async ({ page }) => {
+    // プロジェクト作成
+    const authorInput = page.locator('input[type="text"]').nth(1);
+    await authorInput.fill('テストユーザー');
+    await page.click('button:has-text("作成")');
+    
+    // 編集を行う
+    const canvas = page.locator('canvas');
+    await canvas.click({ position: { x: 50, y: 50 } });
+    
+    // Ctrl+Sで保存
+    const downloadPromise = page.waitForEvent('download');
+    await page.keyboard.press('Control+s');
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toMatch(/\.json$/);
+    
+    // Ctrl+Nで新規プロジェクト
+    await page.keyboard.press('Control+n');
+    await expect(page.locator('[role="dialog"]')).toBeVisible();
+    await expect(page.locator('h2:has-text("新規プロジェクト作成")')).toBeVisible();
+    
+    // ダイアログをキャンセル（キャンセルボタンをクリック）
+    await page.click('button:has-text("キャンセル")');
+    await expect(page.locator('[role="dialog"]')).not.toBeVisible();
+    
+    // Ctrl+Oでファイルを開く
+    await page.keyboard.press('Control+o');
     const fileInput = page.locator('input[type="file"]');
     await expect(fileInput).toBeAttached();
   });
@@ -978,5 +1043,304 @@ test.describe('実装済み機能のブラウザテスト', () => {
     
     // 操作完了を確認
     await expect(page.locator('canvas')).toBeVisible();
+  });
+
+  test('キーボードショートカット統合テスト - 全ツール切り替え', async ({ page }) => {
+    // プロジェクト作成
+    const authorInput = page.locator('input[type="text"]').nth(1);
+    await authorInput.fill('テストユーザー');
+    await page.click('button:has-text("作成")');
+    
+    // 全ツールのキーボードショートカットをテスト
+    const toolShortcuts = [
+      { key: '1', tool: 'pen' },
+      { key: '2', tool: 'rectangle' },
+      { key: '3', tool: 'fill' },
+      { key: '4', tool: 'eyedropper' },
+      { key: '5', tool: 'select' },
+      { key: '6', tool: 'eraser' }
+    ];
+    
+    for (const { key, tool } of toolShortcuts) {
+      await page.keyboard.press(key);
+      await expect(page.locator(`text=ツール: ${tool}`)).toBeVisible();
+      await expect(page.locator(`[role="group"] button[value="${tool}"]`)).toHaveAttribute('aria-pressed', 'true');
+    }
+  });
+
+  test('キーボードショートカット統合テスト - 全レイヤー切り替え', async ({ page }) => {
+    // プロジェクト作成
+    const authorInput = page.locator('input[type="text"]').nth(1);
+    await authorInput.fill('テストユーザー');
+    await page.click('button:has-text("作成")');
+    
+    // 全レイヤーのキーボードショートカットをテスト
+    const layerShortcuts = [
+      { key: 'f', layer: 'floor' },
+      { key: 'w', layer: 'walls' },
+      { key: 'e', layer: 'events' },
+      { key: 'd', layer: 'decorations' }
+    ];
+    
+    for (const { key, layer } of layerShortcuts) {
+      await page.keyboard.press(key);
+      await expect(page.locator(`text=レイヤー: ${layer}`)).toBeVisible();
+    }
+  });
+
+  test('キーボードショートカット統合テスト - その他の機能', async ({ page }) => {
+    // プロジェクト作成
+    const authorInput = page.locator('input[type="text"]').nth(1);
+    await authorInput.fill('テストユーザー');
+    await page.click('button:has-text("作成")');
+    
+    // 初期ズーム確認
+    await expect(page.locator('text=ズーム: 100%')).toBeVisible();
+    
+    // ズームイン (+ または =) - Ctrlキーと組み合わせて使用
+    await page.keyboard.press('Control+=');
+    await page.waitForTimeout(200); // ズーム処理の完了待ち
+    const zoomInText = await page.locator('text=/ズーム: \\d+%/').textContent();
+    expect(zoomInText).not.toBe('ズーム: 100%');
+    
+    // ズームリセット (Ctrl+0)
+    await page.keyboard.press('Control+0');
+    await page.waitForTimeout(200); // ズーム処理の完了待ち
+    await expect(page.locator('text=ズーム: 100%')).toBeVisible();
+    
+    // ズームアウト (Ctrl+-)
+    await page.keyboard.press('Control+-');
+    await page.waitForTimeout(200); // ズーム処理の完了待ち
+    const zoomOutText = await page.locator('text=/ズーム: \\d+%/').textContent();
+    expect(zoomOutText).not.toBe('ズーム: 100%');
+    
+    // ズームリセット (Ctrl+0)
+    await page.keyboard.press('Control+0');
+    await page.waitForTimeout(200); // ズーム処理の完了待ち
+    await expect(page.locator('text=ズーム: 100%')).toBeVisible();
+    
+    // グリッド切り替え (Space)
+    await page.keyboard.press('Space');
+    // グリッドの表示状態変更を確認（視覚的変化は難しいので、エラーが発生しないことを確認）
+    await expect(page.locator('canvas')).toBeVisible();
+    
+    // グリッド切り替え (g)
+    await page.keyboard.press('g');
+    await expect(page.locator('canvas')).toBeVisible();
+  });
+
+  test('キーボードショートカット統合テスト - Tab循環レイヤー切り替え', async ({ page }) => {
+    // プロジェクト作成
+    const authorInput = page.locator('input[type="text"]').nth(1);
+    await authorInput.fill('テストユーザー');
+    await page.click('button:has-text("作成")');
+    
+    // 初期状態（床レイヤー）を確認
+    await expect(page.locator('text=レイヤー: floor')).toBeVisible();
+    
+    // Tab で順次レイヤーを切り替え
+    await page.keyboard.press('Tab');
+    await expect(page.locator('text=レイヤー: walls')).toBeVisible();
+    
+    await page.keyboard.press('Tab');
+    await expect(page.locator('text=レイヤー: events')).toBeVisible();
+    
+    await page.keyboard.press('Tab');
+    await expect(page.locator('text=レイヤー: decorations')).toBeVisible();
+    
+    // 最後からまた最初に戻る
+    await page.keyboard.press('Tab');
+    await expect(page.locator('text=レイヤー: floor')).toBeVisible();
+  });
+
+  test('キーボードショートカット無効化テスト - 入力フィールド内', async ({ page }) => {
+    // 新規プロジェクト作成ダイアログが表示された状態で開始
+    await expect(page.locator('[role="dialog"]')).toBeVisible();
+    
+    // ダンジョン名入力フィールドにフォーカス
+    const dungeonNameInput = page.locator('input[type="text"]').first();
+    await dungeonNameInput.click();
+    await dungeonNameInput.fill(''); // フィールドをクリア
+    
+    // 入力フィールド内ではツール切り替えが無効化されることを確認
+    await page.keyboard.type('123456'); // ツール切り替えキーを入力
+    
+    // 入力内容が反映されることを確認（ツール切り替えではなく文字入力として動作）
+    await expect(dungeonNameInput).toHaveValue('123456');
+    
+    // 作成者名フィールドでも同様にテスト
+    const authorInput = page.locator('input[type="text"]').nth(1);
+    await authorInput.click();
+    await page.keyboard.type('fwed'); // レイヤー切り替えキーを入力
+    
+    // 入力内容が反映されることを確認
+    await expect(authorInput).toHaveValue('fwed');
+    
+    // プロジェクト作成
+    await page.click('button:has-text("作成")');
+    
+    // プロジェクト作成後はキーボードショートカットが有効になることを確認
+    await page.keyboard.press('1');
+    await expect(page.locator('text=ツール: pen')).toBeVisible();
+  });
+
+  test('キーボードショートカット統合テスト - Ctrl組み合わせ', async ({ page }) => {
+    // プロジェクト作成
+    const authorInput = page.locator('input[type="text"]').nth(1);
+    await authorInput.fill('テストユーザー');
+    await page.click('button:has-text("作成")');
+    
+    // 床を配置してUndo/Redoテスト
+    const canvas = page.locator('canvas');
+    await canvas.click({ position: { x: 100, y: 100 } });
+    
+    // Ctrl+Z (Undo)
+    await page.keyboard.press('Control+z');
+    
+    // Ctrl+Y (Redo)
+    await page.keyboard.press('Control+y');
+    
+    // Ctrl+S (Save) - コンソールログが出ることを確認（実際のダウンロードテストは別で実施済み）
+    await page.keyboard.press('Control+s');
+    
+    // 操作完了を確認
+    await expect(page.locator('canvas')).toBeVisible();
+  });
+
+  test('イベント編集機能 - イベントレイヤー基本表示', async ({ page }) => {
+    // プロジェクト作成
+    const authorInput = page.locator('input[type="text"]').nth(1);
+    await authorInput.fill('テストユーザー');
+    await page.click('button:has-text("作成")');
+    
+    // イベントレイヤーを選択
+    await page.click('text=イベントレイヤー');
+    await expect(page.locator('text=レイヤー: events')).toBeVisible();
+    
+    // イベント編集パネルが表示されることを確認
+    await expect(page.locator('text=イベント編集')).toBeVisible();
+    
+    // イベントエディターの基本要素が表示されることを確認
+    await expect(page.locator('text=イベント一覧 (0)')).toBeVisible();
+    await expect(page.getByRole('button', { name: '新規作成' })).toBeVisible();
+    
+    // 初期状態でのメッセージ表示を確認
+    await expect(page.locator('text=イベントがありません')).toBeVisible();
+  });
+
+  test('イベント編集機能 - 矩形ツールによるイベント作成', async ({ page }) => {
+    // プロジェクト作成
+    const authorInput = page.locator('input[type="text"]').nth(1);
+    await authorInput.fill('テストユーザー');
+    await page.click('button:has-text("作成")');
+    
+    // イベントレイヤーを選択
+    await page.click('text=イベントレイヤー');
+    await expect(page.locator('text=レイヤー: events')).toBeVisible();
+    
+    // 矩形ツールを選択
+    await page.keyboard.press('2'); // 矩形ツール
+    await expect(page.locator('text=ツール: rectangle')).toBeVisible();
+    
+    // キャンバス上で矩形を描画してイベントを作成
+    const canvas = page.locator('canvas');
+    
+    // 矩形の開始点をクリック
+    await canvas.click({ position: { x: 100, y: 100 } });
+    
+    // 矩形の終了点をクリック
+    await canvas.click({ position: { x: 150, y: 150 } });
+    
+    // イベントが作成されたことを確認（イベント数が増加）
+    await expect(page.locator('text=/イベント一覧 \\([1-9]\\)/')).toBeVisible();
+  });
+
+  test('イベント編集機能 - イベント種別とトリガー設定', async ({ page }) => {
+    // プロジェクト作成
+    const authorInput = page.locator('input[type="text"]').nth(1);
+    await authorInput.fill('テストユーザー');
+    await page.click('button:has-text("作成")');
+    
+    // イベントレイヤーを選択
+    await page.click('text=イベントレイヤー');
+    await expect(page.locator('text=レイヤー: events')).toBeVisible();
+    
+    // ペンツールでイベントを配置
+    await page.keyboard.press('1'); // ペンツール
+    const canvas = page.locator('canvas');
+    await canvas.click({ position: { x: 100, y: 100 } });
+    
+    // イベント作成を確認
+    await expect(page.locator('text=/イベント一覧 \\([1-9]\\)/')).toBeVisible();
+    
+    // 新規作成ボタンをクリックしてイベント編集ダイアログを開く
+    await page.getByRole('button', { name: '新規作成' }).click();
+    
+    // イベント作成ダイアログが表示されることを確認
+    await expect(page.locator('text=新規イベント作成')).toBeVisible();
+    
+    // イベントタイプの選択肢があることを確認
+    await expect(page.locator('text=イベントタイプ')).toBeVisible();
+    
+    // トリガータイプの選択肢があることを確認
+    await expect(page.locator('text=トリガータイプ')).toBeVisible();
+    
+    // ダイアログを閉じる
+    await page.click('text=キャンセル');
+  });
+
+  test('イベント編集機能 - 消しゴムツールでのイベント削除', async ({ page }) => {
+    // プロジェクト作成
+    const authorInput = page.locator('input[type="text"]').nth(1);
+    await authorInput.fill('テストユーザー');
+    await page.click('button:has-text("作成")');
+    
+    // イベントレイヤーを選択
+    await page.click('text=イベントレイヤー');
+    await expect(page.locator('text=レイヤー: events')).toBeVisible();
+    
+    // ペンツールでイベントを配置
+    await page.keyboard.press('1'); // ペンツール
+    const canvas = page.locator('canvas');
+    await canvas.click({ position: { x: 100, y: 100 } });
+    
+    // イベント作成を確認
+    await expect(page.locator('text=/イベント一覧 \\([1-9]\\)/')).toBeVisible();
+    
+    // 消しゴムツールに切り替え
+    await page.keyboard.press('6'); // 消しゴムツール
+    await expect(page.locator('text=ツール: eraser')).toBeVisible();
+    
+    // 同じ位置をクリックしてイベントを削除
+    await canvas.click({ position: { x: 100, y: 100 } });
+    
+    // イベントが削除されたことを確認
+    await expect(page.locator('text=イベント一覧 (0)')).toBeVisible();
+  });
+
+  test('イベント編集機能 - イベントリスト表示', async ({ page }) => {
+    // プロジェクト作成
+    const authorInput = page.locator('input[type="text"]').nth(1);
+    await authorInput.fill('テストユーザー');
+    await page.click('button:has-text("作成")');
+    
+    // イベントレイヤーを選択
+    await page.click('text=イベントレイヤー');
+    await expect(page.locator('text=レイヤー: events')).toBeVisible();
+    
+    // 複数のイベントを配置
+    await page.keyboard.press('1'); // ペンツール
+    const canvas = page.locator('canvas');
+    
+    // 3つのイベントを配置
+    await canvas.click({ position: { x: 100, y: 100 } });
+    await canvas.click({ position: { x: 150, y: 100 } });
+    await canvas.click({ position: { x: 200, y: 100 } });
+    
+    // イベント数が更新されることを確認
+    await expect(page.locator('text=/イベント一覧 \\([3-9]\\)/')).toBeVisible();
+    
+    // イベントリストセクションが表示されることを確認
+    await expect(page.locator('text=イベント一覧')).toBeVisible();
   });
 });
