@@ -1343,4 +1343,86 @@ test.describe('実装済み機能のブラウザテスト', () => {
     // イベントリストセクションが表示されることを確認
     await expect(page.locator('text=イベント一覧')).toBeVisible();
   });
+
+  test('マウスホバー時のセル情報表示機能 - 基本表示', async ({ page }) => {
+    // プロジェクト作成
+    const authorInput = page.locator('input[type="text"]').nth(1);
+    await authorInput.fill('テストユーザー');
+    await page.click('button:has-text("作成")');
+    
+    // キャンバスにマウスをホバー
+    const canvas = page.locator('canvas');
+    await canvas.hover({ position: { x: 50, y: 50 } });
+    
+    // 右パネルにセル情報が表示されることを確認
+    await expect(page.locator('text=セル情報')).toBeVisible();
+    await expect(page.locator('text=位置:')).toBeVisible();
+    await expect(page.locator('text=床:')).toBeVisible();
+    await expect(page.locator('text=壁:')).toBeVisible();
+  });
+
+  test('マウスホバー時のセル情報表示機能 - 壁情報表示', async ({ page }) => {
+    // プロジェクト作成
+    const authorInput = page.locator('input[type="text"]').nth(1);
+    await authorInput.fill('テストユーザー');
+    await page.click('button:has-text("作成")');
+    
+    // 壁レイヤーで壁を配置
+    await page.click('text=壁レイヤー');
+    await page.click('text=扉'); // 扉タイプを選択
+    
+    const canvas = page.locator('canvas');
+    await canvas.click({ position: { x: 50, y: 30 } }); // 壁を配置
+    
+    // 同じセルにホバーして壁情報を確認
+    await canvas.hover({ position: { x: 50, y: 50 } });
+    
+    // ホバー情報で壁の情報が表示されることを確認
+    await expect(page.locator('text=セル情報')).toBeVisible();
+    // 壁の方向情報を確認（北、東、南、西）
+    await expect(page.locator('text=北:')).toBeVisible();
+    await expect(page.locator('text=東:')).toBeVisible();
+    await expect(page.locator('text=南:')).toBeVisible();
+    await expect(page.locator('text=西:')).toBeVisible();
+  });
+
+  test('マウスホバー時のセル情報表示機能 - 床タイプ表示', async ({ page }) => {
+    // プロジェクト作成
+    const authorInput = page.locator('input[type="text"]').nth(1);
+    await authorInput.fill('テストユーザー');
+    await page.click('button:has-text("作成")');
+    
+    // 床レイヤーでダメージ床を配置
+    await page.click('text=ダメージ'); // ダメージ床を選択
+    const canvas = page.locator('canvas');
+    await canvas.click({ position: { x: 100, y: 100 } }); // 床を配置
+    
+    // 同じセルにホバーして床情報を確認
+    await canvas.hover({ position: { x: 100, y: 100 } });
+    
+    // ホバー情報でダメージ床が表示されることを確認
+    await expect(page.locator('text=セル情報')).toBeVisible();
+    await expect(page.locator('text=ダメージ床')).toBeVisible();
+    await expect(page.locator('text=通行可')).toBeVisible();
+  });
+
+  test('マウスホバー時のセル情報表示機能 - ホバー終了時の非表示', async ({ page }) => {
+    // プロジェクト作成
+    const authorInput = page.locator('input[type="text"]').nth(1);
+    await authorInput.fill('テストユーザー');
+    await page.click('button:has-text("作成")');
+    
+    const canvas = page.locator('canvas');
+    
+    // キャンバスにホバーしてセル情報を表示
+    await canvas.hover({ position: { x: 50, y: 50 } });
+    await expect(page.locator('text=セル情報')).toBeVisible();
+    
+    // マウスをキャンバスの外に移動（メニューバーへ）
+    await page.locator('button:has-text("ファイル")').hover();
+    await page.waitForTimeout(300); // ホバー処理の完了待ち
+    
+    // セル情報が非表示になることを確認（タイムアウトを短く）
+    await expect(page.locator('text=セル情報')).not.toBeVisible({ timeout: 2000 });
+  });
 });

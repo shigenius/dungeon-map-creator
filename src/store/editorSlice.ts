@@ -15,6 +15,22 @@ interface CapturedCellData {
   hasEvents: boolean
 }
 
+interface HoveredCellInfo {
+  position: { x: number; y: number }
+  floor: {
+    type: FloorType
+    passable: boolean
+  }
+  walls: {
+    north: { type: WallType; transparent: boolean } | null
+    east: { type: WallType; transparent: boolean } | null
+    south: { type: WallType; transparent: boolean } | null
+    west: { type: WallType; transparent: boolean } | null
+  }
+  events: Array<{ name: string; type: string }>
+  decorations: Array<{ name: string; type: string }>
+}
+
 interface EditorState {
   currentFloor: number
   selectedTool: DrawingTool
@@ -22,6 +38,7 @@ interface EditorState {
   selectedFloorType: FloorType
   selectedWallType: WallType
   capturedCellData: CapturedCellData | null
+  hoveredCellInfo: HoveredCellInfo | null
   zoom: number
   gridVisible: boolean
   coordinatesVisible: boolean
@@ -41,6 +58,7 @@ const initialState: EditorState = {
   selectedFloorType: 'normal',
   selectedWallType: 'normal',
   capturedCellData: null,
+  hoveredCellInfo: null,
   zoom: 1.0,
   gridVisible: true,
   coordinatesVisible: false,
@@ -116,6 +134,14 @@ const editorSlice = createSlice({
       state.capturedCellData = null
     },
     
+    setHoveredCellInfo: (state, action: PayloadAction<HoveredCellInfo>) => {
+      state.hoveredCellInfo = action.payload
+    },
+    
+    clearHoveredCellInfo: (state) => {
+      state.hoveredCellInfo = null
+    },
+    
     openNewProjectDialog: (state) => {
       state.showNewProjectDialog = true
     },
@@ -142,6 +168,8 @@ export const {
   setSelectedWallType,
   setCapturedCellData,
   clearCapturedCellData,
+  setHoveredCellInfo,
+  clearHoveredCellInfo,
   setZoom,
   toggleGrid,
   toggleCoordinates,

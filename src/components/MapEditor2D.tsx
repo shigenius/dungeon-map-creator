@@ -3,7 +3,7 @@ import { Box } from '@mui/material'
 import { useSelector, useDispatch } from 'react-redux'
 import { RootState } from '../store'
 import { updateCell, updateCells } from '../store/mapSlice'
-import { setCapturedCellData } from '../store/editorSlice'
+import { setCapturedCellData, setHoveredCellInfo, clearHoveredCellInfo } from '../store/editorSlice'
 import { Position, WallType } from '../types/map'
 
 // 床タイプに応じた通行可否を決定する関数
@@ -818,6 +818,12 @@ const MapEditor2D: React.FC = () => {
     return null
   }, [cellSize, floor])
 
+
+  // マウスがキャンバスから離れた時にホバー情報をクリア
+  const handleCanvasMouseLeave = useCallback(() => {
+    dispatch(clearHoveredCellInfo())
+  }, [dispatch])
+
   const handleCanvasClick = useCallback((event: React.MouseEvent) => {
     event.preventDefault()
     event.stopPropagation()
@@ -1245,6 +1251,41 @@ const MapEditor2D: React.FC = () => {
   }, [getCellPosition, floor, selectedLayer, selectedTool, selectedFloorType, selectedWallType, dispatch, currentFloor, isDrawingRectangle, rectangleStart, isDragging, capturedCellData])
 
   const handleCanvasMouseMove = useCallback((event: React.MouseEvent) => {
+    // ホバー情報の更新（ドラッグ中でない場合のみ）
+    if (!isDragging && !isActuallyDragging) {
+      const position = getCellPosition(event)
+      if (position && floor) {
+        const currentCell = floor.cells[position.y][position.x]
+        
+        // ホバー情報を構築
+        const hoveredInfo = {
+          position,
+          floor: {
+            type: currentCell.floor.type,
+            passable: currentCell.floor.passable
+          },
+          walls: {
+            north: currentCell.walls.north,
+            east: currentCell.walls.east,
+            south: currentCell.walls.south,
+            west: currentCell.walls.west
+          },
+          events: currentCell.events.map(event => ({
+            name: event.name,
+            type: event.type
+          })),
+          decorations: currentCell.decorations?.map(decoration => ({
+            name: decoration.name || '無名の装飾',
+            type: decoration.type || 'unknown'
+          })) || []
+        }
+        
+        dispatch(setHoveredCellInfo(hoveredInfo))
+      } else {
+        dispatch(clearHoveredCellInfo())
+      }
+    }
+
     if (selectedTool === 'rectangle' && isDrawingRectangle && rectangleStart) {
       const position = getCellPosition(event)
       if (position) {
@@ -1317,7 +1358,7 @@ const MapEditor2D: React.FC = () => {
         }
       }
     }
-  }, [selectedTool, isDrawingRectangle, rectangleStart, getCellPosition, isDragging, dragStart, selectedLayer, dragStartMouse, isActuallyDragging, cellSize])
+  }, [selectedTool, isDrawingRectangle, rectangleStart, getCellPosition, isDragging, dragStart, selectedLayer, dragStartMouse, isActuallyDragging, cellSize, floor, dispatch])
 
   const handleMouseDown = useCallback((event: React.MouseEvent) => {
     if (selectedLayer === 'walls' && selectedTool === 'pen') {
@@ -1494,6 +1535,7 @@ const MapEditor2D: React.FC = () => {
         ref={canvasRef}
         onClick={handleCanvasClick}
         onMouseMove={handleCanvasMouseMove}
+        onMouseLeave={handleCanvasMouseLeave}
         onMouseDown={handleMouseDown}
         onMouseUp={handleMouseUp}
         onPointerDown={(e) => {
