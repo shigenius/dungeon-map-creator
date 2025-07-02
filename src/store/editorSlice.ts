@@ -39,6 +39,7 @@ interface EditorState {
   selectedWallType: WallType
   capturedCellData: CapturedCellData | null
   hoveredCellInfo: HoveredCellInfo | null
+  hoveredCellPosition: { x: number; y: number } | null
   zoom: number
   gridVisible: boolean
   coordinatesVisible: boolean
@@ -59,6 +60,7 @@ const initialState: EditorState = {
   selectedWallType: 'normal',
   capturedCellData: null,
   hoveredCellInfo: null,
+  hoveredCellPosition: null,
   zoom: 1.0,
   gridVisible: true,
   coordinatesVisible: false,
@@ -142,6 +144,14 @@ const editorSlice = createSlice({
       state.hoveredCellInfo = null
     },
     
+    setHoveredCellPosition: (state, action: PayloadAction<{ x: number; y: number }>) => {
+      state.hoveredCellPosition = action.payload
+    },
+    
+    clearHoveredCellPosition: (state) => {
+      state.hoveredCellPosition = null
+    },
+    
     openNewProjectDialog: (state) => {
       state.showNewProjectDialog = true
     },
@@ -170,6 +180,8 @@ export const {
   clearCapturedCellData,
   setHoveredCellInfo,
   clearHoveredCellInfo,
+  setHoveredCellPosition,
+  clearHoveredCellPosition,
   setZoom,
   toggleGrid,
   toggleCoordinates,

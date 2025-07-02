@@ -1,10 +1,19 @@
-import React, { useRef, useEffect, useCallback, useState } from 'react'
+import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react'
 import { Box } from '@mui/material'
 import { useSelector, useDispatch } from 'react-redux'
 import { RootState } from '../store'
 import { updateCell, updateCells } from '../store/mapSlice'
-import { setCapturedCellData, setHoveredCellInfo, clearHoveredCellInfo } from '../store/editorSlice'
+import { setCapturedCellData, setHoveredCellInfo, clearHoveredCellInfo, setHoveredCellPosition, clearHoveredCellPosition } from '../store/editorSlice'
 import { Position, WallType } from '../types/map'
+
+// デバウンス関数
+const debounce = <T extends (...args: any[]) => void>(func: T, delay: number): T => {
+  let timeoutId: number
+  return ((...args: any[]) => {
+    clearTimeout(timeoutId)
+    timeoutId = window.setTimeout(() => func(...args), delay)
+  }) as T
+}
 
 // 床タイプに応じた通行可否を決定する関数
 const getPassableForFloorType = (floorType: string) => {
@@ -360,7 +369,7 @@ const MapEditor2D: React.FC = () => {
   
   const dungeon = useSelector((state: RootState) => state.map.dungeon)
   const editorState = useSelector((state: RootState) => state.editor)
-  const { currentFloor, selectedTool, selectedLayer, selectedFloorType, selectedWallType, capturedCellData, zoom, gridVisible } = editorState
+  const { currentFloor, selectedTool, selectedLayer, selectedFloorType, selectedWallType, capturedCellData, hoveredCellPosition, zoom, gridVisible } = editorState
 
   // セルサイズを整数に丸めて座標のズレを防ぐ
   const cellSize = Math.round(32 * zoom)
@@ -759,6 +768,27 @@ const MapEditor2D: React.FC = () => {
     ctx.lineWidth = 1
   }, [selectedCell, cellSize])
 
+  const drawHoveredCell = useCallback((ctx: CanvasRenderingContext2D) => {
+    // ペンツールで床または壁レイヤーが選択されている場合のみハイライト表示
+    if (selectedTool !== 'pen' || !hoveredCellPosition || (selectedLayer !== 'floor' && selectedLayer !== 'walls')) return
+
+    const { x, y } = hoveredCellPosition
+    const xPos = x * cellSize
+    const yPos = y * cellSize
+
+    // ハイライト色を設定（半透明）
+    ctx.fillStyle = selectedLayer === 'floor' ? 'rgba(100, 150, 255, 0.3)' : 'rgba(255, 150, 100, 0.3)'
+    ctx.fillRect(xPos, yPos, cellSize, cellSize)
+
+    // 枠線を描画
+    ctx.strokeStyle = selectedLayer === 'floor' ? '#6496ff' : '#ff9664'
+    ctx.lineWidth = 2
+    ctx.setLineDash([3, 3])
+    ctx.strokeRect(xPos, yPos, cellSize, cellSize)
+    ctx.setLineDash([])
+    ctx.lineWidth = 1
+  }, [selectedTool, selectedLayer, hoveredCellPosition, cellSize])
+
   const redraw = useCallback(() => {
     const canvas = canvasRef.current
     if (!canvas || !floor) return
@@ -796,8 +826,11 @@ const MapEditor2D: React.FC = () => {
     // 選択されたセルを描画
     drawSelectedCell(ctx)
     
+    // ホバー中のセルをハイライト
+    drawHoveredCell(ctx)
+    
     drawGrid(ctx)
-  }, [floor, cellSize, drawFloor, drawWalls, drawEvents, drawGrid, drawRectanglePreview, drawDragPreview, drawSelectedCell, editorState])
+  }, [floor, cellSize, drawFloor, drawWalls, drawEvents, drawGrid, drawRectanglePreview, drawDragPreview, drawSelectedCell, drawHoveredCell, editorState])
 
   const getCellPosition = useCallback((event: React.MouseEvent): Position | null => {
     const canvas = canvasRef.current
@@ -818,10 +851,61 @@ const MapEditor2D: React.FC = () => {
     return null
   }, [cellSize, floor])
 
+  // ホバー情報更新処理（パフォーマンス改善のため分離）
+  const updateHoverInfo = useCallback((position: Position) => {
+    if (!floor) return
+    
+    const currentCell = floor.cells[position.y][position.x]
+    
+    // ホバー情報を構築
+    const hoveredInfo = {
+      position,
+      floor: {
+        type: currentCell.floor.type,
+        passable: currentCell.floor.passable
+      },
+      walls: {
+        north: currentCell.walls.north,
+        east: currentCell.walls.east,
+        south: currentCell.walls.south,
+        west: currentCell.walls.west
+      },
+      events: currentCell.events.map(event => ({
+        name: event.name,
+        type: event.type
+      })),
+      decorations: currentCell.decorations?.map(decoration => ({
+        name: decoration.name || '無名の装飾',
+        type: decoration.type || 'unknown'
+      })) || []
+    }
+    
+    // デバッグ情報をコンソールに出力（開発モードのみ）
+    console.log('Hovered Cell Debug:', {
+      position,
+      actualCellData: currentCell,
+      displayedInfo: hoveredInfo
+    })
+    
+    dispatch(setHoveredCellInfo(hoveredInfo))
+    
+    // ペンツールで床または壁レイヤーの場合、ハイライト用の位置も更新
+    if (selectedTool === 'pen' && (selectedLayer === 'floor' || selectedLayer === 'walls')) {
+      dispatch(setHoveredCellPosition(position))
+    }
+  }, [floor, dispatch, selectedTool, selectedLayer])
+
+  // デバウンス版のホバー情報更新
+  const debouncedUpdateHoverInfo = useMemo(
+    () => debounce(updateHoverInfo, 50), // 50ms のデバウンス
+    [updateHoverInfo]
+  )
+
 
   // マウスがキャンバスから離れた時にホバー情報をクリア
   const handleCanvasMouseLeave = useCallback(() => {
     dispatch(clearHoveredCellInfo())
+    dispatch(clearHoveredCellPosition())
   }, [dispatch])
 
   const handleCanvasClick = useCallback((event: React.MouseEvent) => {
@@ -1255,34 +1339,11 @@ const MapEditor2D: React.FC = () => {
     if (!isDragging && !isActuallyDragging) {
       const position = getCellPosition(event)
       if (position && floor) {
-        const currentCell = floor.cells[position.y][position.x]
-        
-        // ホバー情報を構築
-        const hoveredInfo = {
-          position,
-          floor: {
-            type: currentCell.floor.type,
-            passable: currentCell.floor.passable
-          },
-          walls: {
-            north: currentCell.walls.north,
-            east: currentCell.walls.east,
-            south: currentCell.walls.south,
-            west: currentCell.walls.west
-          },
-          events: currentCell.events.map(event => ({
-            name: event.name,
-            type: event.type
-          })),
-          decorations: currentCell.decorations?.map(decoration => ({
-            name: decoration.name || '無名の装飾',
-            type: decoration.type || 'unknown'
-          })) || []
-        }
-        
-        dispatch(setHoveredCellInfo(hoveredInfo))
+        // パフォーマンス改善：デバウンス版を使用
+        debouncedUpdateHoverInfo(position)
       } else {
         dispatch(clearHoveredCellInfo())
+        dispatch(clearHoveredCellPosition())
       }
     }
 
@@ -1358,7 +1419,7 @@ const MapEditor2D: React.FC = () => {
         }
       }
     }
-  }, [selectedTool, isDrawingRectangle, rectangleStart, getCellPosition, isDragging, dragStart, selectedLayer, dragStartMouse, isActuallyDragging, cellSize, floor, dispatch])
+  }, [selectedTool, isDrawingRectangle, rectangleStart, getCellPosition, isDragging, dragStart, selectedLayer, dragStartMouse, isActuallyDragging, cellSize, floor, dispatch, debouncedUpdateHoverInfo])
 
   const handleMouseDown = useCallback((event: React.MouseEvent) => {
     if (selectedLayer === 'walls' && selectedTool === 'pen') {
