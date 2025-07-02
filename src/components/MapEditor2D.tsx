@@ -60,12 +60,15 @@ const setLinePattern = (ctx: CanvasRenderingContext2D, pattern: string) => {
 
 // 境界線座標からセル座標に変換する関数
 const convertBoundaryToCell = (boundaryX: number, boundaryY: number, cellSize: number) => {
+  // セルサイズを整数に丸めて正確な計算を保証
+  const roundedCellSize = Math.round(cellSize)
+  
   // 境界線座標を正確なセル座標に変換
   // 垂直境界線：境界線が完全にセル境界上にある場合は右側のセルを選択
   // 水平境界線：境界線が完全にセル境界上にある場合は下側のセルを選択
   
-  const exactCellX = boundaryX / cellSize
-  const exactCellY = boundaryY / cellSize
+  const exactCellX = boundaryX / roundedCellSize
+  const exactCellY = boundaryY / roundedCellSize
   
   // 境界線が完全にグリッド線上にある場合の処理
   const isOnVerticalBoundary = exactCellX === Math.floor(exactCellX) && exactCellX > 0
@@ -229,9 +232,12 @@ const getWallDirectionFromClick = (
   cellY: number, 
   cellSize: number
 ): 'north' | 'east' | 'south' | 'west' => {
+  // セルサイズを整数に丸めて正確な計算を保証
+  const roundedCellSize = Math.round(cellSize)
+  
   // セル内の相対位置
-  const relativeX = (mouseX - cellX * cellSize) / cellSize
-  const relativeY = (mouseY - cellY * cellSize) / cellSize
+  const relativeX = (mouseX - cellX * roundedCellSize) / roundedCellSize
+  const relativeY = (mouseY - cellY * roundedCellSize) / roundedCellSize
   
   // セル中心からの距離を計算
   const centerX = 0.5
@@ -255,11 +261,14 @@ const getWallDirectionFromBoundary = (
   cellY: number,
   cellSize: number
 ): 'north' | 'east' | 'south' | 'west' => {
+  // セルサイズを整数に丸めて正確な計算を保証
+  const roundedCellSize = Math.round(cellSize)
+  
   // セルの境界座標を計算
-  const cellLeft = cellX * cellSize
-  const cellRight = (cellX + 1) * cellSize
-  const cellTop = cellY * cellSize
-  const cellBottom = (cellY + 1) * cellSize
+  const cellLeft = cellX * roundedCellSize
+  const cellRight = (cellX + 1) * roundedCellSize
+  const cellTop = cellY * roundedCellSize
+  const cellBottom = (cellY + 1) * roundedCellSize
   
   // 境界線がセルのどの辺にあるかを判定
   const tolerance = 1 // ピクセル単位の許容誤差
@@ -294,18 +303,21 @@ const getWallBoundaryPosition = (
   mouseY: number,
   cellSize: number
 ): { x: number; y: number; snapType: 'horizontal' | 'vertical' } => {
-  // すべての可能な境界線との距離を計算
-  const cellX = Math.floor(mouseX / cellSize)
-  const cellY = Math.floor(mouseY / cellSize)
+  // セルサイズを整数に丸めて正確な計算を保証
+  const roundedCellSize = Math.round(cellSize)
   
-  // 各境界線の座標を計算
+  // すべての可能な境界線との距離を計算
+  const cellX = Math.floor(mouseX / roundedCellSize)
+  const cellY = Math.floor(mouseY / roundedCellSize)
+  
+  // 各境界線の座標を整数で計算
   const boundaries = [
     // 垂直境界線
-    { x: cellX * cellSize, y: mouseY, type: 'vertical' as const, dist: Math.abs(mouseX - cellX * cellSize) },
-    { x: (cellX + 1) * cellSize, y: mouseY, type: 'vertical' as const, dist: Math.abs(mouseX - (cellX + 1) * cellSize) },
+    { x: Math.round(cellX * roundedCellSize), y: mouseY, type: 'vertical' as const, dist: Math.abs(mouseX - cellX * roundedCellSize) },
+    { x: Math.round((cellX + 1) * roundedCellSize), y: mouseY, type: 'vertical' as const, dist: Math.abs(mouseX - (cellX + 1) * roundedCellSize) },
     // 水平境界線
-    { x: mouseX, y: cellY * cellSize, type: 'horizontal' as const, dist: Math.abs(mouseY - cellY * cellSize) },
-    { x: mouseX, y: (cellY + 1) * cellSize, type: 'horizontal' as const, dist: Math.abs(mouseY - (cellY + 1) * cellSize) }
+    { x: mouseX, y: Math.round(cellY * roundedCellSize), type: 'horizontal' as const, dist: Math.abs(mouseY - cellY * roundedCellSize) },
+    { x: mouseX, y: Math.round((cellY + 1) * roundedCellSize), type: 'horizontal' as const, dist: Math.abs(mouseY - (cellY + 1) * roundedCellSize) }
   ]
   
   // 最も近い境界線を選択
@@ -314,8 +326,8 @@ const getWallBoundaryPosition = (
   )
   
   return {
-    x: closest.x,
-    y: closest.y,
+    x: Math.round(closest.x),
+    y: Math.round(closest.y),
     snapType: closest.type
   }
 }
@@ -350,18 +362,22 @@ const MapEditor2D: React.FC = () => {
   const editorState = useSelector((state: RootState) => state.editor)
   const { currentFloor, selectedTool, selectedLayer, selectedFloorType, selectedWallType, capturedCellData, zoom, gridVisible } = editorState
 
-  const cellSize = 32 * zoom
+  // セルサイズを整数に丸めて座標のズレを防ぐ
+  const cellSize = Math.round(32 * zoom)
   const floor = dungeon?.floors[currentFloor]
 
   const drawGrid = useCallback((ctx: CanvasRenderingContext2D) => {
     if (!gridVisible || !floor) return
 
+    // アンチエイリアシングを無効化してシャープな線を描画
+    ctx.imageSmoothingEnabled = false
     ctx.strokeStyle = '#333'
     ctx.lineWidth = 1
 
     // 縦線
     for (let x = 0; x <= floor.width; x++) {
-      const xPos = x * cellSize
+      // 座標を整数に丸めて0.5ピクセル補正でシャープな線を描画
+      const xPos = Math.round(x * cellSize) + 0.5
       ctx.beginPath()
       ctx.moveTo(xPos, 0)
       ctx.lineTo(xPos, floor.height * cellSize)
@@ -370,12 +386,16 @@ const MapEditor2D: React.FC = () => {
 
     // 横線
     for (let y = 0; y <= floor.height; y++) {
-      const yPos = y * cellSize
+      // 座標を整数に丸めて0.5ピクセル補正でシャープな線を描画
+      const yPos = Math.round(y * cellSize) + 0.5
       ctx.beginPath()
       ctx.moveTo(0, yPos)
       ctx.lineTo(floor.width * cellSize, yPos)
       ctx.stroke()
     }
+    
+    // アンチエイリアシングを元に戻す
+    ctx.imageSmoothingEnabled = true
   }, [gridVisible, floor, cellSize])
 
   const drawFloor = useCallback((ctx: CanvasRenderingContext2D) => {
@@ -384,8 +404,9 @@ const MapEditor2D: React.FC = () => {
     for (let y = 0; y < floor.height; y++) {
       for (let x = 0; x < floor.width; x++) {
         const cell = floor.cells[y][x]
-        const xPos = x * cellSize
-        const yPos = y * cellSize
+        // 座標を整数に丸めて正確な配置を保証
+        const xPos = Math.round(x * cellSize)
+        const yPos = Math.round(y * cellSize)
 
         // 床の描画
         let floorColor = '#444'
@@ -410,7 +431,8 @@ const MapEditor2D: React.FC = () => {
         }
 
         ctx.fillStyle = floorColor
-        ctx.fillRect(xPos, yPos, cellSize, cellSize)
+        // 床を整数座標とサイズで描画
+        ctx.fillRect(xPos, yPos, Math.round(cellSize), Math.round(cellSize))
 
         // 通行不可の場合は「X」マークを表示
         if (!cell.floor.passable) {
@@ -444,22 +466,28 @@ const MapEditor2D: React.FC = () => {
   const drawWalls = useCallback((ctx: CanvasRenderingContext2D) => {
     if (!floor) return
 
+    // 壁描画時はアンチエイリアシングを無効化してシャープな線を描画
+    ctx.imageSmoothingEnabled = false
+
     for (let y = 0; y < floor.height; y++) {
       for (let x = 0; x < floor.width; x++) {
         const cell = floor.cells[y][x]
-        const xPos = x * cellSize
-        const yPos = y * cellSize
+        // 座標を整数に丸めて正確な配置を保証
+        const xPos = Math.round(x * cellSize)
+        const yPos = Math.round(y * cellSize)
+        const roundedCellSize = Math.round(cellSize)
 
         // 北の壁
         if (cell.walls.north) {
           const style = getWallStyle(cell.walls.north.type)
           ctx.strokeStyle = style.color
-          ctx.lineWidth = style.lineWidth
+          ctx.lineWidth = 2 // 線の太さを統一
           setLinePattern(ctx, style.pattern)
           
           ctx.beginPath()
-          ctx.moveTo(xPos, yPos)
-          ctx.lineTo(xPos + cellSize, yPos)
+          // 0.5ピクセル補正でシャープな線を描画
+          ctx.moveTo(xPos + 0.5, yPos + 0.5)
+          ctx.lineTo(xPos + roundedCellSize + 0.5, yPos + 0.5)
           ctx.stroke()
         }
 
@@ -467,12 +495,13 @@ const MapEditor2D: React.FC = () => {
         if (cell.walls.east) {
           const style = getWallStyle(cell.walls.east.type)
           ctx.strokeStyle = style.color
-          ctx.lineWidth = style.lineWidth
+          ctx.lineWidth = 2 // 線の太さを統一
           setLinePattern(ctx, style.pattern)
           
           ctx.beginPath()
-          ctx.moveTo(xPos + cellSize, yPos)
-          ctx.lineTo(xPos + cellSize, yPos + cellSize)
+          // 0.5ピクセル補正でシャープな線を描画
+          ctx.moveTo(xPos + roundedCellSize + 0.5, yPos + 0.5)
+          ctx.lineTo(xPos + roundedCellSize + 0.5, yPos + roundedCellSize + 0.5)
           ctx.stroke()
         }
 
@@ -480,12 +509,13 @@ const MapEditor2D: React.FC = () => {
         if (cell.walls.south) {
           const style = getWallStyle(cell.walls.south.type)
           ctx.strokeStyle = style.color
-          ctx.lineWidth = style.lineWidth
+          ctx.lineWidth = 2 // 線の太さを統一
           setLinePattern(ctx, style.pattern)
           
           ctx.beginPath()
-          ctx.moveTo(xPos, yPos + cellSize)
-          ctx.lineTo(xPos + cellSize, yPos + cellSize)
+          // 0.5ピクセル補正でシャープな線を描画
+          ctx.moveTo(xPos + 0.5, yPos + roundedCellSize + 0.5)
+          ctx.lineTo(xPos + roundedCellSize + 0.5, yPos + roundedCellSize + 0.5)
           ctx.stroke()
         }
 
@@ -493,12 +523,13 @@ const MapEditor2D: React.FC = () => {
         if (cell.walls.west) {
           const style = getWallStyle(cell.walls.west.type)
           ctx.strokeStyle = style.color
-          ctx.lineWidth = style.lineWidth
+          ctx.lineWidth = 2 // 線の太さを統一
           setLinePattern(ctx, style.pattern)
           
           ctx.beginPath()
-          ctx.moveTo(xPos, yPos)
-          ctx.lineTo(xPos, yPos + cellSize)
+          // 0.5ピクセル補正でシャープな線を描画
+          ctx.moveTo(xPos + 0.5, yPos + 0.5)
+          ctx.lineTo(xPos + 0.5, yPos + roundedCellSize + 0.5)
           ctx.stroke()
         }
       }
@@ -506,6 +537,8 @@ const MapEditor2D: React.FC = () => {
     
     // 線のパターンをリセット
     ctx.setLineDash([])
+    // アンチエイリアシングを元に戻す
+    ctx.imageSmoothingEnabled = true
   }, [floor, cellSize])
 
   const drawDragPreview = useCallback((ctx: CanvasRenderingContext2D) => {
@@ -773,8 +806,10 @@ const MapEditor2D: React.FC = () => {
     const rect = canvas.getBoundingClientRect()
     const rawX = event.clientX - rect.left
     const rawY = event.clientY - rect.top
-    const x = Math.floor(rawX / cellSize)
-    const y = Math.floor(rawY / cellSize)
+    // セルサイズを整数に丸めて正確な座標変換を保証
+    const roundedCellSize = Math.round(cellSize)
+    const x = Math.floor(rawX / roundedCellSize)
+    const y = Math.floor(rawY / roundedCellSize)
 
     if (x >= 0 && x < floor.width && y >= 0 && y < floor.height) {
       return { x, y }
