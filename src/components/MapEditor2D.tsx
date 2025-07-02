@@ -1,19 +1,11 @@
-import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react'
+import React, { useRef, useEffect, useCallback, useState } from 'react'
 import { Box } from '@mui/material'
 import { useSelector, useDispatch } from 'react-redux'
 import { RootState } from '../store'
 import { updateCell, updateCells } from '../store/mapSlice'
-import { setCapturedCellData, setHoveredCellInfo, clearHoveredCellInfo, setHoveredCellPosition, clearHoveredCellPosition } from '../store/editorSlice'
+import { setCapturedCellData, setHoveredCellInfo, clearHoveredCellInfo, setHoveredCellPosition, clearHoveredCellPosition, setHoveredWallInfo, clearHoveredWallInfo } from '../store/editorSlice'
 import { Position, WallType } from '../types/map'
 
-// デバウンス関数
-const debounce = <T extends (...args: any[]) => void>(func: T, delay: number): T => {
-  let timeoutId: number
-  return ((...args: any[]) => {
-    clearTimeout(timeoutId)
-    timeoutId = window.setTimeout(() => func(...args), delay)
-  }) as T
-}
 
 // 床タイプに応じた通行可否を決定する関数
 const getPassableForFloorType = (floorType: string) => {
@@ -24,6 +16,41 @@ const getPassableForFloorType = (floorType: string) => {
     case 'pit': return false
     case 'warp': return true
     default: return true
+  }
+}
+
+// 床タイプごとのハイライト色を取得する関数
+const getFloorHighlightColor = (floorType: string, isShiftPressed: boolean) => {
+  if (isShiftPressed) {
+    return { fill: 'rgba(255, 100, 100, 0.4)', stroke: '#ff6464' } // 削除モード（赤）
+  }
+  
+  switch (floorType) {
+    case 'normal': return { fill: 'rgba(100, 150, 255, 0.3)', stroke: '#6496ff' } // 青
+    case 'damage': return { fill: 'rgba(255, 100, 100, 0.3)', stroke: '#ff6464' } // 赤
+    case 'slippery': return { fill: 'rgba(100, 255, 255, 0.3)', stroke: '#64ffff' } // シアン
+    case 'pit': return { fill: 'rgba(100, 100, 100, 0.3)', stroke: '#646464' } // グレー
+    case 'warp': return { fill: 'rgba(255, 100, 255, 0.3)', stroke: '#ff64ff' } // マゼンタ
+    default: return { fill: 'rgba(100, 150, 255, 0.3)', stroke: '#6496ff' } // デフォルト青
+  }
+}
+
+// 壁タイプごとのハイライト色を取得する関数
+const getWallHighlightColor = (wallType: string, isShiftPressed: boolean) => {
+  if (isShiftPressed) {
+    return { fill: 'rgba(255, 100, 100, 0.4)', stroke: '#ff6464' } // 削除モード（赤）
+  }
+  
+  switch (wallType) {
+    case 'normal': return { fill: 'rgba(255, 200, 100, 0.4)', stroke: '#ffc864' } // オレンジ
+    case 'door': return { fill: 'rgba(139, 69, 19, 0.4)', stroke: '#8b4513' } // 茶色
+    case 'locked_door': return { fill: 'rgba(255, 215, 0, 0.4)', stroke: '#ffd700' } // 金色
+    case 'hidden_door': return { fill: 'rgba(136, 136, 136, 0.4)', stroke: '#888888' } // グレー
+    case 'breakable': return { fill: 'rgba(255, 107, 53, 0.4)', stroke: '#ff6b35' } // オレンジ赤
+    case 'oneway': return { fill: 'rgba(0, 206, 209, 0.4)', stroke: '#00ced1' } // ターコイズ
+    case 'invisible': return { fill: 'rgba(102, 102, 102, 0.4)', stroke: '#666666' } // 暗いグレー
+    case 'event': return { fill: 'rgba(255, 20, 147, 0.4)', stroke: '#ff1493' } // ピンク
+    default: return { fill: 'rgba(255, 200, 100, 0.4)', stroke: '#ffc864' } // デフォルトオレンジ
   }
 }
 
@@ -360,8 +387,6 @@ const MapEditor2D: React.FC = () => {
   // 世界樹の迷宮スタイル用：実際のピクセル座標での開始・終了位置
   const [dragStartPixel, setDragStartPixel] = useState<{ x: number; y: number } | null>(null)
   const [dragEndPixel, setDragEndPixel] = useState<{ x: number; y: number } | null>(null)
-  // Shiftキーによる削除モード
-  const [isShiftPressed, setIsShiftPressed] = useState(false)
   // ドラッグ開始点（マウス座標）
   const [dragStartMouse, setDragStartMouse] = useState<{ x: number; y: number } | null>(null)
   // 実際にドラッグが開始されたかどうかのフラグ
@@ -369,11 +394,50 @@ const MapEditor2D: React.FC = () => {
   
   const dungeon = useSelector((state: RootState) => state.map.dungeon)
   const editorState = useSelector((state: RootState) => state.editor)
-  const { currentFloor, selectedTool, selectedLayer, selectedFloorType, selectedWallType, capturedCellData, hoveredCellPosition, zoom, gridVisible } = editorState
+  const { currentFloor, selectedTool, selectedLayer, selectedFloorType, selectedWallType, capturedCellData, hoveredCellPosition, hoveredWallInfo, isShiftPressed, zoom, gridVisible } = editorState
 
   // セルサイズを整数に丸めて座標のズレを防ぐ
   const cellSize = Math.round(32 * zoom)
   const floor = dungeon?.floors[currentFloor]
+
+  // マウス位置から最も近い壁を検出する関数
+  const getClosestWallFromMouse = useCallback((event: React.MouseEvent): { position: Position; direction: 'north' | 'east' | 'south' | 'west' } | null => {
+    const canvas = canvasRef.current
+    if (!canvas || !floor) return null
+
+    const rect = canvas.getBoundingClientRect()
+    const mouseX = event.clientX - rect.left
+    const mouseY = event.clientY - rect.top
+    
+    // セル位置を取得
+    const roundedCellSize = Math.round(cellSize)
+    const cellX = Math.floor(mouseX / roundedCellSize)
+    const cellY = Math.floor(mouseY / roundedCellSize)
+
+    if (cellX < 0 || cellX >= floor.width || cellY < 0 || cellY >= floor.height) {
+      return null
+    }
+
+    // セル内の相対位置
+    const relativeX = (mouseX - cellX * roundedCellSize) / roundedCellSize
+    const relativeY = (mouseY - cellY * roundedCellSize) / roundedCellSize
+
+    // セルの中心からの距離
+    const centerX = 0.5
+    const centerY = 0.5
+    const dx = relativeX - centerX
+    const dy = relativeY - centerY
+
+    // どの辺に最も近いかを判定
+    let direction: 'north' | 'east' | 'south' | 'west'
+    if (Math.abs(dx) > Math.abs(dy)) {
+      direction = dx > 0 ? 'east' : 'west'
+    } else {
+      direction = dy > 0 ? 'south' : 'north'
+    }
+
+    return { position: { x: cellX, y: cellY }, direction }
+  }, [cellSize, floor])
 
   const drawGrid = useCallback((ctx: CanvasRenderingContext2D) => {
     if (!gridVisible || !floor) return
@@ -770,24 +834,68 @@ const MapEditor2D: React.FC = () => {
 
   const drawHoveredCell = useCallback((ctx: CanvasRenderingContext2D) => {
     // ペンツールで床または壁レイヤーが選択されている場合のみハイライト表示
-    if (selectedTool !== 'pen' || !hoveredCellPosition || (selectedLayer !== 'floor' && selectedLayer !== 'walls')) return
+    if (selectedTool !== 'pen') return
 
-    const { x, y } = hoveredCellPosition
-    const xPos = x * cellSize
-    const yPos = y * cellSize
+    // 床レイヤーのハイライト
+    if (selectedLayer === 'floor' && hoveredCellPosition) {
+      const { x, y } = hoveredCellPosition
+      const xPos = x * cellSize
+      const yPos = y * cellSize
 
-    // ハイライト色を設定（半透明）
-    ctx.fillStyle = selectedLayer === 'floor' ? 'rgba(100, 150, 255, 0.3)' : 'rgba(255, 150, 100, 0.3)'
-    ctx.fillRect(xPos, yPos, cellSize, cellSize)
+      // 床タイプに応じた色を取得
+      const colors = getFloorHighlightColor(selectedFloorType, isShiftPressed)
+      
+      // ハイライト色を設定（半透明）
+      ctx.fillStyle = colors.fill
+      ctx.fillRect(xPos, yPos, cellSize, cellSize)
 
-    // 枠線を描画
-    ctx.strokeStyle = selectedLayer === 'floor' ? '#6496ff' : '#ff9664'
-    ctx.lineWidth = 2
-    ctx.setLineDash([3, 3])
-    ctx.strokeRect(xPos, yPos, cellSize, cellSize)
-    ctx.setLineDash([])
-    ctx.lineWidth = 1
-  }, [selectedTool, selectedLayer, hoveredCellPosition, cellSize])
+      // 枠線を描画
+      ctx.strokeStyle = colors.stroke
+      ctx.lineWidth = 2
+      ctx.setLineDash([3, 3])
+      ctx.strokeRect(xPos, yPos, cellSize, cellSize)
+      ctx.setLineDash([])
+      ctx.lineWidth = 1
+    }
+
+    // 壁レイヤーのハイライト
+    if (selectedLayer === 'walls' && hoveredWallInfo) {
+      const { position, direction } = hoveredWallInfo
+      const { x, y } = position
+      const baseX = x * cellSize
+      const baseY = y * cellSize
+
+      // 壁タイプに応じた色を取得
+      const colors = getWallHighlightColor(selectedWallType, isShiftPressed)
+      
+      ctx.fillStyle = colors.fill
+      ctx.strokeStyle = colors.stroke
+      ctx.lineWidth = 3
+
+      // 方向に応じて壁をハイライト
+      const wallThickness = 6
+      switch (direction) {
+        case 'north':
+          ctx.fillRect(baseX, baseY - wallThickness/2, cellSize, wallThickness)
+          ctx.strokeRect(baseX, baseY - wallThickness/2, cellSize, wallThickness)
+          break
+        case 'east':
+          ctx.fillRect(baseX + cellSize - wallThickness/2, baseY, wallThickness, cellSize)
+          ctx.strokeRect(baseX + cellSize - wallThickness/2, baseY, wallThickness, cellSize)
+          break
+        case 'south':
+          ctx.fillRect(baseX, baseY + cellSize - wallThickness/2, cellSize, wallThickness)
+          ctx.strokeRect(baseX, baseY + cellSize - wallThickness/2, cellSize, wallThickness)
+          break
+        case 'west':
+          ctx.fillRect(baseX - wallThickness/2, baseY, wallThickness, cellSize)
+          ctx.strokeRect(baseX - wallThickness/2, baseY, wallThickness, cellSize)
+          break
+      }
+      
+      ctx.lineWidth = 1
+    }
+  }, [selectedTool, selectedLayer, hoveredCellPosition, hoveredWallInfo, selectedFloorType, selectedWallType, isShiftPressed, cellSize])
 
   const redraw = useCallback(() => {
     const canvas = canvasRef.current
@@ -851,11 +959,39 @@ const MapEditor2D: React.FC = () => {
     return null
   }, [cellSize, floor])
 
+  // セルの実際の壁情報を取得する関数（隣接セルの壁も考慮）
+  const getActualWallInfo = useCallback((position: Position) => {
+    if (!floor) return { north: null, east: null, south: null, west: null }
+    
+    const currentCell = floor.cells[position.y][position.x]
+    const { x, y } = position
+    
+    // 各方向の壁を取得（隣接セルの壁も考慮）
+    const walls = {
+      // 北の壁：現在のセルの北の壁 または 上のセルの南の壁
+      north: currentCell.walls.north || 
+             (y > 0 ? floor.cells[y - 1][x]?.walls.south : null),
+      
+      // 東の壁：現在のセルの東の壁
+      east: currentCell.walls.east,
+      
+      // 南の壁：現在のセルの南の壁
+      south: currentCell.walls.south,
+      
+      // 西の壁：現在のセルの西の壁 または 左のセルの東の壁
+      west: currentCell.walls.west ||
+            (x > 0 ? floor.cells[y][x - 1]?.walls.east : null)
+    }
+    
+    return walls
+  }, [floor])
+
   // ホバー情報更新処理（パフォーマンス改善のため分離）
-  const updateHoverInfo = useCallback((position: Position) => {
+  const updateHoverInfo = useCallback((position: Position, event?: React.MouseEvent) => {
     if (!floor) return
     
     const currentCell = floor.cells[position.y][position.x]
+    const actualWalls = getActualWallInfo(position)
     
     // ホバー情報を構築
     const hoveredInfo = {
@@ -864,12 +1000,7 @@ const MapEditor2D: React.FC = () => {
         type: currentCell.floor.type,
         passable: currentCell.floor.passable
       },
-      walls: {
-        north: currentCell.walls.north,
-        east: currentCell.walls.east,
-        south: currentCell.walls.south,
-        west: currentCell.walls.west
-      },
+      walls: actualWalls,
       events: currentCell.events.map(event => ({
         name: event.name,
         type: event.type
@@ -890,22 +1021,28 @@ const MapEditor2D: React.FC = () => {
     dispatch(setHoveredCellInfo(hoveredInfo))
     
     // ペンツールで床または壁レイヤーの場合、ハイライト用の位置も更新
-    if (selectedTool === 'pen' && (selectedLayer === 'floor' || selectedLayer === 'walls')) {
-      dispatch(setHoveredCellPosition(position))
+    if (selectedTool === 'pen') {
+      if (selectedLayer === 'floor') {
+        dispatch(setHoveredCellPosition(position))
+        dispatch(clearHoveredWallInfo())
+      } else if (selectedLayer === 'walls' && event) {
+        // 壁レイヤーの場合は最も近い壁を検出
+        const wallInfo = getClosestWallFromMouse(event)
+        if (wallInfo) {
+          dispatch(setHoveredWallInfo(wallInfo))
+          dispatch(clearHoveredCellPosition())
+        }
+      }
     }
-  }, [floor, dispatch, selectedTool, selectedLayer])
+  }, [floor, dispatch, selectedTool, selectedLayer, getActualWallInfo, getClosestWallFromMouse])
 
-  // デバウンス版のホバー情報更新
-  const debouncedUpdateHoverInfo = useMemo(
-    () => debounce(updateHoverInfo, 50), // 50ms のデバウンス
-    [updateHoverInfo]
-  )
 
 
   // マウスがキャンバスから離れた時にホバー情報をクリア
   const handleCanvasMouseLeave = useCallback(() => {
     dispatch(clearHoveredCellInfo())
     dispatch(clearHoveredCellPosition())
+    dispatch(clearHoveredWallInfo())
   }, [dispatch])
 
   const handleCanvasClick = useCallback((event: React.MouseEvent) => {
@@ -1339,11 +1476,12 @@ const MapEditor2D: React.FC = () => {
     if (!isDragging && !isActuallyDragging) {
       const position = getCellPosition(event)
       if (position && floor) {
-        // パフォーマンス改善：デバウンス版を使用
-        debouncedUpdateHoverInfo(position)
+        // セル情報を更新
+        updateHoverInfo(position, event)
       } else {
         dispatch(clearHoveredCellInfo())
         dispatch(clearHoveredCellPosition())
+        dispatch(clearHoveredWallInfo())
       }
     }
 
@@ -1419,7 +1557,7 @@ const MapEditor2D: React.FC = () => {
         }
       }
     }
-  }, [selectedTool, isDrawingRectangle, rectangleStart, getCellPosition, isDragging, dragStart, selectedLayer, dragStartMouse, isActuallyDragging, cellSize, floor, dispatch, debouncedUpdateHoverInfo])
+  }, [selectedTool, isDrawingRectangle, rectangleStart, getCellPosition, isDragging, dragStart, selectedLayer, dragStartMouse, isActuallyDragging, cellSize, floor, dispatch, updateHoverInfo, getClosestWallFromMouse])
 
   const handleMouseDown = useCallback((event: React.MouseEvent) => {
     if (selectedLayer === 'walls' && selectedTool === 'pen') {
@@ -1432,7 +1570,6 @@ const MapEditor2D: React.FC = () => {
       
       // マウス座標を保存してドラッグ開始準備
       setDragStartMouse({ x: mouseX, y: mouseY })
-      setIsShiftPressed(event.shiftKey)
       setIsActuallyDragging(false)
       
       // 世界樹の迷宮スタイル：最も近い壁境界線にスナップ
@@ -1458,7 +1595,6 @@ const MapEditor2D: React.FC = () => {
       const mouseY = event.clientY - rect.top
       
       setDragStartMouse({ x: mouseX, y: mouseY })
-      setIsShiftPressed(event.shiftKey)
       setIsActuallyDragging(false)
       
       // 床ドラッグはセル単位でスナップ
@@ -1567,8 +1703,7 @@ const MapEditor2D: React.FC = () => {
     setDragStartPixel(null)
     setDragEndPixel(null)
     setDragStartMouse(null)
-    setIsShiftPressed(false)
-  }, [isDragging, isActuallyDragging, dragStart, dragEnd, dragStartMouse, selectedLayer, selectedTool, selectedWallType, selectedFloorType, isShiftPressed, dispatch, currentFloor, getCellPosition, floor, cellSize, capturedCellData])
+  }, [isDragging, isActuallyDragging, dragStart, dragEnd, dragStartMouse, selectedLayer, selectedTool, selectedWallType, selectedFloorType, dispatch, currentFloor, getCellPosition, floor, cellSize, capturedCellData])
 
   useEffect(() => {
     redraw()

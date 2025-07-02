@@ -3,7 +3,7 @@ import { Box } from '@mui/material'
 import { useSelector, useDispatch } from 'react-redux'
 import { RootState } from './store'
 import { undo, redo, loadDungeon } from './store/mapSlice'
-import { setSelectedTool, setSelectedLayer, toggleGrid, setZoom, openNewProjectDialog } from './store/editorSlice'
+import { setSelectedTool, setSelectedLayer, toggleGrid, setZoom, openNewProjectDialog, setShiftPressed } from './store/editorSlice'
 import { downloadDungeonAsJSON, openDungeonFromFile } from './utils/fileUtils'
 import MenuBar from './components/MenuBar'
 import ToolBar from './components/ToolBar'
@@ -20,6 +20,11 @@ function App() {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      // Shiftキーの状態を追跡
+      if (event.key === 'Shift') {
+        dispatch(setShiftPressed(true))
+      }
+
       // ダイアログが開いている時はショートカットを無効化
       if (!dungeon) return
 
@@ -145,9 +150,18 @@ function App() {
       }
     }
 
+    const handleKeyUp = (event: KeyboardEvent) => {
+      // Shiftキーの状態を追跡
+      if (event.key === 'Shift') {
+        dispatch(setShiftPressed(false))
+      }
+    }
+
     document.addEventListener('keydown', handleKeyDown)
+    document.addEventListener('keyup', handleKeyUp)
     return () => {
       document.removeEventListener('keydown', handleKeyDown)
+      document.removeEventListener('keyup', handleKeyUp)
     }
   }, [dispatch, dungeon, zoom, selectedLayer])
 

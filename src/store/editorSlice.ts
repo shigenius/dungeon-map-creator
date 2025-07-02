@@ -40,6 +40,8 @@ interface EditorState {
   capturedCellData: CapturedCellData | null
   hoveredCellInfo: HoveredCellInfo | null
   hoveredCellPosition: { x: number; y: number } | null
+  hoveredWallInfo: { position: { x: number; y: number }; direction: 'north' | 'east' | 'south' | 'west' } | null
+  isShiftPressed: boolean
   zoom: number
   gridVisible: boolean
   coordinatesVisible: boolean
@@ -61,6 +63,8 @@ const initialState: EditorState = {
   capturedCellData: null,
   hoveredCellInfo: null,
   hoveredCellPosition: null,
+  hoveredWallInfo: null,
+  isShiftPressed: false,
   zoom: 1.0,
   gridVisible: true,
   coordinatesVisible: false,
@@ -152,6 +156,18 @@ const editorSlice = createSlice({
       state.hoveredCellPosition = null
     },
     
+    setHoveredWallInfo: (state, action: PayloadAction<{ position: { x: number; y: number }; direction: 'north' | 'east' | 'south' | 'west' }>) => {
+      state.hoveredWallInfo = action.payload
+    },
+    
+    clearHoveredWallInfo: (state) => {
+      state.hoveredWallInfo = null
+    },
+    
+    setShiftPressed: (state, action: PayloadAction<boolean>) => {
+      state.isShiftPressed = action.payload
+    },
+    
     openNewProjectDialog: (state) => {
       state.showNewProjectDialog = true
     },
@@ -182,6 +198,9 @@ export const {
   clearHoveredCellInfo,
   setHoveredCellPosition,
   clearHoveredCellPosition,
+  setHoveredWallInfo,
+  clearHoveredWallInfo,
+  setShiftPressed,
   setZoom,
   toggleGrid,
   toggleCoordinates,
