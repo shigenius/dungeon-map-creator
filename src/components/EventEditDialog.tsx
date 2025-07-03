@@ -71,19 +71,19 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
   const [editingEvent, setEditingEvent] = useState<DungeonEvent | null>(null)
 
   useEffect(() => {
-    console.log('EventEditDialog useEffect実行:', { 
-      eventProp: event?.id || 'null', 
-      eventName: event?.name || 'null',
-      open 
-    })
+    // console.log('EventEditDialog useEffect実行:', { 
+    //   eventProp: event?.id || 'null', 
+    //   eventName: event?.name || 'null',
+    //   open 
+    // })
     
     if (event) {
-      console.log('EventEditDialog: 既存イベント編集モード', { eventId: event.id, eventName: event.name })
+      // console.log('EventEditDialog: 既存イベント編集モード', { eventId: event.id, eventName: event.name })
       setEditingEvent({ ...event })
     } else if (open) {
       // ダイアログが開いている場合のみ新規イベントを作成
       const newId = crypto.randomUUID()
-      console.log('EventEditDialog: 新規イベント作成モード、新しいID生成:', newId)
+      // console.log('EventEditDialog: 新規イベント作成モード、新しいID生成:', newId)
       setEditingEvent({
         id: newId,
         type: 'treasure',
@@ -110,7 +110,7 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
       })
     } else {
       // ダイアログが閉じている場合はeditingEventをクリア
-      console.log('EventEditDialog: ダイアログが閉じているため、editingEventをクリア')
+      // console.log('EventEditDialog: ダイアログが閉じているため、editingEventをクリア')
       setEditingEvent(null)
     }
   }, [event, open])

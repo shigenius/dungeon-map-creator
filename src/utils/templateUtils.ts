@@ -4,14 +4,14 @@ import { Template, TemplateCell } from '../types/map'
 export const rotateTemplate90 = (template: Template): Template => {
   const { width, height } = template.size
   
-  console.log(`90度回転開始: 元サイズ ${width}x${height}`)
-  console.log('元のテンプレートの最初のセル:', template.cells[0][0])
+  // console.log(`90度回転開始: 元サイズ ${width}x${height}`)
+  // console.log('元のテンプレートの最初のセル:', template.cells[0][0])
   
   // 回転後のサイズ（幅と高さが入れ替わる）
   const newWidth = height
   const newHeight = width
   
-  console.log(`回転後サイズ: ${newWidth}x${newHeight}`)
+  // console.log(`回転後サイズ: ${newWidth}x${newHeight}`)
   
   const newCells: TemplateCell[][] = Array(newHeight).fill(null).map(() => 
     Array(newWidth).fill(null).map(() => ({
@@ -29,7 +29,7 @@ export const rotateTemplate90 = (template: Template): Template => {
       const newX = height - 1 - y
       const newY = x
       
-      console.log(`座標変換: (${x}, ${y}) → (${newX}, ${newY})`)
+      // console.log(`座標変換: (${x}, ${y}) → (${newX}, ${newY})`)
       
       const originalCell = template.cells[y][x]
       
@@ -49,8 +49,8 @@ export const rotateTemplate90 = (template: Template): Template => {
     }
   }
   
-  console.log('回転後のテンプレートの最初のセル:', newCells[0][0])
-  console.log(`90度回転完了`)
+  // console.log('回転後のテンプレートの最初のセル:', newCells[0][0])
+  // console.log(`90度回転完了`)
   
   return {
     ...template,
@@ -61,22 +61,22 @@ export const rotateTemplate90 = (template: Template): Template => {
 
 // テンプレートを指定角度回転させる関数
 export const rotateTemplate = (template: Template, rotation: 0 | 90 | 180 | 270): Template => {
-  console.log(`rotateTemplate呼び出し: ${template.name}, 角度: ${rotation}°`)
+  // console.log(`rotateTemplate呼び出し: ${template.name}, 角度: ${rotation}°`)
   if (rotation === 0) {
-    console.log(`回転なし、元のテンプレートを返却`)
+    // console.log(`回転なし、元のテンプレートを返却`)
     return template
   }
   
   let rotatedTemplate = { ...template }
   
   const rotations = rotation / 90
-  console.log(`${rotations}回90度回転を実行`)
+  // console.log(`${rotations}回90度回転を実行`)
   for (let i = 0; i < rotations; i++) {
-    console.log(`${i + 1}回目の90度回転`)
+    // console.log(`${i + 1}回目の90度回転`)
     rotatedTemplate = rotateTemplate90(rotatedTemplate)
   }
   
-  console.log(`回転完了: ${template.size.width}x${template.size.height} → ${rotatedTemplate.size.width}x${rotatedTemplate.size.height}`)
+  // console.log(`回転完了: ${template.size.width}x${template.size.height} → ${rotatedTemplate.size.width}x${rotatedTemplate.size.height}`)
   return rotatedTemplate
 }
 

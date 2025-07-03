@@ -159,12 +159,26 @@ const mapSlice = createSlice({
       const floor = state.dungeon.floors[floorIndex]
       if (!floor) return
       
+      console.log('placeTemplate実行:', {
+        templateName: inputTemplate.name,
+        templateId: inputTemplate.id,
+        rotation,
+        position
+      })
+      
       // 渡されたテンプレートを使用
       let template = inputTemplate
       
       // テンプレートを指定角度回転
       if (rotation !== 0) {
+        console.log(`テンプレートを${rotation}度回転します`)
         template = rotateTemplateUtil(template, rotation)
+        console.log('回転後のテンプレートサイズ:', {
+          beforeSize: { width: inputTemplate.size.width, height: inputTemplate.size.height },
+          afterSize: { width: template.size.width, height: template.size.height }
+        })
+      } else {
+        console.log('テンプレート回転なし（rotation = 0）')
       }
 
       // マップ全体テンプレートの判定

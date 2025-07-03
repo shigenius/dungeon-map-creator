@@ -6,7 +6,6 @@ import {
   Tabs,
   Card,
   CardContent,
-  CardMedia,
   Grid,
   Chip,
   Button,
@@ -50,9 +49,85 @@ const TabPanel: React.FC<TabPanelProps> = ({ children, value, index }) => {
   )
 }
 
+// ヘルパー関数
+const getFloorTypeColor = (floorType: string) => {
+  switch (floorType) {
+    case 'normal': return '#666'
+    case 'damage': return '#a44'
+    case 'slippery': return '#47a'
+    case 'pit': return '#222'
+    case 'warp': return '#a74'
+    default: return '#666'
+  }
+}
+
+const getFloorTypeName = (floorType: string) => {
+  switch (floorType) {
+    case 'normal': return '通常'
+    case 'damage': return 'ダメージ'
+    case 'slippery': return '滑りやすい'
+    case 'pit': return '落とし穴'
+    case 'warp': return 'ワープ'
+    default: return '不明'
+  }
+}
+
+const getWallTypeColor = (wallType: string) => {
+  switch (wallType) {
+    case 'normal': return '#ffffff'
+    case 'door': return '#D2691E'
+    case 'locked_door': return '#FFD700'
+    case 'hidden_door': return '#999999'
+    case 'breakable': return '#FF8C42'
+    case 'oneway': return '#40E0D0'
+    case 'invisible': return '#777777'
+    case 'event': return '#FF69B4'
+    default: return '#ffffff'
+  }
+}
+
+const getWallTypeName = (wallType: string) => {
+  switch (wallType) {
+    case 'normal': return '通常壁'
+    case 'door': return '扉'
+    case 'locked_door': return '鍵付き扉'
+    case 'hidden_door': return '隠し扉'
+    case 'breakable': return '破壊可能壁'
+    case 'oneway': return '片面壁'
+    case 'invisible': return '透明壁'
+    case 'event': return 'イベント壁'
+    default: return '不明'
+  }
+}
+
+const getDirectionName = (direction: string) => {
+  switch (direction) {
+    case 'north': return '北'
+    case 'east': return '東'
+    case 'south': return '南'
+    case 'west': return '西'
+    default: return direction
+  }
+}
+
+const getDecorationIcon = (decorationType: string) => {
+  switch (decorationType) {
+    case 'furniture': return '🪑'
+    case 'statue': return '🗿'
+    case 'plant': return '🌿'
+    case 'torch': return '🔥'
+    case 'pillar': return '🏛️'
+    case 'rug': return '🧿'
+    case 'painting': return '🖼️'
+    case 'crystal': return '💎'
+    case 'rubble': return '🪨'
+    default: return '❓'
+  }
+}
+
 const RightPanel: React.FC = () => {
   const dispatch = useDispatch()
-  const { templates, selectedTemplate, templateCategory, templateRotation, currentFloor } = useSelector(
+  const { templates, selectedTemplate, templateCategory, templateRotation, currentFloor, hoveredCellInfo } = useSelector(
     (state: RootState) => state.editor
   )
   const dungeon = useSelector((state: RootState) => state.map.dungeon)
@@ -470,12 +545,147 @@ const RightPanel: React.FC = () => {
           <Box sx={{ p: 2 }}>
             <Accordion defaultExpanded>
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Typography variant="subtitle2">セルプロパティ</Typography>
+                <Typography variant="subtitle2">
+                  セルプロパティ
+                  {hoveredCellInfo && (
+                    <Typography component="span" variant="caption" sx={{ ml: 1, color: 'primary.main' }}>
+                      ({hoveredCellInfo.position.x}, {hoveredCellInfo.position.y})
+                    </Typography>
+                  )}
+                </Typography>
               </AccordionSummary>
               <AccordionDetails>
-                <Typography variant="body2" color="text.secondary">
-                  セルを選択してプロパティを編集
-                </Typography>
+                {hoveredCellInfo ? (
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    {/* 座標情報 */}
+                    <Box>
+                      <Typography variant="subtitle2" gutterBottom>
+                        座標
+                      </Typography>
+                      <Typography variant="body2">
+                        X: {hoveredCellInfo.position.x}, Y: {hoveredCellInfo.position.y}
+                      </Typography>
+                    </Box>
+
+                    {/* 床情報 */}
+                    <Box>
+                      <Typography variant="subtitle2" gutterBottom>
+                        床タイプ
+                      </Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Box
+                          sx={{
+                            width: 16,
+                            height: 16,
+                            bgcolor: getFloorTypeColor(hoveredCellInfo.floor.type),
+                            border: '1px solid #ccc',
+                            borderRadius: '2px',
+                          }}
+                        />
+                        <Typography variant="body2">
+                          {getFloorTypeName(hoveredCellInfo.floor.type)}
+                        </Typography>
+                      </Box>
+                      <Typography variant="body2" color="text.secondary">
+                        通行可否: {hoveredCellInfo.floor.passable ? '可能' : '不可'}
+                      </Typography>
+                    </Box>
+
+                    {/* 壁情報 */}
+                    <Box>
+                      <Typography variant="subtitle2" gutterBottom>
+                        壁情報
+                      </Typography>
+                      {(['north', 'east', 'south', 'west'] as const).map((direction) => {
+                        const wall = hoveredCellInfo.walls[direction]
+                        const directionName = getDirectionName(direction)
+                        return (
+                          <Box key={direction} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                            <Typography variant="body2" sx={{ minWidth: 40 }}>
+                              {directionName}:
+                            </Typography>
+                            {wall ? (
+                              <>
+                                <Box
+                                  sx={{
+                                    width: 12,
+                                    height: 12,
+                                    bgcolor: getWallTypeColor(wall.type),
+                                    border: '1px solid #ccc',
+                                    borderRadius: '2px',
+                                  }}
+                                />
+                                <Typography variant="body2">
+                                  {getWallTypeName(wall.type)}
+                                </Typography>
+                              </>
+                            ) : (
+                              <Typography variant="body2" color="text.secondary">
+                                なし
+                              </Typography>
+                            )}
+                          </Box>
+                        )
+                      })}
+                    </Box>
+
+                    {/* イベント情報 */}
+                    <Box>
+                      <Typography variant="subtitle2" gutterBottom>
+                        イベント ({hoveredCellInfo.events.length}個)
+                      </Typography>
+                      {hoveredCellInfo.events.length > 0 ? (
+                        hoveredCellInfo.events.map((event, index) => (
+                          <Box key={index} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                            <Box
+                              sx={{
+                                width: 12,
+                                height: 12,
+                                bgcolor: '#ffd700',
+                                border: '1px solid #ccc',
+                                borderRadius: '50%',
+                              }}
+                            />
+                            <Typography variant="body2">
+                              {event.name} ({event.type})
+                            </Typography>
+                          </Box>
+                        ))
+                      ) : (
+                        <Typography variant="body2" color="text.secondary">
+                          なし
+                        </Typography>
+                      )}
+                    </Box>
+
+                    {/* 装飾情報 */}
+                    <Box>
+                      <Typography variant="subtitle2" gutterBottom>
+                        装飾 ({hoveredCellInfo.decorations.length}個)
+                      </Typography>
+                      {hoveredCellInfo.decorations.length > 0 ? (
+                        hoveredCellInfo.decorations.map((decoration, index) => (
+                          <Box key={index} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                            <Typography variant="body2" sx={{ fontSize: '12px' }}>
+                              {getDecorationIcon(decoration.type)}
+                            </Typography>
+                            <Typography variant="body2">
+                              {decoration.name} ({decoration.type})
+                            </Typography>
+                          </Box>
+                        ))
+                      ) : (
+                        <Typography variant="body2" color="text.secondary">
+                          なし
+                        </Typography>
+                      )}
+                    </Box>
+                  </Box>
+                ) : (
+                  <Typography variant="body2" color="text.secondary">
+                    マウスをマップ上のセルに重ねると詳細情報が表示されます
+                  </Typography>
+                )}
               </AccordionDetails>
             </Accordion>
 

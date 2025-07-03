@@ -19,6 +19,7 @@ import {
   CropSquare as Wall,
   Event,
   Palette,
+  Grid3x3 as GridIcon,
 } from '@mui/icons-material'
 import { useDispatch, useSelector } from 'react-redux'
 import { RootState } from '../store'
@@ -28,7 +29,8 @@ import {
   openNewProjectDialog, 
   setSelectedLayer, 
   toggleLayerVisibility,
-  openHelpDialog
+  openHelpDialog,
+  toggleGrid
 } from '../store/editorSlice'
 import { downloadDungeonAsJSON, openDungeonFromFile } from '../utils/fileUtils'
 import { Layer } from '../types/map'
@@ -38,6 +40,7 @@ const MenuBar: React.FC = () => {
   const dungeon = useSelector((state: RootState) => state.map.dungeon)
   const selectedLayer = useSelector((state: RootState) => state.editor.selectedLayer)
   const layerVisibility = useSelector((state: RootState) => state.editor.layerVisibility)
+  const gridVisible = useSelector((state: RootState) => state.editor.gridVisible)
   const [fileMenuAnchor, setFileMenuAnchor] = React.useState<null | HTMLElement>(null)
   const [editMenuAnchor, setEditMenuAnchor] = React.useState<null | HTMLElement>(null)
   const [viewMenuAnchor, setViewMenuAnchor] = React.useState<null | HTMLElement>(null)
@@ -115,6 +118,10 @@ const MenuBar: React.FC = () => {
 
   const handleLayerVisibilityToggle = (layer: Layer) => {
     dispatch(toggleLayerVisibility(layer))
+  }
+
+  const handleToggleGrid = () => {
+    dispatch(toggleGrid())
   }
 
   const getLayerIcon = (layer: Layer) => {
@@ -244,6 +251,22 @@ const MenuBar: React.FC = () => {
                   {getLayerLabel(layer)}
                 </Button>
               ))}
+              
+              <Divider orientation="vertical" flexItem sx={{ mx: 1, borderColor: 'rgba(255, 255, 255, 0.12)' }} />
+              
+              <Button
+                size="small"
+                startIcon={<GridIcon />}
+                onClick={handleToggleGrid}
+                sx={{ 
+                  color: gridVisible ? 'inherit' : 'rgba(255, 255, 255, 0.5)',
+                  minWidth: 'auto',
+                  px: 1,
+                  py: 0.5
+                }}
+              >
+                グリッド
+              </Button>
             </Box>
           </Toolbar>
         </>

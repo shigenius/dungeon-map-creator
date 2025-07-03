@@ -1,5 +1,5 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit'
-import { DrawingTool, Layer, ViewMode, FloorType, WallType, Template, TemplateCategory, CustomFloorType, CustomWallType, DungeonEvent, DecorationType } from '../types/map'
+import { DrawingTool, Layer, ViewMode, FloorType, WallType, Template, TemplateCategory, CustomFloorType, CustomWallType, DungeonEvent, DecorationType, EventType } from '../types/map'
 
 interface CapturedCellData {
   floor: {
@@ -38,6 +38,7 @@ interface EditorState {
   selectedFloorType: FloorType
   selectedWallType: WallType
   selectedDecorationType: DecorationType
+  selectedEventType: EventType
   capturedCellData: CapturedCellData | null
   hoveredCellInfo: HoveredCellInfo | null
   hoveredCellPosition: { x: number; y: number } | null
@@ -52,6 +53,8 @@ interface EditorState {
   accordionStates: {
     floorTypeAccordion: boolean
     wallTypeAccordion: boolean
+    eventTypeAccordion: boolean
+    decorationTypeAccordion: boolean
   }
   // テンプレート関連の状態
   templates: Template[]
@@ -66,6 +69,7 @@ interface EditorState {
   // イベント関連の状態
   showEventEditDialog: boolean
   editingEvent: DungeonEvent | null
+  selectedEventId: string | null
   // テンプレート配置関連の状態
   templatePlacementMode: boolean
   templatePreviewPosition: { x: number; y: number } | null
@@ -86,6 +90,7 @@ const initialState: EditorState = {
   selectedFloorType: 'normal',
   selectedWallType: 'normal',
   selectedDecorationType: 'furniture',
+  selectedEventType: 'treasure',
   capturedCellData: null,
   hoveredCellInfo: null,
   hoveredCellPosition: null,
@@ -105,6 +110,8 @@ const initialState: EditorState = {
   accordionStates: {
     floorTypeAccordion: true,
     wallTypeAccordion: false,
+    eventTypeAccordion: true,
+    decorationTypeAccordion: true,
   },
   // テンプレート関連の初期状態
   templates: [],
@@ -119,6 +126,7 @@ const initialState: EditorState = {
   // イベント関連の初期状態
   showEventEditDialog: false,
   editingEvent: null,
+  selectedEventId: null,
   // テンプレート配置関連の初期状態
   templatePlacementMode: false,
   templatePreviewPosition: null,
@@ -151,6 +159,10 @@ const editorSlice = createSlice({
         state.accordionStates.floorTypeAccordion = true
       } else if (action.payload === 'walls') {
         state.accordionStates.wallTypeAccordion = true
+      } else if (action.payload === 'events') {
+        state.accordionStates.eventTypeAccordion = true
+      } else if (action.payload === 'decorations') {
+        state.accordionStates.decorationTypeAccordion = true
       }
     },
     
@@ -164,6 +176,10 @@ const editorSlice = createSlice({
     
     setSelectedDecorationType: (state, action: PayloadAction<DecorationType>) => {
       state.selectedDecorationType = action.payload
+    },
+    
+    setSelectedEventType: (state, action: PayloadAction<EventType>) => {
+      state.selectedEventType = action.payload
     },
     
     setZoom: (state, action: PayloadAction<number>) => {
@@ -236,6 +252,14 @@ const editorSlice = createSlice({
 
     toggleWallTypeAccordion: (state) => {
       state.accordionStates.wallTypeAccordion = !state.accordionStates.wallTypeAccordion
+    },
+
+    toggleEventTypeAccordion: (state) => {
+      state.accordionStates.eventTypeAccordion = !state.accordionStates.eventTypeAccordion
+    },
+
+    toggleDecorationTypeAccordion: (state) => {
+      state.accordionStates.decorationTypeAccordion = !state.accordionStates.decorationTypeAccordion
     },
 
     // テンプレート関連のアクション
@@ -333,6 +357,11 @@ const editorSlice = createSlice({
     closeEventEditDialog: (state) => {
       state.showEventEditDialog = false
       state.editingEvent = null
+      state.selectedEventId = null
+    },
+
+    setSelectedEventId: (state, action: PayloadAction<string | null>) => {
+      state.selectedEventId = action.payload
     },
 
     // テンプレート配置関連のアクション
@@ -421,6 +450,7 @@ export const {
   setSelectedFloorType,
   setSelectedWallType,
   setSelectedDecorationType,
+  setSelectedEventType,
   setCapturedCellData,
   clearCapturedCellData,
   setHoveredCellInfo,
@@ -439,6 +469,8 @@ export const {
   closeNewProjectDialog,
   toggleFloorTypeAccordion,
   toggleWallTypeAccordion,
+  toggleEventTypeAccordion,
+  toggleDecorationTypeAccordion,
   // テンプレート関連のアクション
   addTemplate,
   removeTemplate,
@@ -459,6 +491,7 @@ export const {
   // イベント関連のアクション
   openEventEditDialog,
   closeEventEditDialog,
+  setSelectedEventId,
   // テンプレート配置関連のアクション
   setTemplatePreviewPosition,
   enableTemplatePlacementMode,

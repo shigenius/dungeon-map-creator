@@ -56,7 +56,7 @@ export const presetTemplates: Template[] = [
       ]
     ],
     tags: ['テスト', '回転'],
-    createdAt: new Date(),
+    createdAt: new Date().toISOString(),
     isBuiltIn: true
   },
   // 基本的な部屋テンプレート
@@ -84,7 +84,7 @@ export const presetTemplates: Template[] = [
       ]
     ],
     tags: ['基本', '部屋', '扉'],
-    createdAt: new Date(),
+    createdAt: new Date().toISOString(),
     isBuiltIn: true
   },
 
@@ -132,7 +132,7 @@ export const presetTemplates: Template[] = [
       ]
     ],
     tags: ['大部屋', '広間'],
-    createdAt: new Date(),
+    createdAt: new Date().toISOString(),
     isBuiltIn: true
   },
 
@@ -153,7 +153,7 @@ export const presetTemplates: Template[] = [
       ]
     ],
     tags: ['廊下', '水平', '通路'],
-    createdAt: new Date(),
+    createdAt: new Date().toISOString(),
     isBuiltIn: true
   },
 
@@ -171,7 +171,7 @@ export const presetTemplates: Template[] = [
       [createWallCell({ east: normalWall, west: normalWall })]
     ],
     tags: ['廊下', '垂直', '通路'],
-    createdAt: new Date(),
+    createdAt: new Date().toISOString(),
     isBuiltIn: true
   },
 
@@ -200,7 +200,7 @@ export const presetTemplates: Template[] = [
       ]
     ],
     tags: ['交差点', '十字路', '4方向'],
-    createdAt: new Date(),
+    createdAt: new Date().toISOString(),
     isBuiltIn: true
   },
 
@@ -234,7 +234,7 @@ export const presetTemplates: Template[] = [
       ]
     ],
     tags: ['トラップ', '落とし穴', '危険'],
-    createdAt: new Date(),
+    createdAt: new Date().toISOString(),
     isBuiltIn: true
   },
 
@@ -280,7 +280,7 @@ export const presetTemplates: Template[] = [
       return cells
     })(),
     tags: ['ダンジョン', '全体', 'シンプル'],
-    createdAt: new Date(),
+    createdAt: new Date().toISOString(),
     isBuiltIn: true,
     isFullMap: true
   },
@@ -322,7 +322,7 @@ export const presetTemplates: Template[] = [
       return cells
     })(),
     tags: ['迷路', '複雑', 'チャレンジ'],
-    createdAt: new Date(),
+    createdAt: new Date().toISOString(),
     isBuiltIn: true,
     isFullMap: true
   }
