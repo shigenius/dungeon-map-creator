@@ -71,12 +71,21 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
   const [editingEvent, setEditingEvent] = useState<DungeonEvent | null>(null)
 
   useEffect(() => {
+    console.log('EventEditDialog useEffect実行:', { 
+      eventProp: event?.id || 'null', 
+      eventName: event?.name || 'null',
+      open 
+    })
+    
     if (event) {
+      console.log('EventEditDialog: 既存イベント編集モード', { eventId: event.id, eventName: event.name })
       setEditingEvent({ ...event })
-    } else {
-      // 新規イベントの初期値
+    } else if (open) {
+      // ダイアログが開いている場合のみ新規イベントを作成
+      const newId = crypto.randomUUID()
+      console.log('EventEditDialog: 新規イベント作成モード、新しいID生成:', newId)
       setEditingEvent({
-        id: crypto.randomUUID(),
+        id: newId,
         type: 'treasure',
         name: '新しいイベント',
         description: '',
@@ -84,7 +93,7 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
         appearance: {
           visible: true,
           color: '#ffd700',
-          icon: 'treasure'
+          icon: '⭐'
         },
         trigger: {
           type: 'interact',
@@ -99,14 +108,24 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
           modified: new Date().toISOString()
         }
       })
+    } else {
+      // ダイアログが閉じている場合はeditingEventをクリア
+      console.log('EventEditDialog: ダイアログが閉じているため、editingEventをクリア')
+      setEditingEvent(null)
     }
-  }, [event])
+  }, [event, open])
 
   const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue)
   }
 
   const handleSave = () => {
+    console.log('EventEditDialog handleSave実行:', {
+      hasEditingEvent: !!editingEvent,
+      editingEventId: editingEvent?.id,
+      editingEventName: editingEvent?.name
+    })
+    
     if (editingEvent) {
       const updatedEvent = {
         ...editingEvent,
@@ -115,6 +134,10 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
           modified: new Date().toISOString()
         }
       }
+      console.log('EventEditDialog handleSave: onSave呼び出し前', {
+        eventId: updatedEvent.id,
+        eventName: updatedEvent.name
+      })
       onSave(updatedEvent)
       onClose()
     }
@@ -179,6 +202,7 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
       setEditingEvent({ ...editingEvent, actions: newActions })
     }
   }
+
 
   const getEventTypeLabel = (type: EventType) => {
     const labels: Record<EventType, string> = {
@@ -306,7 +330,7 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
                 <Typography variant="subtitle2" gutterBottom sx={{ mt: 2 }}>
                   位置
                 </Typography>
-                <Box sx={{ display: 'flex', gap: 2 }}>
+                <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
                   <TextField
                     label="X座標"
                     type="number"
@@ -388,7 +412,7 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
                   value={editingEvent.appearance.icon || ''}
                   onChange={(e) => updateAppearance('icon', e.target.value)}
                   margin="normal"
-                  helperText="アイコン名を入力（例: treasure, npc, stairs）"
+                  helperText="絵文字または短い文字を入力（例: 💰, 👤, ⚔️, ⭐）"
                 />
               </Grid>
               <Grid item xs={12} md={6}>
@@ -400,18 +424,19 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
                     sx={{
                       width: 60,
                       height: 60,
-                      bgcolor: editingEvent.appearance.color || '#ffd700',
-                      border: '2px solid #333',
-                      borderRadius: 1,
+                      bgcolor: editingEvent.appearance.icon ? 'transparent' : editingEvent.appearance.color || '#ffd700',
+                      border: editingEvent.appearance.icon ? 'none' : `2px solid ${editingEvent.appearance.color || '#ffd700'}`,
+                      borderRadius: '50%',
                       mx: 'auto',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      opacity: editingEvent.appearance.visible ? 1 : 0.3
+                      opacity: editingEvent.appearance.visible ? 1 : 0.3,
+                      fontSize: editingEvent.appearance.icon ? '24px' : '16px'
                     }}
                   >
                     {editingEvent.appearance.visible ? (
-                      <VisibilityIcon />
+                      editingEvent.appearance.icon || '●'
                     ) : (
                       <VisibilityOffIcon />
                     )}

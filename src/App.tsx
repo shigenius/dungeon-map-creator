@@ -233,15 +233,34 @@ function App() {
         event={editingEvent}
         onClose={() => dispatch(closeEventEditDialog())}
         onSave={(event) => {
-          if (editingEvent) {
+          // propsとして渡された元のイベント（編集対象）があるかどうかで判定
+          // editingEventはダイアログ内部の状態で、新規作成時は毎回新しいオブジェクトが作られる
+          const originalEvent = editingEvent // App.tsxで管理されているeditingEvent（propsとして渡されたもの）
+          const isExistingEvent = originalEvent && dungeon?.floors[0]?.cells
+            ?.flat()
+            .some(cell => cell.events.some(e => e.id === originalEvent.id))
+          
+          console.log('EventEditDialog onSave:', {
+            hasOriginalEvent: !!originalEvent,
+            originalEventId: originalEvent?.id,
+            isExistingEvent,
+            saveEventId: event.id,
+            saveEventName: event.name
+          })
+          
+          if (isExistingEvent) {
             // 既存イベントの更新
+            console.log('既存イベント更新実行')
             dispatch(updateEventInCell({
-              x: event.position.x,
-              y: event.position.y,
+              oldX: originalEvent!.position.x,
+              oldY: originalEvent!.position.y,
+              newX: event.position.x,
+              newY: event.position.y,
               event
             }))
           } else {
             // 新しいイベントの追加
+            console.log('新規イベント追加実行')
             dispatch(addEventToCell({
               x: event.position.x,
               y: event.position.y,

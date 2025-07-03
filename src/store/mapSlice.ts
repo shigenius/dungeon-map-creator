@@ -255,9 +255,23 @@ const mapSlice = createSlice({
       const { x, y, event } = action.payload
       const cell = state.dungeon.floors[0].cells[y]?.[x]
       if (cell) {
+        console.log('addEventToCell実行:', {
+          position: { x, y },
+          eventId: event.id,
+          eventName: event.name,
+          currentEventsInCell: cell.events.length,
+          currentEventIds: cell.events.map(e => e.id)
+        })
+        
         // イベントの位置をセルの座標に合わせる
         const eventWithPosition = { ...event, position: { x, y } }
         cell.events.push(eventWithPosition)
+        
+        console.log('addEventToCell完了:', {
+          newEventsInCell: cell.events.length,
+          newEventIds: cell.events.map(e => e.id)
+        })
+        
         // 履歴に追加
         const newHistory = state.history.slice(0, state.historyIndex + 1)
         newHistory.push(JSON.parse(JSON.stringify(state.dungeon)))
@@ -272,29 +286,37 @@ const mapSlice = createSlice({
       }
     },
 
-    updateEventInCell: (state, action: PayloadAction<{ x: number; y: number; event: DungeonEvent }>) => {
+    updateEventInCell: (state, action: PayloadAction<{ oldX: number; oldY: number; newX: number; newY: number; event: DungeonEvent }>) => {
       if (!state.dungeon) return
       
-      const { x, y, event } = action.payload
-      const cell = state.dungeon.floors[0].cells[y]?.[x]
-      if (cell) {
-        const eventIndex = cell.events.findIndex(e => e.id === event.id)
+      const { oldX, oldY, newX, newY, event } = action.payload
+      
+      // 古い位置からイベントを削除
+      const oldCell = state.dungeon.floors[0].cells[oldY]?.[oldX]
+      if (oldCell) {
+        const eventIndex = oldCell.events.findIndex(e => e.id === event.id)
         if (eventIndex !== -1) {
-          // イベントの位置をセルの座標に合わせる
-          const eventWithPosition = { ...event, position: { x, y } }
-          cell.events[eventIndex] = eventWithPosition
-          // 履歴に追加
-          const newHistory = state.history.slice(0, state.historyIndex + 1)
-          newHistory.push(JSON.parse(JSON.stringify(state.dungeon)))
-          
-          if (newHistory.length > state.maxHistory) {
-            newHistory.shift()
-          } else {
-            state.historyIndex++
-          }
-          
-          state.history = newHistory
+          oldCell.events.splice(eventIndex, 1)
         }
+      }
+      
+      // 新しい位置にイベントを追加
+      const newCell = state.dungeon.floors[0].cells[newY]?.[newX]
+      if (newCell) {
+        const eventWithPosition = { ...event, position: { x: newX, y: newY } }
+        newCell.events.push(eventWithPosition)
+        
+        // 履歴に追加
+        const newHistory = state.history.slice(0, state.historyIndex + 1)
+        newHistory.push(JSON.parse(JSON.stringify(state.dungeon)))
+        
+        if (newHistory.length > state.maxHistory) {
+          newHistory.shift()
+        } else {
+          state.historyIndex++
+        }
+        
+        state.history = newHistory
       }
     },
 
@@ -304,7 +326,19 @@ const mapSlice = createSlice({
       const { x, y, eventId } = action.payload
       const cell = state.dungeon.floors[0].cells[y]?.[x]
       if (cell) {
+        const beforeCount = cell.events.length
+        const beforeIds = cell.events.map(e => e.id)
+        
         cell.events = cell.events.filter(event => event.id !== eventId)
+        
+        const afterCount = cell.events.length
+        const afterIds = cell.events.map(e => e.id)
+        
+        console.log(`削除処理: 座標(${x},${y}) 削除対象ID: ${eventId}`)
+        console.log(`削除前: ${beforeCount}個 [${beforeIds.join(', ')}]`)
+        console.log(`削除後: ${afterCount}個 [${afterIds.join(', ')}]`)
+        console.log(`実際に削除された数: ${beforeCount - afterCount}`)
+        
         // 履歴に追加
         const newHistory = state.history.slice(0, state.historyIndex + 1)
         newHistory.push(JSON.parse(JSON.stringify(state.dungeon)))
