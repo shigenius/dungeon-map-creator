@@ -24,20 +24,28 @@ function App() {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      // デバッグ用：全てのキーイベントを一時的にログ出力（テスト用）
+      // console.log('キーイベント受信（全て）:', {
+      //   key: event.key,
+      //   code: event.code,
+      //   keyCode: event.keyCode,
+      //   which: event.which,
+      //   target: (event.target as HTMLElement).tagName,
+      //   targetId: (event.target as HTMLElement).id,
+      //   targetClass: (event.target as HTMLElement).className,
+      //   activeElement: document.activeElement?.tagName,
+      //   activeElementId: document.activeElement?.id,
+      //   activeElementClass: document.activeElement?.className,
+      //   isComposing: event.isComposing,
+      //   isTrusted: event.isTrusted,
+      //   bubbles: event.bubbles,
+      //   cancelable: event.cancelable,
+      //   defaultPrevented: event.defaultPrevented
+      // })
+      
       // Shiftキーの状態を追跡
       if (event.key === 'Shift') {
         dispatch(setShiftPressed(true))
-      }
-
-      // キーイベント情報をログ出力（QとRのみ）
-      if (event.key === 'q' || event.key === 'r') {
-        console.log('キーイベント受信:', {
-          key: event.key,
-          dungeon: !!dungeon,
-          target: (event.target as HTMLElement).tagName,
-          hasCtrlKey: event.ctrlKey,
-          hasMetaKey: event.metaKey
-        })
       }
 
       // ダイアログが開いている時はショートカットを無効化
@@ -162,20 +170,18 @@ function App() {
             dispatch(toggleGrid())
             break
           case 'q':
+          case 'Q':
             // Qキーでテンプレート左回転
-            console.log('Qキー押下:', { selectedTool, selectedTemplate: selectedTemplate?.name, isFullMap: selectedTemplate?.isFullMap })
             if (selectedTool === 'template' && selectedTemplate && !selectedTemplate.isFullMap) {
               event.preventDefault()
-              console.log('テンプレート左回転実行')
               dispatch(rotateTemplateLeft())
             }
             break
           case 'r':
+          case 'R':
             // Rキーでテンプレート右回転
-            console.log('Rキー押下:', { selectedTool, selectedTemplate: selectedTemplate?.name, isFullMap: selectedTemplate?.isFullMap })
             if (selectedTool === 'template' && selectedTemplate && !selectedTemplate.isFullMap) {
               event.preventDefault()
-              console.log('テンプレート右回転実行')
               dispatch(rotateTemplate())
             }
             break

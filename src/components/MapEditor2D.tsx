@@ -816,18 +816,18 @@ const MapEditor2D: React.FC = () => {
                                    typeof event.appearance.icon === 'string' && 
                                    event.appearance.icon.trim().length > 0
               
-              // デバッグログ出力
-              if (x === 0 && y === 0) {
-                console.log('イベント描画デバッグ:', {
-                  eventId: event.id,
-                  eventName: event.name,
-                  iconValue: event.appearance.icon,
-                  iconType: typeof event.appearance.icon,
-                  iconTrimmed: event.appearance.icon?.trim(),
-                  hasValidIcon,
-                  color: event.appearance.color
-                })
-              }
+              // デバッグログ出力（コメントアウト - ホバー時に大量ログが流れるため）
+              // if (x === 0 && y === 0) {
+              //   console.log('イベント描画デバッグ:', {
+              //     eventId: event.id,
+              //     eventName: event.name,
+              //     iconValue: event.appearance.icon,
+              //     iconType: typeof event.appearance.icon,
+              //     iconTrimmed: event.appearance.icon?.trim(),
+              //     hasValidIcon,
+              //     color: event.appearance.color
+              //   })
+              // }
               
               if (hasValidIcon) {
                 // アイコンがある場合：アイコンのみ表示（色付き円は表示しない）
@@ -975,10 +975,10 @@ const MapEditor2D: React.FC = () => {
     if (!templatePreviewPosition) return
 
     const { x: startX, y: startY } = templatePreviewPosition
-    console.log(`テンプレートプレビュー描画: ${selectedTemplate.name}, 回転: ${templateRotation}°`)
+    // console.log(`テンプレートプレビュー描画: ${selectedTemplate.name}, 回転: ${templateRotation}°`)
     // テンプレートを回転させてプレビュー
     const template = rotateTemplateUtil(selectedTemplate, templateRotation)
-    console.log(`回転後サイズ: ${template.size.width}x${template.size.height}`)
+    // console.log(`回転後サイズ: ${template.size.width}x${template.size.height}`)
 
     // テンプレートのサイズをチェック
     if (startX + template.size.width > floor!.width || startY + template.size.height > floor!.height) {
@@ -1563,11 +1563,11 @@ const MapEditor2D: React.FC = () => {
     }
     
     // デバッグ情報をコンソールに出力（開発モードのみ）
-    console.log('Hovered Cell Debug:', {
-      position,
-      actualCellData: currentCell,
-      displayedInfo: hoveredInfo
-    })
+    // console.log('Hovered Cell Debug:', {
+    //   position,
+    //   actualCellData: currentCell,
+    //   displayedInfo: hoveredInfo
+    // })
     
     dispatch(setHoveredCellInfo(hoveredInfo))
     
@@ -1638,18 +1638,24 @@ const MapEditor2D: React.FC = () => {
       }
       
       // 通常のテンプレートは指定位置に配置
-      console.log('テンプレート配置:', {
+      // 最新のtemplateRotationを直接editorStateから取得
+      const currentTemplateRotation = editorState.templateRotation
+      console.log('テンプレート配置前の状態:', {
         templateName: selectedTemplate.name,
         templateId: selectedTemplate.id,
         position,
-        rotation: templateRotation
+        templateRotation,
+        currentTemplateRotation,
+        editorStateTemplateRotation: editorState.templateRotation,
+        selectedTemplateAddress: selectedTemplate
       })
       dispatch(placeTemplate({
         template: selectedTemplate,
         position,
         floorIndex: currentFloor,
-        rotation: templateRotation
+        rotation: currentTemplateRotation
       }))
+      console.log('placeTemplateアクション送信完了')
       
       // テンプレート配置後はプレビュー位置のみクリア（連続配置のため）
       dispatch(setTemplatePreviewPosition(null))
@@ -2079,7 +2085,7 @@ const MapEditor2D: React.FC = () => {
         }
       }
     }
-  }, [selectedLayer, selectedTool, selectedFloorType, selectedWallType, selectedDecorationType, selectedEventType, isShiftPressed, currentFloor, capturedCellData, dispatch, floor, getCellPosition])
+  }, [selectedLayer, selectedTool, selectedFloorType, selectedWallType, selectedDecorationType, selectedEventType, isShiftPressed, currentFloor, capturedCellData, dispatch, floor, getCellPosition, selectedTemplate, templateRotation, editorState, isDragging, isActuallyDragging, rectangleStart, isDrawingRectangle])
 
   // イベントタイプに基づいてイベントを作成するヘルパー関数
   const createEventByType = useCallback((eventType: string, position: Position) => {
