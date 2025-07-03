@@ -34,13 +34,13 @@ import {
 } from '@mui/icons-material'
 import { useDispatch, useSelector } from 'react-redux'
 import { RootState } from '../store'
-import { setSelectedFloorType, setSelectedWallType, setSelectedDecorationType, setSelectedEventType, clearCapturedCellData, toggleFloorTypeAccordion, toggleWallTypeAccordion, toggleEventTypeAccordion, toggleDecorationTypeAccordion, openCustomTypeDialog, openEventEditDialog, setSelectedTemplate, setSelectedTool, setSelectedEventId } from '../store/editorSlice'
+import { setSelectedFloorType, setSelectedWallType, setSelectedDecorationType, setSelectedEventType, clearCapturedCellData, toggleFloorTypeAccordion, toggleWallTypeAccordion, toggleEventTypeAccordion, toggleDecorationTypeAccordion, openCustomTypeDialog, openEventEditDialog, setSelectedTemplate, setSelectedTool, setSelectedEventId, toggleGrid } from '../store/editorSlice'
 import { removeEventFromCell, addEventToCell } from '../store/mapSlice'
 import { Layer, FloorType, WallType, DecorationType, EventType } from '../types/map'
 
 const LeftPanel: React.FC = () => {
   const dispatch = useDispatch()
-  const { selectedLayer, selectedFloorType, selectedWallType, selectedDecorationType, selectedEventType, capturedCellData, accordionStates, customFloorTypes, customWallTypes } = useSelector((state: RootState) => state.editor)
+  const { selectedLayer, selectedFloorType, selectedWallType, selectedDecorationType, selectedEventType, capturedCellData, accordionStates, customFloorTypes, customWallTypes, gridVisible } = useSelector((state: RootState) => state.editor)
   const dungeon = useSelector((state: RootState) => state.map.dungeon)
 
   // イベント操作メニューの状態管理
@@ -198,6 +198,10 @@ const LeftPanel: React.FC = () => {
     handleEventMenuClose()
   }
 
+  const handleToggleGrid = () => {
+    dispatch(toggleGrid())
+  }
+
   return (
     <Box
       sx={{
@@ -220,12 +224,24 @@ const LeftPanel: React.FC = () => {
       >
       {/* 現在のレイヤー表示 */}  
       <Box sx={{ p: 2, bgcolor: 'primary.main', color: 'primary.contrastText' }}>
-        <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center' }}>
-          {layers.find(layer => layer.key === selectedLayer)?.icon}
-          <Box component="span" sx={{ ml: 1 }}>
-            編集中: {layers.find(layer => layer.key === selectedLayer)?.name}
-          </Box>
-        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center' }}>
+            {layers.find(layer => layer.key === selectedLayer)?.icon}
+            <Box component="span" sx={{ ml: 1 }}>
+              編集中: {layers.find(layer => layer.key === selectedLayer)?.name}
+            </Box>
+          </Typography>
+          <Tooltip title="グリッド表示切替">
+            <IconButton 
+              size="small" 
+              onClick={handleToggleGrid}
+              disabled={!dungeon}
+              sx={{ color: gridVisible ? 'inherit' : 'rgba(255, 255, 255, 0.5)' }}
+            >
+              <GridIcon />
+            </IconButton>
+          </Tooltip>
+        </Box>
       </Box>
 
       <Divider />

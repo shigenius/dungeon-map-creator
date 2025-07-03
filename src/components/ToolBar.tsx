@@ -18,17 +18,16 @@ import {
   Redo as RedoIcon,
   ZoomIn as ZoomInIcon,
   ZoomOut as ZoomOutIcon,
-  Grid3x3 as GridIcon,
 } from '@mui/icons-material'
 import { useDispatch, useSelector } from 'react-redux'
 import { RootState } from '../store'
-import { setSelectedTool, setZoom, toggleGrid, setSelectedTemplate } from '../store/editorSlice'
+import { setSelectedTool, setZoom, setSelectedTemplate } from '../store/editorSlice'
 import { undo, redo } from '../store/mapSlice'
 import { DrawingTool } from '../types/map'
 
 const ToolBar: React.FC = () => {
   const dispatch = useDispatch()
-  const { selectedTool, zoom, gridVisible } = useSelector((state: RootState) => state.editor)
+  const { selectedTool, zoom } = useSelector((state: RootState) => state.editor)
   const dungeon = useSelector((state: RootState) => state.map.dungeon)
 
   const handleToolChange = (_: React.MouseEvent<HTMLElement>, newTool: DrawingTool | null) => {
@@ -57,9 +56,6 @@ const ToolBar: React.FC = () => {
     dispatch(setZoom(zoom / 1.2))
   }
 
-  const handleToggleGrid = () => {
-    dispatch(toggleGrid())
-  }
 
   return (
     <Toolbar
@@ -147,18 +143,6 @@ const ToolBar: React.FC = () => {
         <Box sx={{ minWidth: 50, textAlign: 'center', fontSize: '0.875rem' }}>
           {Math.round(zoom * 100)}%
         </Box>
-        <Tooltip title="グリッド表示切替">
-          <span>
-            <IconButton 
-              size="small" 
-              onClick={handleToggleGrid} 
-              disabled={!dungeon}
-              color={gridVisible ? 'primary' : 'default'}
-            >
-              <GridIcon />
-            </IconButton>
-          </span>
-        </Tooltip>
       </Box>
     </Toolbar>
   )

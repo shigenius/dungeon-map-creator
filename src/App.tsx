@@ -181,13 +181,6 @@ function App() {
               dispatch(rotateTemplate())
             }
             break
-          case 'Enter':
-            // Enterキーで範囲選択からテンプレート作成
-            if (selectionMode && selectionStart && selectionEnd) {
-              event.preventDefault()
-              dispatch(openCreateTemplateDialog())
-            }
-            break
         }
       }
     }
