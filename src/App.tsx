@@ -3,7 +3,7 @@ import { Box } from '@mui/material'
 import { useSelector, useDispatch } from 'react-redux'
 import { RootState } from './store'
 import { undo, redo, loadDungeon, addEventToCell, updateEventInCell, removeEventFromCell } from './store/mapSlice'
-import { setSelectedTool, setSelectedLayer, toggleGrid, setZoom, openNewProjectDialog, setShiftPressed, closeEventEditDialog, rotateTemplate, rotateTemplateLeft, openCreateTemplateDialog, closeHelpDialog } from './store/editorSlice'
+import { setSelectedTool, setSelectedLayer, toggleGrid, setZoom, openNewProjectDialog, setShiftPressed, closeEventEditDialog, rotateTemplate, rotateTemplateLeft, openCreateTemplateDialog, closeHelpDialog, clearSelection } from './store/editorSlice'
 import { downloadDungeonAsJSON, openDungeonFromFile } from './utils/fileUtils'
 import MenuBar from './components/MenuBar'
 import ToolBar from './components/ToolBar'
@@ -21,6 +21,13 @@ function App() {
   const dispatch = useDispatch()
   const dungeon = useSelector((state: RootState) => state.map.dungeon)
   const { zoom, selectedLayer, showNewProjectDialog, showEventEditDialog, editingEvent, selectedTool, selectedTemplate, selectionMode, selectionStart, selectionEnd, showHelpDialog } = useSelector((state: RootState) => state.editor)
+
+  // ダンジョンが存在しない場合に新規プロジェクトダイアログを表示
+  useEffect(() => {
+    if (!dungeon && !showNewProjectDialog) {
+      dispatch(openNewProjectDialog())
+    }
+  }, [dungeon, showNewProjectDialog, dispatch])
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -181,6 +188,13 @@ function App() {
               dispatch(rotateTemplate())
             }
             break
+          case 'Escape':
+            // ESCキーで範囲選択をキャンセル
+            if (selectionMode) {
+              event.preventDefault()
+              dispatch(clearSelection())
+            }
+            break
         }
       }
     }
@@ -198,7 +212,7 @@ function App() {
       document.removeEventListener('keydown', handleKeyDown)
       document.removeEventListener('keyup', handleKeyUp)
     }
-  }, [dispatch, dungeon, zoom, selectedLayer, selectedTool, selectedTemplate, selectionMode, selectionStart, selectionEnd])
+  }, [dispatch, dungeon, zoom, selectedLayer, selectedTool, selectedTemplate, selectionMode])
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
@@ -216,7 +230,7 @@ function App() {
         <RightPanel />
       </Box>
       
-      {(!dungeon || showNewProjectDialog) && <NewProjectDialog />}
+      {showNewProjectDialog && <NewProjectDialog />}
       <CustomTypeDialog />
       <CreateTemplateDialog />
       <HelpDialog 

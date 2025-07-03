@@ -78,6 +78,7 @@ interface EditorState {
   selectionMode: boolean
   selectionStart: { x: number; y: number } | null
   selectionEnd: { x: number; y: number } | null
+  selectionConfirmed: boolean
   showCreateTemplateDialog: boolean
   // ヘルプダイアログの状態
   showHelpDialog: boolean
@@ -135,6 +136,7 @@ const initialState: EditorState = {
   selectionMode: false,
   selectionStart: null,
   selectionEnd: null,
+  selectionConfirmed: false,
   showCreateTemplateDialog: false,
   // ヘルプダイアログの初期状態
   showHelpDialog: false,
@@ -415,9 +417,14 @@ const editorSlice = createSlice({
       state.selectionEnd = action.payload
     },
 
+    confirmSelection: (state) => {
+      state.selectionConfirmed = true
+    },
+
     clearSelection: (state) => {
       state.selectionStart = null
       state.selectionEnd = null
+      state.selectionConfirmed = false
       state.selectionMode = false
     },
 
@@ -503,6 +510,7 @@ export const {
   startSelection,
   setSelectionStart,
   setSelectionEnd,
+  confirmSelection,
   clearSelection,
   openCreateTemplateDialog,
   closeCreateTemplateDialog,

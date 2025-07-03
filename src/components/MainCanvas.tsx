@@ -9,12 +9,12 @@ import MapEditor3D from './MapEditor3D'
 
 const MainCanvas: React.FC = () => {
   const dispatch = useDispatch()
-  const { viewMode, selectionMode, selectionStart, selectionEnd } = useSelector((state: RootState) => state.editor)
+  const { viewMode, selectionMode, selectionStart, selectionEnd, selectionConfirmed } = useSelector((state: RootState) => state.editor)
   const dungeon = useSelector((state: RootState) => state.map.dungeon)
 
   // 範囲選択が完了している（範囲が選択されている）かどうかを判定
   const isRangeSelected = selectionMode && selectionStart && selectionEnd && 
-    (selectionStart.x !== selectionEnd.x || selectionStart.y !== selectionEnd.y)
+    (selectionStart.x !== selectionEnd.x || selectionStart.y !== selectionEnd.y) && selectionConfirmed
 
   const handleCreateTemplate = () => {
     dispatch(openCreateTemplateDialog())

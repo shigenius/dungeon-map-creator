@@ -3,7 +3,7 @@ import { Box } from '@mui/material'
 import { useSelector, useDispatch } from 'react-redux'
 import { RootState } from '../store'
 import { updateCell, updateCells, placeTemplate, addDecorationToCell } from '../store/mapSlice'
-import { setCapturedCellData, setHoveredCellInfo, clearHoveredCellInfo, setHoveredCellPosition, clearHoveredCellPosition, setHoveredWallInfo, clearHoveredWallInfo, setTemplatePreviewPosition, setSelectionStart, setSelectionEnd } from '../store/editorSlice'
+import { setCapturedCellData, setHoveredCellInfo, clearHoveredCellInfo, setHoveredCellPosition, clearHoveredCellPosition, setHoveredWallInfo, clearHoveredWallInfo, setTemplatePreviewPosition, setSelectionStart, setSelectionEnd, confirmSelection } from '../store/editorSlice'
 import { rotateTemplate as rotateTemplateUtil } from '../utils/templateUtils'
 import { Position, WallType, DecorationType, Decoration } from '../types/map'
 
@@ -425,7 +425,7 @@ const MapEditor2D: React.FC = () => {
   
   const dungeon = useSelector((state: RootState) => state.map.dungeon)
   const editorState = useSelector((state: RootState) => state.editor)
-  const { currentFloor, selectedTool, selectedLayer, selectedFloorType, selectedWallType, selectedDecorationType, selectedEventType, capturedCellData, hoveredCellPosition, hoveredWallInfo, isShiftPressed, zoom, gridVisible, selectedTemplate, templatePreviewPosition, templateRotation, selectionMode, selectionStart, selectionEnd, selectedEventId } = editorState
+  const { currentFloor, selectedTool, selectedLayer, selectedFloorType, selectedWallType, selectedDecorationType, selectedEventType, capturedCellData, hoveredCellPosition, hoveredWallInfo, isShiftPressed, zoom, gridVisible, selectedTemplate, templatePreviewPosition, templateRotation, selectionMode, selectionStart, selectionEnd, selectionConfirmed, selectedEventId } = editorState
 
   // セルサイズを整数に丸めて座標のズレを防ぐ
   const cellSize = Math.round(32 * zoom)
@@ -1323,8 +1323,20 @@ const MapEditor2D: React.FC = () => {
     const minY = Math.min(selectionStart.y, selectionEnd.y)
     const maxY = Math.max(selectionStart.y, selectionEnd.y)
 
+    // 確定状態に応じて色とスタイルを変更
+    if (selectionConfirmed) {
+      // 確定後：緑色の実線
+      ctx.fillStyle = 'rgba(0, 255, 0, 0.3)'
+      ctx.strokeStyle = '#00ff00'
+      ctx.setLineDash([])
+    } else {
+      // 確定前：青色の破線
+      ctx.fillStyle = 'rgba(0, 150, 255, 0.2)'
+      ctx.strokeStyle = '#0096ff'
+      ctx.setLineDash([5, 5])
+    }
+
     // 選択範囲の背景を描画
-    ctx.fillStyle = 'rgba(0, 150, 255, 0.2)'
     ctx.fillRect(
       minX * cellSize,
       minY * cellSize,
@@ -1333,9 +1345,7 @@ const MapEditor2D: React.FC = () => {
     )
 
     // 選択範囲の枠線を描画
-    ctx.strokeStyle = '#0096ff'
     ctx.lineWidth = 2
-    ctx.setLineDash([5, 5])
     ctx.strokeRect(
       minX * cellSize,
       minY * cellSize,
@@ -1356,7 +1366,7 @@ const MapEditor2D: React.FC = () => {
       (minX + maxX + 1) * cellSize / 2,
       (minY + maxY + 1) * cellSize / 2
     )
-  }, [selectionMode, selectionStart, selectionEnd, cellSize])
+  }, [selectionMode, selectionStart, selectionEnd, selectionConfirmed, cellSize])
 
   const drawHoveredCell = useCallback((ctx: CanvasRenderingContext2D) => {
     // ペンツールで床または壁レイヤーが選択されている場合のみハイライト表示
@@ -2233,7 +2243,7 @@ const MapEditor2D: React.FC = () => {
         }
       }
     }
-  }, [selectionMode, selectionStart, dispatch, selectedTool, isDrawingRectangle, rectangleStart, getCellPosition, isDragging, dragStart, selectedLayer, dragStartMouse, isActuallyDragging, cellSize, floor, updateHoverInfo, getClosestWallFromMouse])
+  }, [selectionMode, selectionStart, selectionConfirmed, dispatch, selectedTool, isDrawingRectangle, rectangleStart, getCellPosition, isDragging, dragStart, selectedLayer, dragStartMouse, isActuallyDragging, cellSize, floor, updateHoverInfo, getClosestWallFromMouse])
 
   const handleMouseDown = useCallback((event: React.MouseEvent) => {
     // 範囲選択モードの処理
@@ -2242,10 +2252,13 @@ const MapEditor2D: React.FC = () => {
       if (!position) return
       
       if (!selectionStart) {
+        // 1回目のクリック：開始点を設定
         dispatch(setSelectionStart(position))
         dispatch(setSelectionEnd(position))
       } else {
+        // 2回目のクリック：終了点を設定して確定
         dispatch(setSelectionEnd(position))
+        dispatch(confirmSelection())
       }
       return
     }
