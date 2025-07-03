@@ -13,7 +13,6 @@ import {
   CropSquare as RectangleIcon,
   FormatColorFill as FillIcon,
   Colorize as EyedropperIcon,
-  CropFree as SelectIcon,
   Delete as EraserIcon,
   Undo as UndoIcon,
   Redo as RedoIcon,
@@ -100,13 +99,8 @@ const ToolBar: React.FC = () => {
             <EyedropperIcon />
           </Tooltip>
         </ToggleButton>
-        <ToggleButton value="select">
-          <Tooltip title="選択ツール (5)">
-            <SelectIcon />
-          </Tooltip>
-        </ToggleButton>
         <ToggleButton value="eraser">
-          <Tooltip title="消しゴムツール (6) - 壁やイベントを消去">
+          <Tooltip title="消しゴムツール (5) - 壁やイベントを消去">
             <EraserIcon />
           </Tooltip>
         </ToggleButton>

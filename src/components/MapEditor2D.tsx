@@ -410,8 +410,6 @@ const MapEditor2D: React.FC = () => {
   const [rectangleEnd, setRectangleEnd] = useState<Position | null>(null)
   const [isDrawingRectangle, setIsDrawingRectangle] = useState(false)
   
-  // 選択ツール用の状態管理
-  const [selectedCell, setSelectedCell] = useState<Position | null>(null)
   
   // ドラッグ描画用の状態管理
   const [isDragging, setIsDragging] = useState(false)
@@ -1683,11 +1681,6 @@ const MapEditor2D: React.FC = () => {
       return
     }
 
-    // 選択ツールの処理
-    if (selectedTool === 'select') {
-      setSelectedCell(position)
-      return
-    }
 
     // 消しゴムツールの処理
     if (selectedTool === 'eraser') {
@@ -2476,7 +2469,6 @@ const MapEditor2D: React.FC = () => {
         cursor: selectedTool === 'pen' ? 'crosshair' : 
                 selectedTool === 'rectangle' ? 'cell' : 
                 selectedTool === 'eyedropper' ? 'grab' : 
-                selectedTool === 'select' ? 'pointer' :
                 selectedTool === 'template' ? 'copy' : 'default',
         position: 'relative',
         userSelect: 'none',

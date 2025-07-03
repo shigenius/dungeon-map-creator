@@ -134,10 +134,6 @@ function App() {
             break
           case '5':
             event.preventDefault()
-            dispatch(setSelectedTool('select'))
-            break
-          case '6':
-            event.preventDefault()
             dispatch(setSelectedTool('eraser'))
             break
           case 'f':

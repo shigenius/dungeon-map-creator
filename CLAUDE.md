@@ -2,8 +2,21 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-必ず日本語で回答してください。
-t-wadaのTDDに従う
+重要ルール
+
+- 必ず日本語で回答してください。
+- タスクが終わるごとに適切に分割されたコミットを行うこと
+- t-wadaのTDDに従う
+- テストは単体テスト、統合テスト、E2Eテストをそれぞれ適切なバランスで実装すること
+- E2Eテストでplaywrightを実行する際はレポートが自動で開かないように `npx playwright test --reporter=list` を用いること
+- これらのルールはタスクが完了するたびに画面出力すること
+
+テストの実行
+
+- npm run test:unit - 単体テスト実行（vitest）
+- npm run test:coverage - カバレッジ付き単体テスト
+- npm run test:e2e - E2Eテスト実行（playwright）
+- npm run test:all - 全テスト実行
 
 ## Project Overview
 
@@ -33,7 +46,7 @@ The application is built with a component-based React architecture:
    - Panel components: MenuBar, ToolBar, LeftPanel, RightPanel, BottomPanel
    - `NewProjectDialog.tsx`: Project creation workflow with size validation
 
-3. **Data Flow**: 
+3. **Data Flow**:
    - User interactions → Redux actions → State updates → Canvas redraw
    - Keyboard shortcuts (App level) → Direct Redux dispatch
    - Hover events → editorSlice → Real-time UI updates
@@ -105,6 +118,7 @@ npm run test        # Run browser tests
 - Real-time cell information display with hover highlighting
 - 2D/3D view mode switching (3D prepared)
 - Template creation dialog with category selection and description
+- Streamlined tool selection (removed separate select tool, integrated into template creation)
 
 ### ✅ Data Management
 - JSON import/export functionality with fileUtils integration
@@ -123,11 +137,34 @@ npm run test        # Run browser tests
 - Template creation dialog with name, description, and category selection
 - Template rotation utilities with proper wall orientation handling
 
+### ✅ Event System
+- Event placement with type-based templates (treasure, NPC, stairs, enemy, save, heal, switch, sign, harvest, custom)
+- Event editing dialog with comprehensive property management (triggers, actions, appearance)
+- Event appearance system with color and icon support
+- Event position management with numerical coordinate editing
+- Event management panel with list of existing events and quick access
+- Event display on map with proper color/icon visualization
+
+### ✅ Decoration System
+- Decoration placement system with multiple decoration types
+- Decoration appearance management with color and icon support
+- Visual decoration display on map canvas
+
 ### 🚧 Pending Implementation
 - Three.js 3D preview system
-- Advanced event system with complex triggers
+- Advanced event system with complex triggers and conditional logic
 - Map validation and balance checking
-- Decoration system implementation
+- Multi-floor management interface
+
+### 🚧 Current TODOs (Rate Limited Session)
+- イベント管理のアイコンをマップ表示と同じに統一 (medium priority)
+- イベント選択時にマップ上の対応イベントをハイライト (medium priority)
+- イベント管理で重複した古いアコーディオンを削除 (low priority)
+- 3Dプレビューシステムの基本実装 (high priority)
+- イベント編集ダイアログの詳細機能実装 (medium priority)
+- マップ検証機能の実装 (medium priority)
+- マルチフロア管理機能の実装 (high priority)
+- ミニマップ表示機能の実装 (low priority)
 
 ## Performance Constraints
 
@@ -163,7 +200,7 @@ The interface consists of:
 - **2**: Rectangle tool
 - **3**: Fill tool
 - **4**: Eyedropper tool
-- **5**: Select tool
+- **5**: Eraser tool
 
 ### Layer Management
 - **F**: Floor layer

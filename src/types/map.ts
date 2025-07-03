@@ -140,7 +140,7 @@ export interface Template {
   cells: TemplateCell[][]
   thumbnail?: string // Base64エンコードされた画像
   tags: string[]
-  createdAt: Date
+  createdAt: string
   isBuiltIn: boolean // プリセットテンプレートかどうか
   isFullMap?: boolean // マップ全体を置き換えるテンプレートかどうか
 }
@@ -323,6 +323,6 @@ export interface MapEditorState {
   viewMode: ViewMode
 }
 
-export type DrawingTool = 'pen' | 'rectangle' | 'fill' | 'eyedropper' | 'select' | 'eraser' | 'template'
+export type DrawingTool = 'pen' | 'rectangle' | 'fill' | 'eyedropper' | 'eraser' | 'template'
 export type Layer = 'floor' | 'walls' | 'events' | 'decorations'
 export type ViewMode = '2d' | '3d' | 'preview'
