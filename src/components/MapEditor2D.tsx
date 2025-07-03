@@ -3,7 +3,7 @@ import { Box } from '@mui/material'
 import { useSelector, useDispatch } from 'react-redux'
 import { RootState } from '../store'
 import { updateCell, updateCells, placeTemplate, addDecorationToCell } from '../store/mapSlice'
-import { setCapturedCellData, setHoveredCellInfo, clearHoveredCellInfo, setHoveredCellPosition, clearHoveredCellPosition, setHoveredWallInfo, clearHoveredWallInfo, setTemplatePreviewPosition, disableTemplatePlacementMode, setSelectionStart, setSelectionEnd } from '../store/editorSlice'
+import { setCapturedCellData, setHoveredCellInfo, clearHoveredCellInfo, setHoveredCellPosition, clearHoveredCellPosition, setHoveredWallInfo, clearHoveredWallInfo, setTemplatePreviewPosition, setSelectionStart, setSelectionEnd } from '../store/editorSlice'
 import { rotateTemplate as rotateTemplateUtil } from '../utils/templateUtils'
 import { Position, WallType, DecorationType, Decoration } from '../types/map'
 
@@ -427,7 +427,7 @@ const MapEditor2D: React.FC = () => {
   
   const dungeon = useSelector((state: RootState) => state.map.dungeon)
   const editorState = useSelector((state: RootState) => state.editor)
-  const { currentFloor, selectedTool, selectedLayer, selectedFloorType, selectedWallType, selectedDecorationType, capturedCellData, hoveredCellPosition, hoveredWallInfo, isShiftPressed, zoom, gridVisible, selectedTemplate, templatePreviewPosition, templateRotation, selectionMode, selectionStart, selectionEnd } = editorState
+  const { currentFloor, selectedTool, selectedLayer, selectedFloorType, selectedWallType, selectedDecorationType, selectedEventType, capturedCellData, hoveredCellPosition, hoveredWallInfo, isShiftPressed, zoom, gridVisible, selectedTemplate, templatePreviewPosition, templateRotation, selectionMode, selectionStart, selectionEnd, selectedEventId } = editorState
 
   // セルサイズを整数に丸めて座標のズレを防ぐ
   const cellSize = Math.round(32 * zoom)
@@ -480,9 +480,9 @@ const MapEditor2D: React.FC = () => {
     ctx.strokeStyle = '#333'
     ctx.lineWidth = 1
 
-    // 縦線
+    // 縦線 - 各線の位置を個別に計算してピクセル整合性を保つ
     for (let x = 0; x <= floor.width; x++) {
-      // 座標を整数に丸めて0.5ピクセル補正でシャープな線を描画
+      // 累積誤差を避けるため、各線の位置を独立して計算し、ピクセル境界に合わせる
       const xPos = Math.round(x * cellSize) + 0.5
       ctx.beginPath()
       ctx.moveTo(xPos, 0)
@@ -490,9 +490,9 @@ const MapEditor2D: React.FC = () => {
       ctx.stroke()
     }
 
-    // 横線
+    // 横線 - 各線の位置を個別に計算してピクセル整合性を保つ
     for (let y = 0; y <= floor.height; y++) {
-      // 座標を整数に丸めて0.5ピクセル補正でシャープな線を描画
+      // 累積誤差を避けるため、各線の位置を独立して計算し、ピクセル境界に合わせる
       const yPos = Math.round(y * cellSize) + 0.5
       ctx.beginPath()
       ctx.moveTo(0, yPos)
@@ -802,31 +802,87 @@ const MapEditor2D: React.FC = () => {
       for (let x = 0; x < floor.width; x++) {
         const cell = floor.cells[y][x]
         if (cell.events.length > 0) {
-          const xPos = x * cellSize + cellSize / 4
-          const yPos = y * cellSize + cellSize / 4
-          const size = cellSize / 2
+          cell.events.forEach((event, index) => {
+            if (!event.appearance.visible) return
 
-          // イベントを小さな円で表示
-          ctx.fillStyle = '#ff0'
-          ctx.beginPath()
-          ctx.arc(xPos + size / 2, yPos + size / 2, size / 3, 0, Math.PI * 2)
-          ctx.fill()
+            const xPos = x * cellSize + cellSize / 4
+            const yPos = y * cellSize + cellSize / 4
+            const size = cellSize / 2
 
-          // イベント数を表示
-          if (cellSize > 16) {
-            ctx.fillStyle = '#000'
-            ctx.font = `${Math.min(cellSize / 6, 10)}px Arial`
-            ctx.textAlign = 'center'
-            ctx.fillText(
-              cell.events.length.toString(),
-              xPos + size / 2,
-              yPos + size / 2 + 3
-            )
-          }
+            // イベントのアイコンまたは色つき円を表示
+            if (cellSize > 16) {
+              // アイコンがあるかどうかを厳密にチェック（空文字列、空白、null、undefinedを除外）
+              const hasValidIcon = event.appearance.icon && 
+                                   typeof event.appearance.icon === 'string' && 
+                                   event.appearance.icon.trim().length > 0
+              
+              // デバッグログ出力
+              if (x === 0 && y === 0) {
+                console.log('イベント描画デバッグ:', {
+                  eventId: event.id,
+                  eventName: event.name,
+                  iconValue: event.appearance.icon,
+                  iconType: typeof event.appearance.icon,
+                  iconTrimmed: event.appearance.icon?.trim(),
+                  hasValidIcon,
+                  color: event.appearance.color
+                })
+              }
+              
+              if (hasValidIcon) {
+                // アイコンがある場合：アイコンのみ表示（色付き円は表示しない）
+                ctx.fillStyle = '#fff'
+                ctx.font = `${Math.min(cellSize / 3, 16)}px Arial`
+                ctx.textAlign = 'center'
+                ctx.textBaseline = 'middle'
+                ctx.fillText(
+                  event.appearance.icon,
+                  xPos + size / 2,
+                  yPos + size / 2
+                )
+              } else {
+                // アイコンがない場合：色つきの○のみ表示
+                ctx.fillStyle = event.appearance.color || '#ffd700'
+                ctx.beginPath()
+                ctx.arc(xPos + size / 2, yPos + size / 2, size / 4, 0, Math.PI * 2)
+                ctx.fill()
+                
+                // 外枠
+                ctx.strokeStyle = '#fff'
+                ctx.lineWidth = 1
+                ctx.beginPath()
+                ctx.arc(xPos + size / 2, yPos + size / 2, size / 4, 0, Math.PI * 2)
+                ctx.stroke()
+              }
+            }
+
+            // 複数のイベントがある場合は番号を表示
+            if (cell.events.length > 1 && cellSize > 20) {
+              ctx.fillStyle = '#fff'
+              ctx.font = `${Math.min(cellSize / 8, 8)}px Arial`
+              ctx.textAlign = 'center'
+              ctx.fillText(
+                (index + 1).toString(),
+                xPos + size - 4,
+                yPos + 8
+              )
+            }
+
+            // 選択されたイベントをハイライト表示
+            if (selectedEventId === event.id) {
+              ctx.strokeStyle = '#00ff00'  // 明るい緑色
+              ctx.lineWidth = 4
+              ctx.setLineDash([5, 5])  // 点線でハイライト
+              ctx.beginPath()
+              ctx.arc(xPos + size / 2, yPos + size / 2, size / 2.5, 0, Math.PI * 2)
+              ctx.stroke()
+              ctx.setLineDash([])  // 点線をリセット
+            }
+          })
         }
       }
     }
-  }, [floor, cellSize])
+  }, [floor, cellSize, selectedEventId])
 
   const drawDecorations = useCallback((ctx: CanvasRenderingContext2D) => {
     if (!floor) return
@@ -1110,29 +1166,25 @@ const MapEditor2D: React.FC = () => {
               eventColor = '#888888'
               eventIcon = '階'
               break
-            case 'teleport':
-              eventColor = '#ff44ff'
-              eventIcon = 'テ'
-              break
-            case 'trigger':
-              eventColor = '#ffaa44'
-              eventIcon = 'ト'
-              break
-            case 'healing':
+            case 'heal':
               eventColor = '#44ffff'
               eventIcon = '回'
-              break
-            case 'shop':
-              eventColor = '#aa44ff'
-              eventIcon = '店'
               break
             case 'save':
               eventColor = '#44aaff'
               eventIcon = 'S'
               break
-            case 'info':
+            case 'sign':
               eventColor = '#aaaaaa'
-              eventIcon = '情'
+              eventIcon = '看'
+              break
+            case 'switch':
+              eventColor = '#ffaa44'
+              eventIcon = 'ス'
+              break
+            case 'harvest':
+              eventColor = '#44ff44'
+              eventIcon = '採'
               break
           }
           
@@ -1218,7 +1270,6 @@ const MapEditor2D: React.FC = () => {
     
     // テンプレート情報の表示
     const templateWidth = template.size.width * cellSize
-    const templateHeight = template.size.height * cellSize
     
     // テンプレート名とサイズの背景
     ctx.fillStyle = 'rgba(0, 255, 136, 0.9)'
@@ -1558,10 +1609,24 @@ const MapEditor2D: React.FC = () => {
     const position = getCellPosition(event)
     if (!position || !floor) return
 
+    console.log('=== CanvasClick Debug ===')
+    console.log('選択レイヤー:', selectedLayer)
+    console.log('選択ツール:', selectedTool)
+    console.log('クリック位置:', position)
+    console.log('isDragging:', isDragging)
+    console.log('isActuallyDragging:', isActuallyDragging)
+
     const currentCell = floor.cells[position.y][position.x]
+    console.log('現在のセルのイベント数:', currentCell.events.length)
 
     // ドラッグ操作中、または壁レイヤーのペンツール（handleMouseUpで処理済み）、または床レイヤーのペンツール（handleMouseUpで処理済み）はクリック処理をスキップ
     if (isDragging || isActuallyDragging || (selectedLayer === 'walls' && selectedTool === 'pen') || (selectedLayer === 'floor' && selectedTool === 'pen')) {
+      console.log('クリック処理をスキップ - 理由:', {
+        isDragging,
+        isActuallyDragging,
+        wallsPen: selectedLayer === 'walls' && selectedTool === 'pen',
+        floorPen: selectedLayer === 'floor' && selectedTool === 'pen'
+      })
       return
     }
 
@@ -1787,42 +1852,9 @@ const MapEditor2D: React.FC = () => {
                     }
                   })
                 } else if (selectedLayer === 'events') {
-                  const hasEvent = cell.events.length > 0
-                  const newEvents = hasEvent ? [] : [{
-                    id: crypto.randomUUID(),
-                    type: 'treasure' as const,
-                    name: '宝箱',
-                    description: '基本的な宝箱',
-                    position: cellPosition,
-                    appearance: {
-                      visible: true,
-                      color: '#ffd700',
-                      icon: 'treasure'
-                    },
-                    trigger: {
-                      type: 'interact' as const,
-                      conditions: [],
-                      repeatPolicy: {
-                        type: 'once' as const
-                      }
-                    },
-                    actions: [{
-                      id: crypto.randomUUID(),
-                      type: 'treasure' as const,
-                      params: {
-                        items: [{ id: 'gold', count: 100 }],
-                        message: '金貨を100枚見つけた！'
-                      }
-                    }],
-                    flags: {},
-                    enabled: true,
-                    priority: 1,
-                    metadata: {
-                      created: new Date().toISOString(),
-                      modified: new Date().toISOString(),
-                      version: 1
-                    }
-                  }]
+                  // 既存のイベントに新しいイベントを追加（上書きしない）
+                  const newEvent = createEventByType(selectedEventType, cellPosition)
+                  const newEvents = [...cell.events, newEvent]
                   updates.push({
                     position: cellPosition,
                     cell: { events: newEvents }
@@ -1990,83 +2022,55 @@ const MapEditor2D: React.FC = () => {
     } else if (selectedLayer === 'events') {
       if (selectedTool === 'pen') {
         // イベントの追加/削除
-        const hasEvent = currentCell.events.length > 0
-        const newEvents = hasEvent ? [] : [{
-          id: crypto.randomUUID(),
-          type: 'treasure' as const,
-          name: '宝箱',
-          description: '基本的な宝箱',
-          position: position,
-          appearance: {
-            visible: true,
-            color: '#ffd700',
-            icon: 'treasure'
-          },
-          trigger: {
-            type: 'interact' as const,
-            conditions: [],
-            repeatPolicy: {
-              type: 'once' as const
-            }
-          },
-          actions: [{
-            id: crypto.randomUUID(),
-            type: 'treasure' as const,
-            params: {
-              items: [{ id: 'gold', count: 100 }],
-              message: '金貨を100枚見つけた！'
-            }
-          }],
-          flags: {},
-          enabled: true,
-          priority: 1,
-          metadata: {
-            created: new Date().toISOString(),
-            modified: new Date().toISOString(),
-            version: 1
+        if (isShiftPressed) {
+          // Shift押下時は最後のイベントのみ削除（全削除ではない）
+          if (currentCell.events.length > 0) {
+            const newEvents = currentCell.events.slice(0, -1)  // 最後の要素を削除
+            dispatch(updateCell({
+              floorIndex: currentFloor,
+              position,
+              cell: { events: newEvents }
+            }))
           }
-        }]
-
-        dispatch(updateCell({
-          floorIndex: currentFloor,
-          position,
-          cell: {
-            events: newEvents,
-          }
-        }))
+        } else {
+          // 新しいイベントを追加
+          const newEvent = createEventByType(selectedEventType, position)
+          console.log('新しいイベント作成:', newEvent.id, newEvent.name)
+          console.log('現在のセルのイベント:', currentCell.events.map(e => `${e.id} (${e.name})`))
+          const newEvents = [...currentCell.events, newEvent]
+          console.log('新しい配列:', newEvents.map(e => `${e.id} (${e.name})`))
+          dispatch(updateCell({
+            floorIndex: currentFloor,
+            position,
+            cell: { events: newEvents }
+          }))
+        }
       }
     } else if (selectedLayer === 'decorations') {
       if (selectedTool === 'pen') {
         // 装飾の追加/削除
-        const hasDecoration = currentCell.decorations.length > 0
-        if (hasDecoration) {
-          // 装飾がある場合は削除
+        if (isShiftPressed) {
+          // Shift押下時は削除
           dispatch(updateCell({
             floorIndex: currentFloor,
             position,
-            cell: {
-              decorations: [],
-            }
+            cell: { decorations: [] }
           }))
         } else {
-          // 装飾がない場合は追加
+          // 新しい装飾を追加
           const newDecoration: Decoration = {
             id: crypto.randomUUID(),
             type: selectedDecorationType,
-            name: `${getDecorationIcon(selectedDecorationType)} ${selectedDecorationType}`,
-            position: position,
+            name: getDecorationName(selectedDecorationType),
+            position: { x: position.x, y: position.y },
             appearance: {
               visible: true,
               color: getDecorationColor(selectedDecorationType),
               icon: getDecorationIcon(selectedDecorationType),
-              layer: 0,
-              rotation: 0,
-              scale: 1.0
+              layer: 1
             },
-            properties: {},
-            interactable: false
+            properties: {}
           }
-
           dispatch(addDecorationToCell({
             x: position.x,
             y: position.y,
@@ -2075,7 +2079,80 @@ const MapEditor2D: React.FC = () => {
         }
       }
     }
-  }, [getCellPosition, floor, selectedLayer, selectedTool, selectedFloorType, selectedWallType, selectedDecorationType, dispatch, currentFloor, isDrawingRectangle, rectangleStart, isDragging, capturedCellData, selectedTemplate, templateRotation])
+  }, [selectedLayer, selectedTool, selectedFloorType, selectedWallType, selectedDecorationType, selectedEventType, isShiftPressed, currentFloor, capturedCellData, dispatch, floor, getCellPosition])
+
+  // イベントタイプに基づいてイベントを作成するヘルパー関数
+  const createEventByType = useCallback((eventType: string, position: Position) => {
+    const eventConfigs = {
+      treasure: { name: '宝箱', description: 'アイテムを入手できる宝箱', color: '#ffd700', icon: '💰' },
+      npc: { name: 'NPC', description: '話しかけられるキャラクター', color: '#40e0d0', icon: '👤' },
+      stairs: { name: '階段', description: '他の階への移動', color: '#888888', icon: '🪜' },
+      enemy: { name: '敵', description: 'シンボルエンカウント', color: '#ff4444', icon: '👹' },
+      save: { name: 'セーブポイント', description: 'ゲームデータを保存', color: '#44aaff', icon: '💾' },
+      heal: { name: '回復ポイント', description: 'HP・MPを回復', color: '#44ffaa', icon: '❤️' },
+      switch: { name: 'スイッチ', description: '扉や仕掛けを操作', color: '#ffaa44', icon: '🔘' },
+      sign: { name: '看板', description: 'メッセージを表示', color: '#aaaaaa', icon: '📋' },
+      harvest: { name: '採取ポイント', description: 'アイテムを採取', color: '#44ff44', icon: '🌾' },
+    }
+
+    const config = eventConfigs[eventType as keyof typeof eventConfigs] || eventConfigs.treasure
+    const generatedId = crypto.randomUUID()
+    console.log('createEventByType: 新しいID生成 =', generatedId)
+
+    return {
+      id: generatedId,
+      type: eventType as any,
+      name: config.name,
+      description: config.description,
+      position: position,
+      appearance: {
+        visible: true,
+        color: config.color,
+        icon: config.icon
+      },
+      trigger: {
+        type: 'interact' as const,
+        conditions: [],
+        repeatPolicy: {
+          type: 'once' as const
+        }
+      },
+      actions: [{
+        id: crypto.randomUUID(),
+        type: eventType as any,
+        params: {
+          items: [{ id: 'gold', count: 100 }],
+          message: config.description
+        }
+      }],
+      flags: {},
+      enabled: true,
+      priority: 1,
+      metadata: {
+        created: new Date().toISOString(),
+        modified: new Date().toISOString(),
+        version: 1
+      },
+      conditions: []
+    }
+  }, [])
+
+  // 装飾名を取得するヘルパー関数
+  const getDecorationName = useCallback((decorationType: string) => {
+    const decorationNames = {
+      furniture: '家具',
+      statue: '彫像',
+      plant: '植物',
+      torch: '松明',
+      pillar: '柱',
+      rug: '絨毯',
+      painting: '絵画',
+      crystal: 'クリスタル',
+      rubble: '瓦礫'
+    }
+    return decorationNames[decorationType as keyof typeof decorationNames] || '装飾'
+  }, [])
+
 
   const handleCanvasMouseMove = useCallback((event: React.MouseEvent) => {
     // 範囲選択モードでのマウスムーブ処理
