@@ -1314,20 +1314,6 @@ const MapEditor2D: React.FC = () => {
     ctx.lineWidth = 1
   }, [isDrawingRectangle, rectangleStart, rectangleEnd, cellSize])
 
-  const drawSelectedCell = useCallback((ctx: CanvasRenderingContext2D) => {
-    if (!selectedCell) return
-
-    // 選択されたセルの枠線を描画
-    ctx.strokeStyle = '#00ff00'  // 緑色
-    ctx.lineWidth = 3
-    ctx.strokeRect(
-      selectedCell.x * cellSize,
-      selectedCell.y * cellSize,
-      cellSize,
-      cellSize
-    )
-    ctx.lineWidth = 1
-  }, [selectedCell, cellSize])
 
   const drawSelection = useCallback((ctx: CanvasRenderingContext2D) => {
     if (!selectionMode || !selectionStart || !selectionEnd) return
@@ -1478,7 +1464,6 @@ const MapEditor2D: React.FC = () => {
     drawDragPreview(ctx)
     
     // 選択されたセルを描画
-    drawSelectedCell(ctx)
     
     // ホバー中のセルをハイライト
     drawHoveredCell(ctx)
@@ -1487,7 +1472,7 @@ const MapEditor2D: React.FC = () => {
     drawSelection(ctx)
     
     drawGrid(ctx)
-  }, [floor, cellSize, drawFloor, drawWalls, drawEvents, drawDecorations, drawGrid, drawRectanglePreview, drawTemplatePreview, drawDragPreview, drawSelectedCell, drawHoveredCell, drawSelection, editorState, templateRotation])
+  }, [floor, cellSize, drawFloor, drawWalls, drawEvents, drawDecorations, drawGrid, drawRectanglePreview, drawTemplatePreview, drawDragPreview, drawHoveredCell, drawSelection, editorState, templateRotation])
 
   const getCellPosition = useCallback((event: React.MouseEvent): Position | null => {
     const canvas = canvasRef.current
