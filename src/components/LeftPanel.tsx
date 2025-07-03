@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import {
   Box,
   Typography,
@@ -14,10 +14,12 @@ import {
   IconButton,
   Tooltip,
   Button,
+  Menu,
+  MenuItem,
+  ListItemSecondaryAction,
 } from '@mui/material'
 import {
   ExpandMore as ExpandMoreIcon,
-  ViewList as ObjectListIcon,
   Terrain as FloorIcon,
   CropSquare as WallIcon,
   Event as EventIcon,
@@ -25,16 +27,25 @@ import {
   Colorize as EyedropperIcon,
   Clear as ClearIcon,
   Add as AddIcon,
+  Delete as DeleteIcon,
+  ContentCopy as CopyIcon,
+  MoreVert as MoreVertIcon,
+  Grid3x3 as GridIcon,
 } from '@mui/icons-material'
 import { useDispatch, useSelector } from 'react-redux'
 import { RootState } from '../store'
-import { setSelectedFloorType, setSelectedWallType, setSelectedDecorationType, clearCapturedCellData, toggleFloorTypeAccordion, toggleWallTypeAccordion, openCustomTypeDialog, openEventEditDialog, setSelectedTemplate } from '../store/editorSlice'
-import { Layer, FloorType, WallType, DecorationType } from '../types/map'
+import { setSelectedFloorType, setSelectedWallType, setSelectedDecorationType, setSelectedEventType, clearCapturedCellData, toggleFloorTypeAccordion, toggleWallTypeAccordion, toggleEventTypeAccordion, toggleDecorationTypeAccordion, openCustomTypeDialog, openEventEditDialog, setSelectedTemplate, setSelectedTool, setSelectedEventId } from '../store/editorSlice'
+import { removeEventFromCell, addEventToCell } from '../store/mapSlice'
+import { Layer, FloorType, WallType, DecorationType, EventType } from '../types/map'
 
 const LeftPanel: React.FC = () => {
   const dispatch = useDispatch()
-  const { selectedLayer, selectedFloorType, selectedWallType, selectedDecorationType, capturedCellData, accordionStates, customFloorTypes, customWallTypes } = useSelector((state: RootState) => state.editor)
+  const { selectedLayer, selectedFloorType, selectedWallType, selectedDecorationType, selectedEventType, capturedCellData, accordionStates, customFloorTypes, customWallTypes } = useSelector((state: RootState) => state.editor)
   const dungeon = useSelector((state: RootState) => state.map.dungeon)
+
+  // イベント操作メニューの状態管理
+  const [eventMenuAnchor, setEventMenuAnchor] = useState<null | HTMLElement>(null)
+  const [selectedEventForMenu, setSelectedEventForMenu] = useState<any>(null)
 
   const layers: Array<{ key: Layer; name: string; icon: React.ReactNode }> = [
     { key: 'floor', name: '床レイヤー', icon: <FloorIcon /> },
@@ -74,17 +85,31 @@ const LeftPanel: React.FC = () => {
     { key: 'rubble', name: '瓦礫', color: '#696969', description: '石くずや破片', icon: '🪨' },
   ]
 
+  const eventTypes: Array<{ key: EventType; name: string; color: string; description: string; icon: string }> = [
+    { key: 'treasure', name: '宝箱', color: '#ffd700', description: 'アイテムや金を入手', icon: '💰' },
+    { key: 'npc', name: 'NPC', color: '#40e0d0', description: '会話や情報提供', icon: '👤' },
+    { key: 'stairs', name: '階段', color: '#888888', description: '他の階への移動', icon: '🪜' },
+    { key: 'enemy', name: '敵', color: '#ff4444', description: 'シンボルエンカウント', icon: '👹' },
+    { key: 'save', name: 'セーブ', color: '#44aaff', description: 'セーブポイント', icon: '💾' },
+    { key: 'heal', name: '回復', color: '#44ffaa', description: 'HP・MP回復', icon: '❤️' },
+    { key: 'switch', name: 'スイッチ', color: '#ffaa44', description: '扉や仕掛けの操作', icon: '🔘' },
+    { key: 'sign', name: '看板', color: '#aaaaaa', description: 'メッセージ表示', icon: '📋' },
+    { key: 'harvest', name: '採取', color: '#44ff44', description: 'アイテム採取地点', icon: '🌾' },
+  ]
+
 
   const handleFloorTypeSelect = (floorType: FloorType) => {
     dispatch(setSelectedFloorType(floorType))
-    // テンプレート選択を解除
+    // テンプレート選択を解除し、ペンツールに切り替え
     dispatch(setSelectedTemplate(null))
+    dispatch(setSelectedTool('pen'))
   }
 
   const handleWallTypeSelect = (wallType: WallType) => {
     dispatch(setSelectedWallType(wallType))
-    // テンプレート選択を解除
+    // テンプレート選択を解除し、ペンツールに切り替え
     dispatch(setSelectedTemplate(null))
+    dispatch(setSelectedTool('pen'))
   }
   
   const handleClearCapturedData = () => {
@@ -99,6 +124,14 @@ const LeftPanel: React.FC = () => {
     dispatch(toggleWallTypeAccordion())
   }
 
+  const handleEventTypeAccordionToggle = () => {
+    dispatch(toggleEventTypeAccordion())
+  }
+
+  const handleDecorationTypeAccordionToggle = () => {
+    dispatch(toggleDecorationTypeAccordion())
+  }
+
   const handleAddCustomFloorType = () => {
     dispatch(openCustomTypeDialog('floor'))
   }
@@ -109,8 +142,60 @@ const LeftPanel: React.FC = () => {
 
   const handleDecorationTypeSelect = (decorationType: DecorationType) => {
     dispatch(setSelectedDecorationType(decorationType))
-    // テンプレート選択を解除
+    // テンプレート選択を解除し、ペンツールに切り替え
     dispatch(setSelectedTemplate(null))
+    dispatch(setSelectedTool('pen'))
+  }
+
+  const handleEventTypeSelect = (eventType: EventType) => {
+    dispatch(setSelectedEventType(eventType))
+    // テンプレート選択を解除し、ペンツールに切り替え
+    dispatch(setSelectedTemplate(null))
+    dispatch(setSelectedTool('pen'))
+  }
+
+  // イベント操作関連のハンドラー
+  const handleEventMenuOpen = (event: React.MouseEvent<HTMLElement>, eventData: any) => {
+    event.stopPropagation()
+    setEventMenuAnchor(event.currentTarget)
+    setSelectedEventForMenu(eventData)
+  }
+
+  const handleEventMenuClose = () => {
+    setEventMenuAnchor(null)
+    setSelectedEventForMenu(null)
+  }
+
+  const handleDeleteEvent = () => {
+    if (selectedEventForMenu) {
+      dispatch(removeEventFromCell({
+        x: selectedEventForMenu.position.x,
+        y: selectedEventForMenu.position.y,
+        eventId: selectedEventForMenu.id
+      }))
+    }
+    handleEventMenuClose()
+  }
+
+  const handleDuplicateEvent = () => {
+    if (selectedEventForMenu) {
+      const duplicatedEvent = {
+        ...selectedEventForMenu,
+        id: crypto.randomUUID(),
+        name: `${selectedEventForMenu.name} (コピー)`,
+        metadata: {
+          ...selectedEventForMenu.metadata,
+          created: new Date().toISOString(),
+          modified: new Date().toISOString()
+        }
+      }
+      dispatch(addEventToCell({
+        x: selectedEventForMenu.position.x,
+        y: selectedEventForMenu.position.y,
+        event: duplicatedEvent
+      }))
+    }
+    handleEventMenuClose()
   }
 
   return (
@@ -304,13 +389,24 @@ const LeftPanel: React.FC = () => {
       {/* イベントレイヤー関連 */}
       {selectedLayer === 'events' && (
         <>
-          <Accordion>
+          <Accordion expanded={selectedLayer === 'events'}>
             <AccordionSummary expandIcon={<ExpandMoreIcon />}>
               <EventIcon sx={{ mr: 1 }} />
               <Typography>イベント管理</Typography>
             </AccordionSummary>
             <AccordionDetails sx={{ p: 2 }}>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<AddIcon />}
+                  fullWidth
+                  sx={{ mb: 2 }}
+                  onClick={() => dispatch(openEventEditDialog(null))}
+                >
+                  新しいイベント
+                </Button>
+                
                 <Typography variant="body2" color="text.secondary" gutterBottom>
                   現在の階にあるイベント一覧です
                 </Typography>
@@ -321,42 +417,49 @@ const LeftPanel: React.FC = () => {
                   </Typography>
                 </Box>
                 
-                <Button
-                  variant="outlined"
-                  size="small"
-                  startIcon={<AddIcon />}
-                  fullWidth
-                  sx={{ mb: 1 }}
-                  onClick={() => dispatch(openEventEditDialog(null))}
-                >
-                  新しいイベント
-                </Button>
-                
                 <List dense sx={{ maxHeight: 200, overflow: 'auto' }}>
-                  {dungeon?.floors[0]?.cells?.flat().map(cell => 
-                    cell.events.map(event => (
-                      <ListItem key={event.id} disablePadding>
+                  {dungeon?.floors[0]?.cells?.flat().flatMap((cell, cellIndex) => 
+                    cell.events.map((event, eventIndex) => (
+                      <ListItem key={`${event.id}-${cellIndex}-${eventIndex}`} disablePadding>
                         <ListItemButton 
-                          onClick={() => dispatch(openEventEditDialog(event))}
+                          onClick={() => {
+                            dispatch(setSelectedEventId(event.id))
+                            dispatch(openEventEditDialog(event))
+                          }}
                         >
                           <ListItemIcon sx={{ minWidth: 28 }}>
                             <Box
                               sx={{
-                                width: 12,
-                                height: 12,
-                                bgcolor: event.appearance.color || '#ffd700',
-                                border: '1px solid #ccc',
+                                width: 20,
+                                height: 20,
+                                bgcolor: (event.appearance.icon && event.appearance.icon.trim()) ? 'transparent' : event.appearance.color || '#ffd700',
+                                border: (event.appearance.icon && event.appearance.icon.trim()) ? 'none' : `1px solid ${event.appearance.color || '#ffd700'}`,
                                 borderRadius: '50%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '12px',
                               }}
-                            />
+                            >
+                              {(event.appearance.icon && event.appearance.icon.trim()) ? event.appearance.icon : '●'}
+                            </Box>
                           </ListItemIcon>
                           <ListItemText 
                             primary={event.name}
-                            secondary={`(${cell.x}, ${cell.y}) ${event.type}`}
+                            secondary={`(${event.position.x}, ${event.position.y}) ${event.type}`}
                             primaryTypographyProps={{ variant: 'body2' }}
                             secondaryTypographyProps={{ variant: 'caption' }}
                           />
                         </ListItemButton>
+                        <ListItemSecondaryAction>
+                          <IconButton
+                            edge="end"
+                            size="small"
+                            onClick={(e) => handleEventMenuOpen(e, event)}
+                          >
+                            <MoreVertIcon fontSize="small" />
+                          </IconButton>
+                        </ListItemSecondaryAction>
                       </ListItem>
                     ))
                   ) || []}
@@ -370,6 +473,38 @@ const LeftPanel: React.FC = () => {
               </Box>
             </AccordionDetails>
           </Accordion>
+          
+          <Accordion expanded={accordionStates.eventTypeAccordion} onChange={handleEventTypeAccordionToggle}>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <EventIcon sx={{ mr: 1 }} />
+              <Typography>イベントテンプレート選択</Typography>
+            </AccordionSummary>
+            <AccordionDetails sx={{ p: 0 }}>
+              <List dense>
+                {eventTypes.map((eventType) => (
+                  <ListItem key={eventType.key} disablePadding>
+                    <ListItemButton
+                      selected={selectedEventType === eventType.key}
+                      onClick={() => handleEventTypeSelect(eventType.key)}
+                      disabled={!dungeon}
+                      sx={{ pl: 2 }}
+                    >
+                      <ListItemIcon sx={{ minWidth: 32 }}>
+                        <Typography sx={{ fontSize: '16px' }}>
+                          {eventType.icon}
+                        </Typography>
+                      </ListItemIcon>
+                      <ListItemText 
+                        primary={eventType.name}
+                        secondary={eventType.description}
+                      />
+                    </ListItemButton>
+                  </ListItem>
+                ))}
+              </List>
+            </AccordionDetails>
+          </Accordion>
+          
           <Divider />
         </>
       )}
@@ -377,7 +512,7 @@ const LeftPanel: React.FC = () => {
       {/* 装飾レイヤー関連 */}
       {selectedLayer === 'decorations' && (
         <>
-          <Accordion>
+          <Accordion expanded={accordionStates.decorationTypeAccordion} onChange={handleDecorationTypeAccordionToggle}>
             <AccordionSummary expandIcon={<ExpandMoreIcon />}>
               <DecorationIcon sx={{ mr: 1 }} />
               <Typography>装飾タイプ選択</Typography>
@@ -546,19 +681,46 @@ const LeftPanel: React.FC = () => {
         </>
       )}
 
-      {/* オブジェクトリスト */}
-      <Accordion>
-        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-          <ObjectListIcon sx={{ mr: 1 }} />
-          <Typography>オブジェクトリスト</Typography>
-        </AccordionSummary>
-        <AccordionDetails>
-          <Typography variant="body2" color="text.secondary">
-            {dungeon ? 'オブジェクトが表示されます' : 'プロジェクトを作成してください'}
-          </Typography>
-        </AccordionDetails>
-      </Accordion>
       </Box>
+
+      {/* イベント操作メニュー */}
+      <Menu
+        anchorEl={eventMenuAnchor}
+        open={Boolean(eventMenuAnchor)}
+        onClose={handleEventMenuClose}
+        anchorOrigin={{
+          vertical: 'top',
+          horizontal: 'right',
+        }}
+        transformOrigin={{
+          vertical: 'top',
+          horizontal: 'left',
+        }}
+      >
+        <MenuItem onClick={() => {
+          if (selectedEventForMenu) {
+            dispatch(openEventEditDialog(selectedEventForMenu))
+          }
+          handleEventMenuClose()
+        }}>
+          <ListItemIcon>
+            <EventIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>編集</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={handleDuplicateEvent}>
+          <ListItemIcon>
+            <CopyIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>複製</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={handleDeleteEvent} sx={{ color: 'error.main' }}>
+          <ListItemIcon>
+            <DeleteIcon fontSize="small" sx={{ color: 'error.main' }} />
+          </ListItemIcon>
+          <ListItemText>削除</ListItemText>
+        </MenuItem>
+      </Menu>
     </Box>
   )
 }
