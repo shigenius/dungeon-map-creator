@@ -5,7 +5,7 @@ import { useSelector, useDispatch } from 'react-redux'
 import { RootState } from '../store'
 import { openCreateTemplateDialog, setViewCenter } from '../store/editorSlice'
 import MapEditor2D from './MapEditor2D'
-import MapEditor3D from './MapEditor3D'
+import MapEditor3DProgressive from './MapEditor3DProgressive'
 import Minimap from './Minimap'
 
 const MainCanvas: React.FC = () => {
@@ -54,7 +54,7 @@ const MainCanvas: React.FC = () => {
       }}
     >
       {viewMode === '2d' && <MapEditor2D />}
-      {/* {(viewMode === '3d' || viewMode === 'preview') && <MapEditor3D />} */}
+      {(viewMode === '3d' || viewMode === 'preview') && <MapEditor3DProgressive />}
       
       {/* ミニマップ - 一時的に無効化 */}
       {/* <Minimap onCellClick={handleMinimapClick} /> */}

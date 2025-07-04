@@ -1,0 +1,257 @@
+import React, { Suspense, useRef } from 'react'
+import { Box, Typography, CircularProgress, IconButton, Tooltip } from '@mui/material'
+import {
+  ZoomIn as ZoomInIcon,
+  ZoomOut as ZoomOutIcon,
+  CenterFocusStrong as CenterIcon,
+} from '@mui/icons-material'
+import { Canvas, useThree, useFrame } from 'react-three-fiber'
+import { useSelector } from 'react-redux'
+import { RootState } from '../store'
+import * as THREE from 'three'
+
+// 簡易カメラコントロール
+const CameraControls: React.FC<{ controlsRef: React.MutableRefObject<any> }> = ({ controlsRef }) => {
+  const { camera } = useThree()
+  
+  // 基本的なマウス操作（簡易版）
+  useFrame(() => {
+    // カメラの基本設定のみ
+  })
+
+  return null
+}
+
+// 3Dダンジョンセル（簡易版）
+const SimpleDungeonCell: React.FC<{
+  x: number
+  y: number
+  floorType: string
+  passable: boolean
+  walls: any
+  hasEvents: boolean
+}> = ({ x, y, floorType, passable, walls, hasEvents }) => {
+  
+  // 床の色を取得
+  const getFloorColor = (type: string) => {
+    switch (type) {
+      case 'normal': return '#666666'
+      case 'damage': return '#aa4444'
+      case 'slippery': return '#4488aa'
+      case 'pit': return '#222222'
+      case 'warp': return '#aa44aa'
+      default: return '#666666'
+    }
+  }
+
+  return (
+    <group position={[x - 10, 0, y - 10]}>
+      {/* 床 */}
+      {passable && (
+        <mesh position={[0, -0.1, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[0.9, 0.9]} />
+          <meshStandardMaterial color={getFloorColor(floorType)} />
+        </mesh>
+      )}
+
+      {/* 壁（簡易版） */}
+      {walls.north && (
+        <mesh position={[0, 0.5, -0.45]}>
+          <boxGeometry args={[0.9, 1, 0.1]} />
+          <meshStandardMaterial color="#ffffff" />
+        </mesh>
+      )}
+      {walls.east && (
+        <mesh position={[0.45, 0.5, 0]}>
+          <boxGeometry args={[0.1, 1, 0.9]} />
+          <meshStandardMaterial color="#ffffff" />
+        </mesh>
+      )}
+      {walls.south && (
+        <mesh position={[0, 0.5, 0.45]}>
+          <boxGeometry args={[0.9, 1, 0.1]} />
+          <meshStandardMaterial color="#ffffff" />
+        </mesh>
+      )}
+      {walls.west && (
+        <mesh position={[-0.45, 0.5, 0]}>
+          <boxGeometry args={[0.1, 1, 0.9]} />
+          <meshStandardMaterial color="#ffffff" />
+        </mesh>
+      )}
+
+      {/* イベント表示 */}
+      {hasEvents && (
+        <mesh position={[0, 0.2, 0]}>
+          <sphereGeometry args={[0.1, 8, 8]} />
+          <meshStandardMaterial color="#ffd700" emissive="#ffd700" emissiveIntensity={0.3} />
+        </mesh>
+      )}
+    </group>
+  )
+}
+
+// 3Dシーン
+const DungeonScene: React.FC = () => {
+  const { dungeon, currentFloor } = useSelector((state: RootState) => ({
+    dungeon: state.map.dungeon,
+    currentFloor: state.editor.currentFloor,
+  }))
+
+  if (!dungeon) return null
+
+  const floor = dungeon.floors[currentFloor]
+  if (!floor) return null
+
+  return (
+    <group>
+      {/* 照明 */}
+      <ambientLight intensity={0.6} />
+      <directionalLight position={[10, 10, 5]} intensity={0.8} />
+      
+      {/* ダンジョンセル */}
+      {floor.cells.map((row, y) =>
+        row.map((cell, x) => {
+          // セル数制限（パフォーマンス対策）
+          if (x >= 20 || y >= 20) return null
+          
+          return (
+            <SimpleDungeonCell
+              key={`${x}-${y}`}
+              x={x}
+              y={y}
+              floorType={cell.floor.type}
+              passable={cell.floor.passable}
+              walls={cell.walls}
+              hasEvents={cell.events.length > 0}
+            />
+          )
+        })
+      )}
+
+      {/* グリッド */}
+      <gridHelper args={[20, 20, '#444444', '#444444']} />
+    </group>
+  )
+}
+
+const MapEditor3DProgressive: React.FC = () => {
+  const controlsRef = useRef<any>(null)
+  const { dungeon, currentFloor } = useSelector((state: RootState) => ({
+    dungeon: state.map.dungeon,
+    currentFloor: state.editor.currentFloor,
+  }))
+
+  if (!dungeon) {
+    return (
+      <Box
+        sx={{
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          bgcolor: '#1a1a1a',
+          color: '#fff',
+        }}
+      >
+        <Typography variant="h6" color="text.secondary">
+          3Dプレビューを表示するにはプロジェクトを作成してください
+        </Typography>
+      </Box>
+    )
+  }
+
+  return (
+    <Box
+      sx={{
+        width: '100%',
+        height: '100%',
+        position: 'relative',
+        bgcolor: '#1a1a1a',
+      }}
+    >
+      {/* 3Dキャンバス */}
+      <Canvas 
+        style={{ width: '100%', height: '100%' }}
+        camera={{ position: [15, 15, 15], fov: 60, near: 0.1, far: 1000 }}
+      >
+        <Suspense fallback={null}>
+          <CameraControls controlsRef={controlsRef} />
+          <DungeonScene />
+        </Suspense>
+      </Canvas>
+
+      {/* 基本コントロール */}
+      <Box
+        sx={{
+          position: 'absolute',
+          top: 16,
+          left: 16,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 1,
+          bgcolor: 'rgba(0, 0, 0, 0.7)',
+          p: 1,
+          borderRadius: 1,
+        }}
+      >
+        <Tooltip title="3Dプレビュー（簡易版）">
+          <IconButton size="small" sx={{ color: 'white' }}>
+            <CenterIcon />
+          </IconButton>
+        </Tooltip>
+      </Box>
+
+      {/* フロア情報 */}
+      <Box
+        sx={{
+          position: 'absolute',
+          bottom: 16,
+          left: 16,
+          bgcolor: 'rgba(0, 0, 0, 0.7)',
+          p: 1,
+          borderRadius: 1,
+        }}
+      >
+        <Typography variant="body2" sx={{ color: 'white' }}>
+          フロア {currentFloor + 1}: {dungeon.floors[currentFloor]?.name || '無名'}
+        </Typography>
+        <Typography variant="caption" sx={{ color: '#aaa', display: 'block' }}>
+          3Dプレビュー（基本機能） | 最大20×20セル表示
+        </Typography>
+      </Box>
+
+      {/* ローディング */}
+      <Suspense
+        fallback={
+          <Box
+            sx={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              bgcolor: 'rgba(0, 0, 0, 0.8)',
+              color: 'white',
+            }}
+          >
+            <Box sx={{ textAlign: 'center' }}>
+              <CircularProgress color="primary" />
+              <Typography variant="body2" sx={{ mt: 2 }}>
+                3Dシーンを読み込み中...
+              </Typography>
+            </Box>
+          </Box>
+        }
+      >
+        <div />
+      </Suspense>
+    </Box>
+  )
+}
+
+export default MapEditor3DProgressive
