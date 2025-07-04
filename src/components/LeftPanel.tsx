@@ -30,7 +30,7 @@ import {
   Delete as DeleteIcon,
   ContentCopy as CopyIcon,
   MoreVert as MoreVertIcon,
-  Template as TemplateIcon,
+  ViewModule as TemplateIcon,
 } from '@mui/icons-material'
 import { useDispatch, useSelector } from 'react-redux'
 import { RootState } from '../store'

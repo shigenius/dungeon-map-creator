@@ -54,10 +54,10 @@ const MainCanvas: React.FC = () => {
       }}
     >
       {viewMode === '2d' && <MapEditor2D />}
-      {(viewMode === '3d' || viewMode === 'preview') && <MapEditor3D />}
+      {/* {(viewMode === '3d' || viewMode === 'preview') && <MapEditor3D />} */}
       
-      {/* ミニマップ */}
-      <Minimap onCellClick={handleMinimapClick} />
+      {/* ミニマップ - 一時的に無効化 */}
+      {/* <Minimap onCellClick={handleMinimapClick} /> */}
       
       {/* 範囲選択完了時のテンプレート作成ボタン */}
       {isRangeSelected && (
