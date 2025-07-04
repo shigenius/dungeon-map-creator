@@ -30,10 +30,13 @@ import {
   loadTemplates,
   rotateTemplate,
   startSelection,
+  openEventEditDialog,
 } from '../store/editorSlice'
 import { placeTemplate } from '../store/mapSlice'
 import { Template, TemplateCategory } from '../types/map'
 import { presetTemplates, getCategoryDisplayName } from '../data/presetTemplates'
+import EventTemplateDialog from './EventTemplateDialog'
+import { EventTemplate } from '../data/eventTemplates'
 
 interface TabPanelProps {
   children?: React.ReactNode
@@ -133,6 +136,7 @@ const RightPanel: React.FC = () => {
   const dungeon = useSelector((state: RootState) => state.map.dungeon)
 
   const [tabValue, setTabValue] = React.useState(0)
+  const [showEventTemplateDialog, setShowEventTemplateDialog] = React.useState(false)
 
   // プリセットテンプレートをロード
   useEffect(() => {
@@ -165,6 +169,41 @@ const RightPanel: React.FC = () => {
 
   const handleCreateTemplate = () => {
     dispatch(startSelection())
+  }
+
+  const handleEventTemplateSelect = (template: EventTemplate) => {
+    if (template.presetEvent && dungeon) {
+      const now = new Date().toISOString()
+      const templateEvent = template.presetEvent
+      
+      // テンプレートから新しいイベントを作成
+      const newEvent = {
+        id: crypto.randomUUID(),
+        type: templateEvent.type || 'custom',
+        name: templateEvent.name || 'イベント',
+        description: templateEvent.description || '',
+        position: { x: 0, y: 0 }, // デフォルト位置
+        appearance: {
+          visible: true,
+          ...templateEvent.appearance
+        },
+        trigger: templateEvent.trigger || { type: 'interact', repeatPolicy: { type: 'once' } },
+        actions: templateEvent.actions ? [...templateEvent.actions] : [],
+        enabled: templateEvent.enabled !== undefined ? templateEvent.enabled : true,
+        priority: templateEvent.priority !== undefined ? templateEvent.priority : 1,
+        flags: templateEvent.flags || {},
+        metadata: {
+          created: now,
+          modified: now,
+          author: dungeon.author || '',
+          version: 1
+        }
+      }
+      
+      // イベント編集ダイアログを開く
+      dispatch(openEventEditDialog(newEvent))
+      setShowEventTemplateDialog(false)
+    }
   }
 
   const categories: TemplateCategory[] = ['room', 'corridor', 'junction', 'trap', 'puzzle', 'decoration', 'fullmap', 'custom']
@@ -694,9 +733,19 @@ const RightPanel: React.FC = () => {
                 <Typography variant="subtitle2">イベントプロパティ</Typography>
               </AccordionSummary>
               <AccordionDetails>
-                <Typography variant="body2" color="text.secondary">
-                  イベントの詳細設定（開発中）
-                </Typography>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <Button
+                    variant="outlined"
+                    startIcon={<AddIcon />}
+                    onClick={() => setShowEventTemplateDialog(true)}
+                    fullWidth
+                  >
+                    イベントテンプレートから作成
+                  </Button>
+                  <Typography variant="body2" color="text.secondary">
+                    事前定義されたテンプレートからイベントを素早く作成できます
+                  </Typography>
+                </Box>
               </AccordionDetails>
             </Accordion>
 
@@ -713,6 +762,13 @@ const RightPanel: React.FC = () => {
           </Box>
         </TabPanel>
       </Box>
+
+      {/* イベントテンプレートダイアログ */}
+      <EventTemplateDialog
+        open={showEventTemplateDialog}
+        onClose={() => setShowEventTemplateDialog(false)}
+        onSelectTemplate={handleEventTemplateSelect}
+      />
     </Box>
   )
 }

@@ -30,6 +30,7 @@ import {
   Delete as DeleteIcon,
   ContentCopy as CopyIcon,
   MoreVert as MoreVertIcon,
+  Template as TemplateIcon,
 } from '@mui/icons-material'
 import { useDispatch, useSelector } from 'react-redux'
 import { RootState } from '../store'
@@ -37,6 +38,8 @@ import { setSelectedFloorType, setSelectedWallType, setSelectedDecorationType, s
 import { removeEventFromCell, addEventToCell } from '../store/mapSlice'
 import { Layer, FloorType, WallType, DecorationType, EventType } from '../types/map'
 import FloorManagerPanel from './FloorManagerPanel'
+import EventTemplateDialog from './EventTemplateDialog'
+import { EventTemplate } from '../data/eventTemplates'
 
 const LeftPanel: React.FC = () => {
   const dispatch = useDispatch()
@@ -46,6 +49,7 @@ const LeftPanel: React.FC = () => {
   // イベント操作メニューの状態管理
   const [eventMenuAnchor, setEventMenuAnchor] = useState<null | HTMLElement>(null)
   const [selectedEventForMenu, setSelectedEventForMenu] = useState<any>(null)
+  const [showEventTemplateDialog, setShowEventTemplateDialog] = useState(false)
 
   const layers: Array<{ key: Layer; name: string; icon: React.ReactNode }> = [
     { key: 'floor', name: '床レイヤー', icon: <FloorIcon /> },
@@ -200,6 +204,40 @@ const LeftPanel: React.FC = () => {
     handleEventMenuClose()
   }
 
+  const handleTemplateSelect = (template: EventTemplate) => {
+    if (template.presetEvent && dungeon) {
+      const now = new Date().toISOString()
+      const templateEvent = template.presetEvent
+      
+      // テンプレートから新しいイベントを作成
+      const newEvent = {
+        id: crypto.randomUUID(),
+        type: templateEvent.type || 'custom',
+        name: templateEvent.name || 'イベント',
+        description: templateEvent.description || '',
+        position: { x: 0, y: 0 }, // デフォルト位置
+        appearance: {
+          visible: true,
+          ...templateEvent.appearance
+        },
+        trigger: templateEvent.trigger || { type: 'interact', repeatPolicy: { type: 'once' } },
+        actions: templateEvent.actions ? [...templateEvent.actions] : [],
+        enabled: templateEvent.enabled !== undefined ? templateEvent.enabled : true,
+        priority: templateEvent.priority !== undefined ? templateEvent.priority : 1,
+        flags: templateEvent.flags || {},
+        metadata: {
+          created: now,
+          modified: now,
+          author: dungeon.author || '',
+          version: 1
+        }
+      }
+      
+      // イベント編集ダイアログを開く
+      dispatch(openEventEditDialog(newEvent))
+      setShowEventTemplateDialog(false)
+    }
+  }
 
   return (
     <Box
@@ -403,16 +441,26 @@ const LeftPanel: React.FC = () => {
             </AccordionSummary>
             <AccordionDetails sx={{ p: 2 }}>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  startIcon={<AddIcon />}
-                  fullWidth
-                  sx={{ mb: 2 }}
-                  onClick={() => dispatch(openEventEditDialog(null))}
-                >
-                  新しいイベント
-                </Button>
+                <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={<AddIcon />}
+                    sx={{ flex: 1 }}
+                    onClick={() => dispatch(openEventEditDialog(null))}
+                  >
+                    新規作成
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={<TemplateIcon />}
+                    sx={{ flex: 1 }}
+                    onClick={() => setShowEventTemplateDialog(true)}
+                  >
+                    テンプレート
+                  </Button>
+                </Box>
                 
                 <Typography variant="body2" color="text.secondary" gutterBottom>
                   現在の階にあるイベント一覧です
@@ -728,6 +776,13 @@ const LeftPanel: React.FC = () => {
           <ListItemText>削除</ListItemText>
         </MenuItem>
       </Menu>
+
+      {/* イベントテンプレートダイアログ */}
+      <EventTemplateDialog
+        open={showEventTemplateDialog}
+        onClose={() => setShowEventTemplateDialog(false)}
+        onSelectTemplate={handleTemplateSelect}
+      />
     </Box>
   )
 }

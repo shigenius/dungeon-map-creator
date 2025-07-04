@@ -35,8 +35,11 @@ import {
   ExpandMore as ExpandMoreIcon,
   Visibility as VisibilityIcon,
   VisibilityOff as VisibilityOffIcon,
+  Template as TemplateIcon,
 } from '@mui/icons-material'
 import { DungeonEvent, EventType, TriggerType, ActionType, EventAction } from '../types/map'
+import EventTemplateDialog from './EventTemplateDialog'
+import { EventTemplate } from '../data/eventTemplates'
 
 interface TabPanelProps {
   children?: React.ReactNode
@@ -69,6 +72,7 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
 }) => {
   const [tabValue, setTabValue] = useState(0)
   const [editingEvent, setEditingEvent] = useState<DungeonEvent | null>(null)
+  const [showTemplateDialog, setShowTemplateDialog] = useState(false)
 
   useEffect(() => {
     // console.log('EventEditDialog useEffect実行:', { 
@@ -203,6 +207,37 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
     }
   }
 
+  const handleTemplateSelect = (template: EventTemplate) => {
+    if (editingEvent && template.presetEvent) {
+      const now = new Date().toISOString()
+      const templateEvent = template.presetEvent
+      
+      // テンプレートから新しいイベントデータを作成
+      const newEvent: DungeonEvent = {
+        ...editingEvent, // 現在のIDと位置は保持
+        type: templateEvent.type || editingEvent.type,
+        name: templateEvent.name || editingEvent.name,
+        description: templateEvent.description || editingEvent.description,
+        appearance: {
+          ...editingEvent.appearance,
+          ...templateEvent.appearance
+        },
+        trigger: templateEvent.trigger || editingEvent.trigger,
+        actions: templateEvent.actions ? [...templateEvent.actions] : editingEvent.actions,
+        enabled: templateEvent.enabled !== undefined ? templateEvent.enabled : editingEvent.enabled,
+        priority: templateEvent.priority !== undefined ? templateEvent.priority : editingEvent.priority,
+        flags: templateEvent.flags || editingEvent.flags,
+        metadata: {
+          ...editingEvent.metadata,
+          modified: now,
+          version: (editingEvent.metadata.version || 0) + 1
+        }
+      }
+      
+      setEditingEvent(newEvent)
+      setShowTemplateDialog(false)
+    }
+  }
 
   const getEventTypeLabel = (type: EventType) => {
     const labels: Record<EventType, string> = {
@@ -273,7 +308,15 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
       <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <EventIcon />
         イベント編集: {editingEvent.name}
-        <Box sx={{ ml: 'auto' }}>
+        <Box sx={{ ml: 'auto', display: 'flex', gap: 1 }}>
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<TemplateIcon />}
+            onClick={() => setShowTemplateDialog(true)}
+          >
+            テンプレート
+          </Button>
           <IconButton onClick={onClose}>
             <CloseIcon />
           </IconButton>
@@ -690,6 +733,13 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
           保存
         </Button>
       </DialogActions>
+
+      {/* イベントテンプレートダイアログ */}
+      <EventTemplateDialog
+        open={showTemplateDialog}
+        onClose={() => setShowTemplateDialog(false)}
+        onSelectTemplate={handleTemplateSelect}
+      />
     </Dialog>
   )
 }
