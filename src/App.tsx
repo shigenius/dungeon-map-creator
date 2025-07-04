@@ -3,7 +3,7 @@ import { Box } from '@mui/material'
 import { useSelector, useDispatch } from 'react-redux'
 import { RootState } from './store'
 import { undo, redo, loadDungeon, addEventToCell, updateEventInCell, removeEventFromCell } from './store/mapSlice'
-import { setSelectedTool, setSelectedLayer, toggleGrid, setZoom, openNewProjectDialog, setShiftPressed, closeEventEditDialog, rotateTemplate, rotateTemplateLeft, closeHelpDialog, clearSelection } from './store/editorSlice'
+import { setSelectedTool, setSelectedLayer, toggleGrid, setZoom, openNewProjectDialog, setShiftPressed, closeEventEditDialog, rotateTemplate, rotateTemplateLeft, closeHelpDialog, clearSelection, closeMapValidationDialog } from './store/editorSlice'
 import { downloadDungeonAsJSON, openDungeonFromFile } from './utils/fileUtils'
 import MenuBar from './components/MenuBar'
 import ToolBar from './components/ToolBar'
@@ -16,11 +16,12 @@ import CustomTypeDialog from './components/CustomTypeDialog'
 import EventEditDialog from './components/EventEditDialog'
 import CreateTemplateDialog from './components/CreateTemplateDialog'
 import HelpDialog from './components/HelpDialog'
+import MapValidationDialog from './components/MapValidationDialog'
 
 function App() {
   const dispatch = useDispatch()
   const dungeon = useSelector((state: RootState) => state.map.dungeon)
-  const { zoom, selectedLayer, showNewProjectDialog, showEventEditDialog, editingEvent, selectedTool, selectedTemplate, selectionMode, showHelpDialog, currentFloor } = useSelector((state: RootState) => state.editor)
+  const { zoom, selectedLayer, showNewProjectDialog, showEventEditDialog, editingEvent, selectedTool, selectedTemplate, selectionMode, showHelpDialog, showMapValidationDialog, currentFloor } = useSelector((state: RootState) => state.editor)
 
   // ダンジョンが存在しない場合に新規プロジェクトダイアログを表示
   useEffect(() => {
@@ -236,6 +237,13 @@ function App() {
       <HelpDialog 
         open={showHelpDialog}
         onClose={() => dispatch(closeHelpDialog())}
+      />
+
+      {/* マップ検証ダイアログ */}
+      <MapValidationDialog
+        open={showMapValidationDialog}
+        onClose={() => dispatch(closeMapValidationDialog())}
+        dungeon={dungeon}
       />
       <EventEditDialog 
         open={showEventEditDialog}

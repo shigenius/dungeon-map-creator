@@ -82,6 +82,8 @@ interface EditorState {
   showCreateTemplateDialog: boolean
   // ヘルプダイアログの状態
   showHelpDialog: boolean
+  // マップ検証ダイアログの状態
+  showMapValidationDialog: boolean
 }
 
 const initialState: EditorState = {
@@ -140,6 +142,8 @@ const initialState: EditorState = {
   showCreateTemplateDialog: false,
   // ヘルプダイアログの初期状態
   showHelpDialog: false,
+  // マップ検証ダイアログの初期状態
+  showMapValidationDialog: false,
 }
 
 const editorSlice = createSlice({
@@ -447,6 +451,14 @@ const editorSlice = createSlice({
     closeHelpDialog: (state) => {
       state.showHelpDialog = false
     },
+
+    openMapValidationDialog: (state) => {
+      state.showMapValidationDialog = true
+    },
+
+    closeMapValidationDialog: (state) => {
+      state.showMapValidationDialog = false
+    },
   },
 })
 
@@ -517,6 +529,9 @@ export const {
   // ヘルプダイアログ関連のアクション
   openHelpDialog,
   closeHelpDialog,
+  // マップ検証ダイアログ関連のアクション
+  openMapValidationDialog,
+  closeMapValidationDialog,
 } = editorSlice.actions
 
 export default editorSlice.reducer
