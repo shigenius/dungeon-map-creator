@@ -84,6 +84,10 @@ interface EditorState {
   showHelpDialog: boolean
   // マップ検証ダイアログの状態
   showMapValidationDialog: boolean
+  // ビューポート関連の状態
+  viewCenter: { x: number; y: number } | null
+  // ミニマップの状態
+  minimapVisible: boolean
 }
 
 const initialState: EditorState = {
@@ -144,6 +148,10 @@ const initialState: EditorState = {
   showHelpDialog: false,
   // マップ検証ダイアログの初期状態
   showMapValidationDialog: false,
+  // ビューポート関連の初期状態
+  viewCenter: null,
+  // ミニマップの初期状態
+  minimapVisible: true,
 }
 
 const editorSlice = createSlice({
@@ -459,6 +467,18 @@ const editorSlice = createSlice({
     closeMapValidationDialog: (state) => {
       state.showMapValidationDialog = false
     },
+
+    setViewCenter: (state, action: PayloadAction<{ x: number; y: number }>) => {
+      state.viewCenter = action.payload
+    },
+
+    toggleMinimap: (state) => {
+      state.minimapVisible = !state.minimapVisible
+    },
+
+    setMinimapVisible: (state, action: PayloadAction<boolean>) => {
+      state.minimapVisible = action.payload
+    },
   },
 })
 
@@ -532,6 +552,11 @@ export const {
   // マップ検証ダイアログ関連のアクション
   openMapValidationDialog,
   closeMapValidationDialog,
+  // ビューポート関連のアクション
+  setViewCenter,
+  // ミニマップ関連のアクション
+  toggleMinimap,
+  setMinimapVisible,
 } = editorSlice.actions
 
 export default editorSlice.reducer

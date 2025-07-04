@@ -3,7 +3,7 @@ import { Box } from '@mui/material'
 import { useSelector, useDispatch } from 'react-redux'
 import { RootState } from '../store'
 import { updateCell, updateCells, placeTemplate, addDecorationToCell } from '../store/mapSlice'
-import { setCapturedCellData, setHoveredCellInfo, clearHoveredCellInfo, setHoveredCellPosition, clearHoveredCellPosition, setHoveredWallInfo, clearHoveredWallInfo, setTemplatePreviewPosition, setSelectionStart, setSelectionEnd, confirmSelection } from '../store/editorSlice'
+import { setCapturedCellData, setHoveredCellInfo, clearHoveredCellInfo, setHoveredCellPosition, clearHoveredCellPosition, setHoveredWallInfo, clearHoveredWallInfo, setTemplatePreviewPosition, setSelectionStart, setSelectionEnd, confirmSelection, setViewCenter } from '../store/editorSlice'
 import { rotateTemplate as rotateTemplateUtil } from '../utils/templateUtils'
 import { Position, WallType, DecorationType, Decoration } from '../types/map'
 

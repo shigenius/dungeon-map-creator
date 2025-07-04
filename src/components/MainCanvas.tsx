@@ -3,9 +3,10 @@ import { Box, Typography, Button, Fab, Tooltip } from '@mui/material'
 import { Add as AddIcon } from '@mui/icons-material'
 import { useSelector, useDispatch } from 'react-redux'
 import { RootState } from '../store'
-import { openCreateTemplateDialog } from '../store/editorSlice'
+import { openCreateTemplateDialog, setViewCenter } from '../store/editorSlice'
 import MapEditor2D from './MapEditor2D'
 import MapEditor3D from './MapEditor3D'
+import Minimap from './Minimap'
 
 const MainCanvas: React.FC = () => {
   const dispatch = useDispatch()
@@ -18,6 +19,11 @@ const MainCanvas: React.FC = () => {
 
   const handleCreateTemplate = () => {
     dispatch(openCreateTemplateDialog())
+  }
+
+  const handleMinimapClick = (x: number, y: number) => {
+    // ミニマップクリック時にビューを移動
+    dispatch(setViewCenter({ x, y }))
   }
 
   if (!dungeon) {
@@ -49,6 +55,9 @@ const MainCanvas: React.FC = () => {
     >
       {viewMode === '2d' && <MapEditor2D />}
       {(viewMode === '3d' || viewMode === 'preview') && <MapEditor3D />}
+      
+      {/* ミニマップ */}
+      <Minimap onCellClick={handleMinimapClick} />
       
       {/* 範囲選択完了時のテンプレート作成ボタン */}
       {isRangeSelected && (
