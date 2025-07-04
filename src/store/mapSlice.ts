@@ -263,11 +263,11 @@ const mapSlice = createSlice({
     },
 
     // イベント関連のアクション
-    addEventToCell: (state, action: PayloadAction<{ x: number; y: number; event: DungeonEvent }>) => {
+    addEventToCell: (state, action: PayloadAction<{ x: number; y: number; event: DungeonEvent; floorIndex?: number }>) => {
       if (!state.dungeon) return
       
-      const { x, y, event } = action.payload
-      const cell = state.dungeon.floors[0].cells[y]?.[x]
+      const { x, y, event, floorIndex = 0 } = action.payload
+      const cell = state.dungeon.floors[floorIndex]?.cells[y]?.[x]
       if (cell) {
         console.log('addEventToCell実行:', {
           position: { x, y },
@@ -300,13 +300,13 @@ const mapSlice = createSlice({
       }
     },
 
-    updateEventInCell: (state, action: PayloadAction<{ oldX: number; oldY: number; newX: number; newY: number; event: DungeonEvent }>) => {
+    updateEventInCell: (state, action: PayloadAction<{ oldX: number; oldY: number; newX: number; newY: number; event: DungeonEvent; floorIndex?: number }>) => {
       if (!state.dungeon) return
       
-      const { oldX, oldY, newX, newY, event } = action.payload
+      const { oldX, oldY, newX, newY, event, floorIndex = 0 } = action.payload
       
       // 古い位置からイベントを削除
-      const oldCell = state.dungeon.floors[0].cells[oldY]?.[oldX]
+      const oldCell = state.dungeon.floors[floorIndex]?.cells[oldY]?.[oldX]
       if (oldCell) {
         const eventIndex = oldCell.events.findIndex(e => e.id === event.id)
         if (eventIndex !== -1) {
@@ -315,7 +315,7 @@ const mapSlice = createSlice({
       }
       
       // 新しい位置にイベントを追加
-      const newCell = state.dungeon.floors[0].cells[newY]?.[newX]
+      const newCell = state.dungeon.floors[floorIndex]?.cells[newY]?.[newX]
       if (newCell) {
         const eventWithPosition = { ...event, position: { x: newX, y: newY } }
         newCell.events.push(eventWithPosition)
@@ -334,11 +334,11 @@ const mapSlice = createSlice({
       }
     },
 
-    removeEventFromCell: (state, action: PayloadAction<{ x: number; y: number; eventId: string }>) => {
+    removeEventFromCell: (state, action: PayloadAction<{ x: number; y: number; eventId: string; floorIndex?: number }>) => {
       if (!state.dungeon) return
       
-      const { x, y, eventId } = action.payload
-      const cell = state.dungeon.floors[0].cells[y]?.[x]
+      const { x, y, eventId, floorIndex = 0 } = action.payload
+      const cell = state.dungeon.floors[floorIndex]?.cells[y]?.[x]
       if (cell) {
         const beforeCount = cell.events.length
         const beforeIds = cell.events.map(e => e.id)
@@ -368,11 +368,11 @@ const mapSlice = createSlice({
     },
 
     // 装飾関連のアクション
-    addDecorationToCell: (state, action: PayloadAction<{ x: number; y: number; decoration: Decoration }>) => {
+    addDecorationToCell: (state, action: PayloadAction<{ x: number; y: number; decoration: Decoration; floorIndex?: number }>) => {
       if (!state.dungeon) return
       
-      const { x, y, decoration } = action.payload
-      const cell = state.dungeon.floors[0].cells[y]?.[x]
+      const { x, y, decoration, floorIndex = 0 } = action.payload
+      const cell = state.dungeon.floors[floorIndex]?.cells[y]?.[x]
       if (cell) {
         // 装飾の位置をセルの座標に合わせる
         const decorationWithPosition = { ...decoration, position: { x, y } }
@@ -391,11 +391,11 @@ const mapSlice = createSlice({
       }
     },
 
-    updateDecorationInCell: (state, action: PayloadAction<{ x: number; y: number; decoration: Decoration }>) => {
+    updateDecorationInCell: (state, action: PayloadAction<{ x: number; y: number; decoration: Decoration; floorIndex?: number }>) => {
       if (!state.dungeon) return
       
-      const { x, y, decoration } = action.payload
-      const cell = state.dungeon.floors[0].cells[y]?.[x]
+      const { x, y, decoration, floorIndex = 0 } = action.payload
+      const cell = state.dungeon.floors[floorIndex]?.cells[y]?.[x]
       if (cell) {
         const decorationIndex = cell.decorations.findIndex(d => d.id === decoration.id)
         if (decorationIndex !== -1) {
@@ -417,11 +417,11 @@ const mapSlice = createSlice({
       }
     },
 
-    removeDecorationFromCell: (state, action: PayloadAction<{ x: number; y: number; decorationId: string }>) => {
+    removeDecorationFromCell: (state, action: PayloadAction<{ x: number; y: number; decorationId: string; floorIndex?: number }>) => {
       if (!state.dungeon) return
       
-      const { x, y, decorationId } = action.payload
-      const cell = state.dungeon.floors[0].cells[y]?.[x]
+      const { x, y, decorationId, floorIndex = 0 } = action.payload
+      const cell = state.dungeon.floors[floorIndex]?.cells[y]?.[x]
       if (cell) {
         cell.decorations = cell.decorations.filter(decoration => decoration.id !== decorationId)
         // 履歴に追加
@@ -506,8 +506,94 @@ const mapSlice = createSlice({
         created: new Date().toISOString()
       })
     },
+
+    // フロア管理アクション
+    addFloor: (state, action: PayloadAction<{ name: string; width: number; height: number }>) => {
+      if (!state.dungeon) return
+      
+      addToHistory(state)
+      
+      const { name, width, height } = action.payload
+      const newFloor = {
+        id: crypto.randomUUID(),
+        name,
+        width,
+        height,
+        cells: Array.from({ length: height }, (_, y) =>
+          Array.from({ length: width }, (_, x) => ({
+            x,
+            y,
+            floor: {
+              type: 'normal' as const,
+              passable: true,
+            },
+            walls: {
+              north: null,
+              east: null,
+              south: null,
+              west: null,
+            },
+            events: [],
+            decorations: [],
+            properties: {},
+          }))
+        ),
+        environment: {
+          lighting: 'normal',
+          ceiling: 'normal',
+          ambient: {
+            sound: null,
+            volume: 0.5,
+          },
+        },
+      }
+      
+      state.dungeon.floors.push(newFloor)
+    },
+
+    removeFloor: (state, action: PayloadAction<number>) => {
+      if (!state.dungeon) return
+      if (state.dungeon.floors.length <= 1) return // 最低1フロアは残す
+      
+      addToHistory(state)
+      
+      const floorIndex = action.payload
+      if (floorIndex >= 0 && floorIndex < state.dungeon.floors.length) {
+        state.dungeon.floors.splice(floorIndex, 1)
+      }
+    },
+
+    renameFloor: (state, action: PayloadAction<{ floorIndex: number; newName: string }>) => {
+      if (!state.dungeon) return
+      
+      addToHistory(state)
+      
+      const { floorIndex, newName } = action.payload
+      const floor = state.dungeon.floors[floorIndex]
+      if (floor) {
+        floor.name = newName
+      }
+    },
+
+    duplicateFloor: (state, action: PayloadAction<{ sourceFloorIndex: number; newName: string }>) => {
+      if (!state.dungeon) return
+      
+      addToHistory(state)
+      
+      const { sourceFloorIndex, newName } = action.payload
+      const sourceFloor = state.dungeon.floors[sourceFloorIndex]
+      if (!sourceFloor) return
+      
+      const duplicatedFloor = {
+        ...JSON.parse(JSON.stringify(sourceFloor)), // ディープコピー
+        id: crypto.randomUUID(),
+        name: newName,
+      }
+      
+      state.dungeon.floors.push(duplicatedFloor)
+    },
   },
 })
 
-export const { createNewDungeon, loadDungeon, updateCell, updateCells, undo, redo, placeTemplate, addEventToCell, updateEventInCell, removeEventFromCell, addDecorationToCell, updateDecorationInCell, removeDecorationFromCell, createTemplateFromSelection } = mapSlice.actions
+export const { createNewDungeon, loadDungeon, updateCell, updateCells, undo, redo, placeTemplate, addEventToCell, updateEventInCell, removeEventFromCell, addDecorationToCell, updateDecorationInCell, removeDecorationFromCell, createTemplateFromSelection, addFloor, removeFloor, renameFloor, duplicateFloor } = mapSlice.actions
 export default mapSlice.reducer

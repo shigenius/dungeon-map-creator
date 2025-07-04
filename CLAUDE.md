@@ -6,6 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - 必ず日本語で回答してください。
 - タスクが終わるごとに適切に分割されたコミットを行うこと
+- コミットの前にテストをすべて実行し、すべて通過することを確認すること
 - t-wadaのTDDに従う
 - テストは単体テスト、統合テスト、E2Eテストをそれぞれ適切なバランスで実装すること
 - E2Eテストでplaywrightを実行する際はレポートが自動で開かないように `npx playwright test --reporter=list` を用いること

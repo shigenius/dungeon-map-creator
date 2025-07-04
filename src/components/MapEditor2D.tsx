@@ -2068,7 +2068,8 @@ const MapEditor2D: React.FC = () => {
           dispatch(addDecorationToCell({
             x: position.x,
             y: position.y,
-            decoration: newDecoration
+            decoration: newDecoration,
+            floorIndex: currentFloor
           }))
         }
       }
@@ -2432,7 +2433,8 @@ const MapEditor2D: React.FC = () => {
             dispatch(addDecorationToCell({
               x: dragStart.x,
               y: dragStart.y,
-              decoration: newDecoration
+              decoration: newDecoration,
+              floorIndex: currentFloor
             }))
           }
         }

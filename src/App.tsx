@@ -3,7 +3,7 @@ import { Box } from '@mui/material'
 import { useSelector, useDispatch } from 'react-redux'
 import { RootState } from './store'
 import { undo, redo, loadDungeon, addEventToCell, updateEventInCell, removeEventFromCell } from './store/mapSlice'
-import { setSelectedTool, setSelectedLayer, toggleGrid, setZoom, openNewProjectDialog, setShiftPressed, closeEventEditDialog, rotateTemplate, rotateTemplateLeft, openCreateTemplateDialog, closeHelpDialog, clearSelection } from './store/editorSlice'
+import { setSelectedTool, setSelectedLayer, toggleGrid, setZoom, openNewProjectDialog, setShiftPressed, closeEventEditDialog, rotateTemplate, rotateTemplateLeft, closeHelpDialog, clearSelection } from './store/editorSlice'
 import { downloadDungeonAsJSON, openDungeonFromFile } from './utils/fileUtils'
 import MenuBar from './components/MenuBar'
 import ToolBar from './components/ToolBar'
@@ -20,7 +20,7 @@ import HelpDialog from './components/HelpDialog'
 function App() {
   const dispatch = useDispatch()
   const dungeon = useSelector((state: RootState) => state.map.dungeon)
-  const { zoom, selectedLayer, showNewProjectDialog, showEventEditDialog, editingEvent, selectedTool, selectedTemplate, selectionMode, selectionStart, selectionEnd, showHelpDialog } = useSelector((state: RootState) => state.editor)
+  const { zoom, selectedLayer, showNewProjectDialog, showEventEditDialog, editingEvent, selectedTool, selectedTemplate, selectionMode, showHelpDialog, currentFloor } = useSelector((state: RootState) => state.editor)
 
   // ダンジョンが存在しない場合に新規プロジェクトダイアログを表示
   useEffect(() => {
@@ -245,7 +245,7 @@ function App() {
           // propsとして渡された元のイベント（編集対象）があるかどうかで判定
           // editingEventはダイアログ内部の状態で、新規作成時は毎回新しいオブジェクトが作られる
           const originalEvent = editingEvent // App.tsxで管理されているeditingEvent（propsとして渡されたもの）
-          const isExistingEvent = originalEvent && dungeon?.floors[0]?.cells
+          const isExistingEvent = originalEvent && dungeon?.floors[currentFloor]?.cells
             ?.flat()
             .some(cell => cell.events.some(e => e.id === originalEvent.id))
           
@@ -265,7 +265,8 @@ function App() {
               oldY: originalEvent!.position.y,
               newX: event.position.x,
               newY: event.position.y,
-              event
+              event,
+              floorIndex: currentFloor
             }))
           } else {
             // 新しいイベントの追加
@@ -273,7 +274,8 @@ function App() {
             dispatch(addEventToCell({
               x: event.position.x,
               y: event.position.y,
-              event
+              event,
+              floorIndex: currentFloor
             }))
           }
         }}
@@ -282,7 +284,8 @@ function App() {
             dispatch(removeEventFromCell({
               x: editingEvent.position.x,
               y: editingEvent.position.y,
-              eventId
+              eventId,
+              floorIndex: currentFloor
             }))
           }
         }}

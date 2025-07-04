@@ -36,10 +36,11 @@ import { RootState } from '../store'
 import { setSelectedFloorType, setSelectedWallType, setSelectedDecorationType, setSelectedEventType, clearCapturedCellData, toggleFloorTypeAccordion, toggleWallTypeAccordion, toggleEventTypeAccordion, toggleDecorationTypeAccordion, openCustomTypeDialog, openEventEditDialog, setSelectedTemplate, setSelectedTool, setSelectedEventId } from '../store/editorSlice'
 import { removeEventFromCell, addEventToCell } from '../store/mapSlice'
 import { Layer, FloorType, WallType, DecorationType, EventType } from '../types/map'
+import FloorManagerPanel from './FloorManagerPanel'
 
 const LeftPanel: React.FC = () => {
   const dispatch = useDispatch()
-  const { selectedLayer, selectedFloorType, selectedWallType, selectedDecorationType, selectedEventType, capturedCellData, accordionStates, customFloorTypes, customWallTypes } = useSelector((state: RootState) => state.editor)
+  const { selectedLayer, selectedFloorType, selectedWallType, selectedDecorationType, selectedEventType, capturedCellData, accordionStates, customFloorTypes, customWallTypes, currentFloor } = useSelector((state: RootState) => state.editor)
   const dungeon = useSelector((state: RootState) => state.map.dungeon)
 
   // イベント操作メニューの状態管理
@@ -170,7 +171,8 @@ const LeftPanel: React.FC = () => {
       dispatch(removeEventFromCell({
         x: selectedEventForMenu.position.x,
         y: selectedEventForMenu.position.y,
-        eventId: selectedEventForMenu.id
+        eventId: selectedEventForMenu.id,
+        floorIndex: currentFloor
       }))
     }
     handleEventMenuClose()
@@ -191,7 +193,8 @@ const LeftPanel: React.FC = () => {
       dispatch(addEventToCell({
         x: selectedEventForMenu.position.x,
         y: selectedEventForMenu.position.y,
-        event: duplicatedEvent
+        event: duplicatedEvent,
+        floorIndex: currentFloor
       }))
     }
     handleEventMenuClose()
@@ -218,6 +221,10 @@ const LeftPanel: React.FC = () => {
           overflowX: 'hidden',
         }}
       >
+      {/* フロア管理パネル */}
+      <FloorManagerPanel />
+      <Divider />
+
       {/* 現在のレイヤー表示 */}  
       <Box sx={{ p: 2, bgcolor: 'primary.main', color: 'primary.contrastText' }}>
         <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center' }}>
@@ -413,12 +420,12 @@ const LeftPanel: React.FC = () => {
                 
                 <Box sx={{ mb: 2 }}>
                   <Typography variant="caption" color="text.secondary">
-                    イベント数: {dungeon?.floors[0]?.cells?.flat().reduce((count, cell) => count + cell.events.length, 0) || 0}
+                    イベント数: {dungeon?.floors[currentFloor]?.cells?.flat().reduce((count, cell) => count + cell.events.length, 0) || 0}
                   </Typography>
                 </Box>
                 
                 <List dense sx={{ maxHeight: 200, overflow: 'auto' }}>
-                  {dungeon?.floors[0]?.cells?.flat().flatMap((cell, cellIndex) => 
+                  {dungeon?.floors[currentFloor]?.cells?.flat().flatMap((cell, cellIndex) => 
                     cell.events.map((event, eventIndex) => (
                       <ListItem key={`${event.id}-${cellIndex}-${eventIndex}`} disablePadding>
                         <ListItemButton 
@@ -465,7 +472,7 @@ const LeftPanel: React.FC = () => {
                   ) || []}
                 </List>
                 
-                {(!dungeon?.floors[0]?.cells?.flat().some(cell => cell.events.length > 0)) && (
+                {(!dungeon?.floors[currentFloor]?.cells?.flat().some(cell => cell.events.length > 0)) && (
                   <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 2 }}>
                     イベントがありません
                   </Typography>
@@ -556,12 +563,12 @@ const LeftPanel: React.FC = () => {
                 
                 <Box sx={{ mb: 2 }}>
                   <Typography variant="caption" color="text.secondary">
-                    装飾数: {dungeon?.floors[0]?.cells?.flat().reduce((count, cell) => count + cell.decorations.length, 0) || 0}
+                    装飾数: {dungeon?.floors[currentFloor]?.cells?.flat().reduce((count, cell) => count + cell.decorations.length, 0) || 0}
                   </Typography>
                 </Box>
                 
                 <List dense sx={{ maxHeight: 200, overflow: 'auto' }}>
-                  {dungeon?.floors[0]?.cells?.flat().map(cell => 
+                  {dungeon?.floors[currentFloor]?.cells?.flat().map(cell => 
                     cell.decorations.map(decoration => (
                       <ListItem key={decoration.id} disablePadding>
                         <ListItemButton>
@@ -582,7 +589,7 @@ const LeftPanel: React.FC = () => {
                   ) || []}
                 </List>
                 
-                {(!dungeon?.floors[0]?.cells?.flat().some(cell => cell.decorations.length > 0)) && (
+                {(!dungeon?.floors[currentFloor]?.cells?.flat().some(cell => cell.decorations.length > 0)) && (
                   <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 2 }}>
                     装飾がありません
                   </Typography>
