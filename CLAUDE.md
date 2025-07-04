@@ -7,10 +7,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - 必ず日本語で回答してください。
 - タスクが終わるごとに適切に分割されたコミットを行うこと
 - コミットの前にテストをすべて実行し、すべて通過することを確認すること
-- t-wadaのTDDに従う
+- すべての開発段階においてt-wadaのTDDに従う
 - テストは単体テスト、統合テスト、E2Eテストをそれぞれ適切なバランスで実装すること
 - E2Eテストでplaywrightを実行する際はレポートが自動で開かないように `npx playwright test --reporter=list` を用いること
 - これらのルールはタスクが完了するたびに画面出力すること
+- **TODO管理の永続化**: 開発TODOはCLAUDE.mdにチェックリスト形式で記録し、完了時に更新すること
 
 テストの実行
 
@@ -18,6 +19,307 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - npm run test:coverage - カバレッジ付き単体テスト
 - npm run test:e2e - E2Eテスト実行（playwright）
 - npm run test:all - 全テスト実行
+
+## Claude Code品質保証フロー
+
+### 基本原則
+- **ユーザーに動作確認させない**: Claude Codeが責任を持って品質を保証する
+- **デグレ絶対禁止**: 既存機能の破壊は許されない
+- **エラー隠蔽禁止**: 問題は必ず報告し、修復完了まで次の作業を行わない
+- **テスト優先**: 失敗しているテストがある状態では新機能開発を行わない
+
+### MCP Playwright活用ガイド（最重要ツール）
+
+#### 利用可能な機能
+- `mcp__playwright__browser_navigate` - ページ移動・初期ロード
+- `mcp__playwright__browser_console_messages` - コンソールエラー・ログ確認（重要）
+- `mcp__playwright__browser_snapshot` - ページ状態のスクリーンショット取得（トークン消費が激しいためできる限り使わない）
+- `mcp__playwright__browser_click` - 要素クリック
+- `mcp__playwright__browser_type` - テキスト入力
+- `mcp__playwright__browser_evaluate` - JavaScript実行
+- `mcp__playwright__browser_close` - ブラウザ終了
+
+#### 重要な活用場面
+- JavaScriptエラーの検出
+- コンポーネント変更後の動作確認
+- インポート文修正後の確認
+- 新機能実装後の確認
+- ユーザーにボールを返す前の最終確認
+
+#### このプロジェクト特有の操作手順
+
+**1. 基本確認フロー（毎回必須）**
+```playwright
+# 1. ページ読み込み
+mcp__playwright__browser_navigate http://localhost:5173
+
+# 2. 初期読み込みエラーチェック
+mcp__playwright__browser_console_messages  # エラーの有無を確認
+
+# 3. 白画面チェック（重要）
+# - 白画面の場合は即座にコンソールエラーをチェック
+# - React/TypeScriptのビルドエラーが原因の可能性が高い
+```
+
+**2. 新規プロジェクト作成フロー確認**
+```playwright
+# プロジェクト作成ボタンクリック
+mcp__playwright__browser_click 'text=新規プロジェクト'
+
+# エラーチェック
+mcp__playwright__browser_console_messages
+
+# ダイアログでの入力
+mcp__playwright__browser_type 'input[placeholder*="プロジェクト名"]' 'テストプロジェクト'
+
+# 作成実行
+mcp__playwright__browser_click 'text=作成'
+
+# 最終確認
+mcp__playwright__browser_console_messages
+```
+
+**3. 主要機能動作確認**
+```playwright
+# ツール切り替え確認
+mcp__playwright__browser_click '[data-testid="tool-pen"]'
+mcp__playwright__browser_console_messages
+
+mcp__playwright__browser_click '[data-testid="tool-rectangle"]'
+mcp__playwright__browser_console_messages
+
+# レイヤー切り替え確認
+mcp__playwright__browser_click 'text=壁'
+mcp__playwright__browser_console_messages
+
+mcp__playwright__browser_click 'text=イベント'
+mcp__playwright__browser_console_messages
+
+# キャンバス操作確認（基本的なクリック）
+mcp__playwright__browser_click 'canvas'
+mcp__playwright__browser_console_messages
+```
+
+**4. 特定機能の動作確認**
+```playwright
+# テンプレート機能
+mcp__playwright__browser_click 'text=テンプレート'
+mcp__playwright__browser_console_messages
+
+# 3D表示切り替え
+mcp__playwright__browser_click 'text=3D'
+mcp__playwright__browser_console_messages
+
+# ファイル操作
+mcp__playwright__browser_click 'text=ファイル'
+mcp__playwright__browser_console_messages
+```
+
+**5. エラー発生時の詳細確認**
+```playwright
+# エラーが発生した場合の詳細確認
+mcp__playwright__browser_evaluate 'console.error.toString()'
+
+# React DevToolsがある場合の状態確認
+mcp__playwright__browser_evaluate 'window.__REACT_DEVTOOLS_GLOBAL_HOOK__'
+
+# Redux状態確認
+mcp__playwright__browser_evaluate 'window.__REDUX_DEVTOOLS_EXTENSION__'
+```
+
+**6. 重要な確認ポイント**
+- **白画面**: 即座にコンソールエラー確認（インポートエラーの可能性）
+- **ボタンクリック無反応**: Redux状態管理のエラーかイベントハンドラー問題
+- **キャンバス描画問題**: Canvas APIエラーまたはRedux状態の問題
+- **ダイアログ表示問題**: Material-UIコンポーネントのエラー
+- **3D表示問題**: Three.jsライブラリまたはWebGLエラー
+
+**7. 問題の種類別対応**
+```playwright
+# TypeScriptエラー（白画面）
+# → まずnpm run buildでエラー確認
+
+# React Hydrationエラー
+# → console_messagesでHydration関連ログ確認
+
+# Redux状態管理エラー
+# → ボタンクリック後にconsole_messagesで状態関連エラー確認
+
+# Canvas描画エラー
+# → キャンバスクリック後にconsole_messagesでCanvas関連エラー確認
+```
+
+### 必須開発フロー
+
+#### 1. 作業開始時の状況確認
+```bash
+# 現在の状況を必ず確認
+npm run build                    # TypeScriptエラーの有無
+npm run test:unit               # 単体テストの状況
+```
+```playwright
+mcp__playwright__browser_navigate → console_messages  # 現在のアプリケーション状態
+```
+
+#### 2. コード変更時の必須チェック（順序厳守）
+```bash
+# 1. TypeScriptエラーチェック
+npm run build
+
+# 2. 単体テストチェック（失敗があれば必ず修復）
+npm run test:unit
+```
+```playwright
+# 3. ブラウザ動作確認（最重要）
+mcp__playwright__browser_navigate http://localhost:5173
+mcp__playwright__browser_console_messages  # エラーがないか確認
+
+# 4. 基本機能動作確認
+mcp__playwright__browser_click [新規作成ボタン]
+mcp__playwright__browser_console_messages  # エラーがないか確認
+```
+
+#### 3. デグレ防止のためのテスト戦略
+
+**失敗テスト処理ルール**
+- 失敗しているテストがある状態では**絶対に新機能開発を行わない**
+- テスト修復を最優先で実行
+- 修復不可能な場合はユーザーに報告
+
+**テスト実装ルール**
+- 新機能実装時は対応するテストを必ず作成
+- 既存機能変更時は関連テストを更新
+- E2Eテストで主要ユーザーフローを保護
+
+**継続的品質保証**
+```bash
+# 毎回実行必須
+npm run test:unit               # 全単体テストパス確認
+npm run test:e2e               # 主要フロー動作確認
+```
+
+#### 4. コミット前の必須確認（全て✓であることを確認）
+
+```bash
+# ビルド成功
+npm run build                   # ✓ TypeScriptエラーなし
+
+# テスト全パス
+npm run test:unit              # ✓ 単体テスト全パス
+npm run test:e2e               # ✓ E2Eテスト全パス（主要フロー）
+
+# Lint成功
+npm run lint                   # ✓ Lintエラーなし
+```
+
+```playwright
+# ブラウザ最終確認
+mcp__playwright__browser_navigate http://localhost:5173
+mcp__playwright__browser_console_messages  # ✓ コンソールエラーなし
+
+# 基本機能確認
+[プロジェクト作成 → ツール切り替え → 基本操作] # ✓ 正常動作
+```
+
+#### 5. ユーザーへの報告形式
+
+**動作確認完了時**
+```
+✅ 動作確認完了
+- ビルド: 成功
+- テスト: 全パス (XXX/XXX)
+- ブラウザ: エラーなし
+- 基本機能: 正常動作
+```
+
+**問題発見時**
+```
+❌ 問題発見
+- 種類: [TypeScriptエラー/テスト失敗/ブラウザエラー]
+- 詳細: [具体的な問題内容]
+- 対応: [修復方針]
+- 状況: 修復完了まで次の作業を停止
+```
+
+### トラブルシューティング
+
+#### Playwrightエラー時
+```bash
+pkill -f playwright            # プロセス強制終了
+# 再度ナビゲート
+```
+
+#### テスト修復の優先順位
+1. TypeScriptエラー（ビルド失敗）
+2. 単体テスト失敗
+3. E2Eテスト失敗
+4. Lintエラー
+
+### 禁止事項
+- エラーがある状態でのコミット
+- テスト失敗を無視した新機能開発
+- ユーザーへのエラー状況の隠蔽
+- 動作確認なしでの「完了」報告
+- Playwrightを使わない動作確認
+
+### TODO管理
+
+#### TODO管理ルール
+- 開発TODOは必ずCLAUDE.mdに記録する
+- チェックリスト形式で管理: `- [ ]` (未完了) / `- [x]` (完了)
+- 優先度を明記: (高優先度)/(中優先度)/(低優先度)
+- 完了時は必ずチェックボックスを更新
+- 新規TODO追加時はこのセクションに追記
+
+#### 現在のTODO
+
+**品質向上・テスト関連 (高優先度)**
+- [ ] カバレッジツールの依存関係を追加し、テスト環境を修復
+- [ ] 失敗している単体テストを修復（RightPanelコンポーネントのundefinedエラー等）
+- [ ] E2Eテスト環境の修復（Playwrightサーバー起動問題の解決）
+- [ ] コアコンポーネントの単体テストを実装（MapEditor2D, LeftPanel, RightPanel等）
+- [ ] Redux sliceの単体テストを実装（mapSlice, editorSlice）
+- [ ] ユーティリティ関数のテストを実装（templateUtils, eventValidation, mapValidation等）
+- [ ] テストカバレッジを80%以上に向上
+
+**パフォーマンス最適化 (高優先度)**
+- [ ] パフォーマンス問題を特定・分析（Canvas描画、Redux状態更新、メモリ使用量等）
+- [ ] Canvas描画の最適化（差分更新、オフスクリーン描画等）
+- [ ] Redux状態管理の最適化（不要な再レンダリング防止、セレクターの最適化）
+
+**リファクタリング (中優先度)**
+- [ ] 大きなコンポーネントを機能別に分割（MapEditor2D, LeftPanel等）
+- [ ] 重複コードの統合とユーティリティ関数の抽出
+- [ ] コンポーネントの最適化（React.memo、useMemo、useCallback等）
+
+**技術改善 (低優先度)**
+- [ ] TypeScript型定義の改善と型安全性の向上
+
+**機能改善**
+- [x] マルチフロア管理機能の実装
+  - [ ] MCP Playwrightでの動作確認（フロア追加・削除・切り替え・名前変更）
+  - [ ] 単体テスト充実化（FloorManagerPanel.tsx、mapSliceのfloor操作）
+  - [ ] E2Eテスト実装（マルチフロア操作フロー）
+- [x] イベントテンプレートシステムの実装
+  - [ ] MCP Playwrightでの動作確認（テンプレート選択・適用・カテゴリ切り替え）
+  - [ ] 単体テスト充実化（EventTemplateDialog.tsx、eventTemplates.ts）
+  - [ ] E2Eテスト実装（イベントテンプレート作成・適用フロー）
+- [x] リアルタイムイベント検証システムの実装
+  - [ ] MCP Playwrightでの動作確認（検証メッセージ表示・リアルタイム更新）
+  - [ ] 単体テスト充実化（eventValidation.ts、検証ロジック）
+  - [ ] E2Eテスト実装（イベント検証UI操作フロー）
+- [x] 包括的マップ検証機能の実装
+  - [ ] MCP Playwrightでの動作確認（検証ダイアログ・スコア表示・カテゴリ別結果）
+  - [ ] 単体テスト充実化（mapValidation.ts、MapValidationDialog.tsx）
+  - [ ] E2Eテスト実装（マップ検証実行・結果確認フロー）
+- [x] ミニマップ表示機能の実装
+  - [ ] MCP Playwrightでの動作確認（ミニマップ表示切り替え・ズーム・クリック移動）
+  - [ ] 単体テスト充実化（Minimap.tsx、描画ロジック）
+  - [ ] E2Eテスト実装（ミニマップ操作フロー）
+- [x] 3Dプレビューシステムの基本実装
+  - [ ] MCP Playwrightでの動作確認（3D表示切り替え・カメラ操作・レンダリング）
+  - [ ] 単体テスト充実化（MapEditor3D.tsx、Three.js統合）
+  - [ ] E2Eテスト実装（3D表示・操作フロー）
 
 ## Project Overview
 

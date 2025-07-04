@@ -834,7 +834,7 @@ const MapEditor2D: React.FC = () => {
                 ctx.textAlign = 'center'
                 ctx.textBaseline = 'middle'
                 ctx.fillText(
-                  event.appearance.icon,
+                  event.appearance.icon || '🔸',
                   xPos + size / 2,
                   yPos + size / 2
                 )
@@ -1434,11 +1434,12 @@ const MapEditor2D: React.FC = () => {
   }, [selectedTool, selectedLayer, hoveredCellPosition, hoveredWallInfo, selectedFloorType, selectedWallType, isShiftPressed, cellSize])
 
   const redraw = useCallback(() => {
-    const canvas = canvasRef.current
-    if (!canvas || !floor) return
+    try {
+      const canvas = canvasRef.current
+      if (!canvas || !floor) return
 
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return
 
     // キャンバスサイズを設定
     canvas.width = floor.width * cellSize
@@ -1482,6 +1483,9 @@ const MapEditor2D: React.FC = () => {
     drawSelection(ctx)
     
     drawGrid(ctx)
+    } catch (error) {
+      console.error('MapEditor2D redraw error:', error)
+    }
   }, [floor, cellSize, drawFloor, drawWalls, drawEvents, drawDecorations, drawGrid, drawRectanglePreview, drawTemplatePreview, drawDragPreview, drawHoveredCell, drawSelection, editorState, templateRotation])
 
   const getCellPosition = useCallback((event: React.MouseEvent): Position | null => {
@@ -2457,7 +2461,16 @@ const MapEditor2D: React.FC = () => {
 
 
   if (!floor) {
-    return <Box>フロアデータが見つかりません</Box>
+    return (
+      <Box sx={{ padding: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'white' }}>
+        <div>
+          <h3>フロアデータが見つかりません</h3>
+          <p>ダンジョン: {dungeon ? 'あり' : 'なし'}</p>
+          <p>現在のフロア: {currentFloor}</p>
+          <p>フロア数: {dungeon?.floors?.length || 0}</p>
+        </div>
+      </Box>
+    )
   }
 
   return (

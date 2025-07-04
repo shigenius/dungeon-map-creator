@@ -418,7 +418,7 @@ const editorSlice = createSlice({
       state.selectionMode = true
       state.selectionStart = null
       state.selectionEnd = null
-      state.selectedTool = 'select'
+      state.selectedTool = 'pen'
     },
 
     setSelectionStart: (state, action: PayloadAction<{ x: number; y: number }>) => {

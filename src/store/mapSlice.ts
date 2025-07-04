@@ -16,6 +16,24 @@ const initialState: MapState = {
   maxHistory: 50,
 }
 
+// ヘルパー関数：履歴に追加
+const addToHistoryHelper = (state: MapState) => {
+  if (!state.dungeon) return
+  
+  state.dungeon.metadata.modified = new Date().toISOString()
+  
+  const newHistory = state.history.slice(0, state.historyIndex + 1)
+  newHistory.push(JSON.parse(JSON.stringify(state.dungeon)))
+  
+  if (newHistory.length > state.maxHistory) {
+    newHistory.shift()
+  } else {
+    state.historyIndex++
+  }
+  
+  state.history = newHistory
+}
+
 const mapSlice = createSlice({
   name: 'map',
   initialState,
@@ -511,7 +529,7 @@ const mapSlice = createSlice({
     addFloor: (state, action: PayloadAction<{ name: string; width: number; height: number }>) => {
       if (!state.dungeon) return
       
-      addToHistory(state)
+      addToHistoryHelper(state)
       
       const { name, width, height } = action.payload
       const newFloor = {
@@ -539,11 +557,17 @@ const mapSlice = createSlice({
           }))
         ),
         environment: {
-          lighting: 'normal',
-          ceiling: 'normal',
-          ambient: {
-            sound: null,
-            volume: 0.5,
+          lighting: {
+            ambient: 0.5,
+            sources: [],
+          },
+          ceiling: {
+            height: 3,
+            texture: 'normal',
+          },
+          audio: {
+            bgm: undefined,
+            ambient: undefined,
           },
         },
       }
@@ -555,7 +579,7 @@ const mapSlice = createSlice({
       if (!state.dungeon) return
       if (state.dungeon.floors.length <= 1) return // 最低1フロアは残す
       
-      addToHistory(state)
+      addToHistoryHelper(state)
       
       const floorIndex = action.payload
       if (floorIndex >= 0 && floorIndex < state.dungeon.floors.length) {
@@ -566,7 +590,7 @@ const mapSlice = createSlice({
     renameFloor: (state, action: PayloadAction<{ floorIndex: number; newName: string }>) => {
       if (!state.dungeon) return
       
-      addToHistory(state)
+      addToHistoryHelper(state)
       
       const { floorIndex, newName } = action.payload
       const floor = state.dungeon.floors[floorIndex]
@@ -578,7 +602,7 @@ const mapSlice = createSlice({
     duplicateFloor: (state, action: PayloadAction<{ sourceFloorIndex: number; newName: string }>) => {
       if (!state.dungeon) return
       
-      addToHistory(state)
+      addToHistoryHelper(state)
       
       const { sourceFloorIndex, newName } = action.payload
       const sourceFloor = state.dungeon.floors[sourceFloorIndex]

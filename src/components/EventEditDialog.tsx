@@ -28,7 +28,6 @@ import {
   Slider,
   Alert,
   AlertTitle,
-  Collapse,
   Chip,
 } from '@mui/material'
 import {
@@ -39,7 +38,7 @@ import {
   ExpandMore as ExpandMoreIcon,
   Visibility as VisibilityIcon,
   VisibilityOff as VisibilityOffIcon,
-  Template as TemplateIcon,
+  ContentCopy as TemplateIcon,
   CheckCircle as CheckCircleIcon,
   Warning as WarningIcon,
   Error as ErrorIcon,

@@ -105,7 +105,7 @@ const CreateTemplateDialog: React.FC = () => {
       cells: templateCells,
       tags: ['ユーザー作成'],
       author: dungeon.author,
-      createdAt: new Date(),
+      createdAt: new Date().toISOString(),
       isCustom: true,
       isFullMap: false,
       isBuiltIn: false

@@ -8,7 +8,7 @@ import {
   CenterFocusStrong as CenterIcon,
 } from '@mui/icons-material'
 import { Canvas, extend, useThree, useFrame } from 'react-three-fiber'
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls'
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { useSelector } from 'react-redux'
 import { RootState } from '../store'
 import * as THREE from 'three'

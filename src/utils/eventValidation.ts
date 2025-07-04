@@ -247,7 +247,7 @@ const validateTrigger = (trigger: EventTrigger, errors: EventValidationError[], 
         })
       }
 
-      if (condition.type === 'flag' && !condition.flagName) {
+      if (condition.type === 'flag' && !condition.key) {
         errors.push({
           field: `trigger.conditions[${index}].flagName`,
           message: `条件${index + 1}のフラグ名が設定されていません`,

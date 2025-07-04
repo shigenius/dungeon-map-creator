@@ -3,16 +3,12 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Provider } from 'react-redux'
 import { configureStore } from '@reduxjs/toolkit'
-import App from '../App'
+import App from '../../App'
 import mapSliceReducer from '../../store/mapSlice'
 import editorSliceReducer from '../../store/editorSlice'
+import { RootState } from '../../store'
 
-// グローバルモック
-global.ResizeObserver = vi.fn().mockImplementation(() => ({
-  observe: vi.fn(),
-  unobserve: vi.fn(),
-  disconnect: vi.fn()
-}))
+// グローバルモック（setup.tsで設定済み）
 
 // Canvas APIのモック
 const mockCanvas = {
