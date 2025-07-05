@@ -1,12 +1,58 @@
 import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react'
 import { Box } from '@mui/material'
 import { useSelector, useDispatch } from 'react-redux'
+import { createSelector } from '@reduxjs/toolkit'
 import { RootState } from '../store'
 import { updateCell, updateCells, placeTemplate, addDecorationToCell } from '../store/mapSlice'
 import { setCapturedCellData, setHoveredCellInfo, clearHoveredCellInfo, setHoveredCellPosition, clearHoveredCellPosition, setHoveredWallInfo, clearHoveredWallInfo, setTemplatePreviewPosition, setSelectionStart, setSelectionEnd, confirmSelection, setViewCenter, openEventEditDialog } from '../store/editorSlice'
 import { rotateTemplate as rotateTemplateUtil } from '../utils/templateUtils'
 import { Position, WallType, DecorationType, Decoration, EventType } from '../types/map'
 
+// メモ化されたReduxセレクター
+const selectDungeon = (state: RootState) => state.map.dungeon
+const selectCurrentFloor = (state: RootState) => state.editor.currentFloor
+const selectZoom = (state: RootState) => state.editor.zoom
+const selectGridVisible = (state: RootState) => state.editor.gridVisible
+const selectSelectedTool = (state: RootState) => state.editor.selectedTool
+const selectSelectedLayer = (state: RootState) => state.editor.selectedLayer
+const selectSelectedFloorType = (state: RootState) => state.editor.selectedFloorType
+const selectSelectedWallType = (state: RootState) => state.editor.selectedWallType
+const selectSelectedDecorationType = (state: RootState) => state.editor.selectedDecorationType
+const selectLayerVisibility = (state: RootState) => state.editor.layerVisibility
+const selectSelectedTemplate = (state: RootState) => state.editor.selectedTemplate
+const selectTemplateRotation = (state: RootState) => state.editor.templateRotation
+const selectSelectionMode = (state: RootState) => state.editor.selectionMode
+const selectSelectionStart = (state: RootState) => state.editor.selectionStart
+const selectSelectionEnd = (state: RootState) => state.editor.selectionEnd
+const selectTemplatePreviewPosition = (state: RootState) => state.editor.templatePreviewPosition
+const selectSelectedEventId = (state: RootState) => state.editor.selectedEventId
+const selectHighlightedEventId = (state: RootState) => state.editor.highlightedEventId
+const selectCapturedCellData = (state: RootState) => state.editor.capturedCellData
+
+// コンパウンドセレクター（複数の状態を組み合わせる）
+const selectCurrentFloorData = createSelector(
+  [selectDungeon, selectCurrentFloor],
+  (dungeon, currentFloor) => dungeon?.floors[currentFloor] || null
+)
+
+const selectEditorConfig = createSelector(
+  [selectSelectedTool, selectSelectedLayer, selectZoom, selectGridVisible],
+  (selectedTool, selectedLayer, zoom, gridVisible) => ({
+    selectedTool,
+    selectedLayer,
+    zoom,
+    gridVisible
+  })
+)
+
+const selectSelectionConfig = createSelector(
+  [selectSelectionMode, selectSelectionStart, selectSelectionEnd],
+  (selectionMode, selectionStart, selectionEnd) => ({
+    selectionMode,
+    selectionStart,
+    selectionEnd
+  })
+)
 
 // 床タイプに応じた通行可否を決定する関数
 const getPassableForFloorType = (floorType: string) => {
@@ -401,8 +447,10 @@ const getWallBoundaryPosition = (
   }
 }
 
-const MapEditor2D: React.FC = () => {
+const MapEditor2D: React.FC = React.memo(() => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const offscreenCanvasRef = useRef<HTMLCanvasElement | null>(null)
+  const offscreenCtxRef = useRef<CanvasRenderingContext2D | null>(null)
   const dispatch = useDispatch()
   
   // 矩形ツール用の状態管理
@@ -423,13 +471,99 @@ const MapEditor2D: React.FC = () => {
   // 実際にドラッグが開始されたかどうかのフラグ
   const [isActuallyDragging, setIsActuallyDragging] = useState(false)
   
-  const dungeon = useSelector((state: RootState) => state.map.dungeon)
-  const editorState = useSelector((state: RootState) => state.editor)
-  const { currentFloor, selectedTool, selectedLayer, selectedFloorType, selectedWallType, selectedDecorationType, selectedEventType, capturedCellData, hoveredCellPosition, hoveredWallInfo, isShiftPressed, zoom, gridVisible, selectedTemplate, templatePreviewPosition, templateRotation, selectionMode, selectionStart, selectionEnd, selectionConfirmed, selectedEventId, highlightedEventId } = editorState
+  // 差分更新のための変更追跡
+  const [changedCells, setChangedCells] = useState<Set<string>>(new Set())
+  const [lastFloorData, setLastFloorData] = useState<any>(null)
+  const [needsFullRedraw, setNeedsFullRedraw] = useState(true)
+  
+  // メモ化されたセレクターで不要な再レンダリングを防止
+  const dungeon = useSelector(selectDungeon)
+  const currentFloor = useSelector(selectCurrentFloor)
+  const floor = useSelector(selectCurrentFloorData)
+  const editorConfig = useSelector(selectEditorConfig)
+  const selectionConfig = useSelector(selectSelectionConfig)
+  const layerVisibility = useSelector(selectLayerVisibility)
+  const selectedTemplate = useSelector(selectSelectedTemplate)
+  const templateRotation = useSelector(selectTemplateRotation)
+  const templatePreviewPosition = useSelector(selectTemplatePreviewPosition)
+  const selectedEventId = useSelector(selectSelectedEventId)
+  const highlightedEventId = useSelector(selectHighlightedEventId)
+  const capturedCellData = useSelector(selectCapturedCellData)
+  const selectedFloorType = useSelector(selectSelectedFloorType)
+  const selectedWallType = useSelector(selectSelectedWallType)
+  const selectedDecorationType = useSelector(selectSelectedDecorationType)
+  
+  // その他のエディター状態（個別に取得）
+  const selectedEventType = useSelector((state: RootState) => state.editor.selectedEventType)
+  const hoveredCellPosition = useSelector((state: RootState) => state.editor.hoveredCellPosition)
+  const hoveredWallInfo = useSelector((state: RootState) => state.editor.hoveredWallInfo)
+  const isShiftPressed = useSelector((state: RootState) => state.editor.isShiftPressed)
+  const selectionConfirmed = useSelector((state: RootState) => state.editor.selectionConfirmed)
+  
+  // エディター設定を展開
+  const { selectedTool, selectedLayer, zoom, gridVisible } = editorConfig
+  const { selectionMode, selectionStart, selectionEnd } = selectionConfig
 
   // セルサイズを整数に丸めて座標のズレを防ぐ（useMemoで最適化）
   const cellSize = useMemo(() => Math.round(32 * zoom), [zoom])
-  const floor = dungeon?.floors[currentFloor]
+  // floorは既にselectCurrentFloorDataセレクターで取得済み
+
+  // 変更されたセルを検出する関数
+  const detectChangedCells = useCallback(() => {
+    if (!floor || !lastFloorData) return new Set<string>()
+    
+    const changes = new Set<string>()
+    
+    for (let y = 0; y < floor.height; y++) {
+      for (let x = 0; x < floor.width; x++) {
+        const cellKey = `${x},${y}`
+        const currentCell = floor.cells[y][x]
+        const lastCell = lastFloorData.cells?.[y]?.[x]
+        
+        if (!lastCell || JSON.stringify(currentCell) !== JSON.stringify(lastCell)) {
+          changes.add(cellKey)
+        }
+      }
+    }
+    
+    return changes
+  }, [floor, lastFloorData])
+
+  // オフスクリーンキャンバスの初期化
+  useEffect(() => {
+    if (!floor) return
+    
+    const newWidth = floor.width * cellSize
+    const newHeight = floor.height * cellSize
+    
+    // オフスクリーンキャンバスを作成または更新
+    if (!offscreenCanvasRef.current || 
+        offscreenCanvasRef.current.width !== newWidth || 
+        offscreenCanvasRef.current.height !== newHeight) {
+      
+      const offscreenCanvas = document.createElement('canvas')
+      offscreenCanvas.width = newWidth
+      offscreenCanvas.height = newHeight
+      offscreenCanvasRef.current = offscreenCanvas
+      
+      const offscreenCtx = offscreenCanvas.getContext('2d')
+      offscreenCtxRef.current = offscreenCtx
+      
+      // サイズ変更時は必ず完全再描画
+      setNeedsFullRedraw(true)
+    }
+  }, [floor, cellSize])
+  
+  // フロアデータの変更を追跡
+  useEffect(() => {
+    if (floor) {
+      const newChangedCells = detectChangedCells()
+      if (newChangedCells.size > 0) {
+        setChangedCells(prevChanged => new Set([...prevChanged, ...newChangedCells]))
+      }
+      setLastFloorData(JSON.parse(JSON.stringify(floor))) // ディープコピー
+    }
+  }, [floor, detectChangedCells])
 
   // マウス位置から最も近い壁を検出する関数
   const getClosestWallFromMouse = useCallback((event: React.MouseEvent): { position: Position; direction: 'north' | 'east' | 'south' | 'west' } | null => {
@@ -502,11 +636,15 @@ const MapEditor2D: React.FC = () => {
     ctx.imageSmoothingEnabled = true
   }, [gridVisible, floor, cellSize])
 
-  const drawFloor = useCallback((ctx: CanvasRenderingContext2D) => {
+  const drawFloor = useCallback((ctx: CanvasRenderingContext2D, changedCellsOnly = false) => {
     if (!floor) return
 
     for (let y = 0; y < floor.height; y++) {
       for (let x = 0; x < floor.width; x++) {
+        // 差分更新の場合、変更されたセルのみを描画
+        if (changedCellsOnly && !changedCells.has(`${x},${y}`)) {
+          continue
+        }
         const cell = floor.cells[y][x]
         // 座標を整数に丸めて正確な配置を保証
         const xPos = Math.round(x * cellSize)
@@ -565,9 +703,9 @@ const MapEditor2D: React.FC = () => {
         }
       }
     }
-  }, [floor, cellSize])
+  }, [floor, cellSize, changedCells])
 
-  const drawWalls = useCallback((ctx: CanvasRenderingContext2D) => {
+  const drawWalls = useCallback((ctx: CanvasRenderingContext2D, changedCellsOnly = false) => {
     if (!floor) return
 
     // 壁描画時はアンチエイリアシングを無効化してシャープな線を描画
@@ -575,6 +713,10 @@ const MapEditor2D: React.FC = () => {
 
     for (let y = 0; y < floor.height; y++) {
       for (let x = 0; x < floor.width; x++) {
+        // 差分更新の場合、変更されたセルのみを描画
+        if (changedCellsOnly && !changedCells.has(`${x},${y}`)) {
+          continue
+        }
         const cell = floor.cells[y][x]
         // 座標を整数に丸めて正確な配置を保証
         const xPos = Math.round(x * cellSize)
@@ -793,11 +935,15 @@ const MapEditor2D: React.FC = () => {
     ctx.setLineDash([])
   }, [isDragging, dragStartPixel, dragEndPixel, dragStart, dragEnd, selectedLayer, selectedWallType, selectedFloorType, isShiftPressed, cellSize])
 
-  const drawEvents = useCallback((ctx: CanvasRenderingContext2D) => {
+  const drawEvents = useCallback((ctx: CanvasRenderingContext2D, changedCellsOnly = false) => {
     if (!floor) return
 
     for (let y = 0; y < floor.height; y++) {
       for (let x = 0; x < floor.width; x++) {
+        // 差分更新の場合、変更されたセルのみを描画
+        if (changedCellsOnly && !changedCells.has(`${x},${y}`)) {
+          continue
+        }
         const cell = floor.cells[y][x]
         if (cell.events.length > 0) {
           cell.events.forEach((event, index) => {
@@ -893,11 +1039,15 @@ const MapEditor2D: React.FC = () => {
     }
   }, [floor, cellSize, selectedEventId, highlightedEventId])
 
-  const drawDecorations = useCallback((ctx: CanvasRenderingContext2D) => {
+  const drawDecorations = useCallback((ctx: CanvasRenderingContext2D, changedCellsOnly = false) => {
     if (!floor) return
 
     for (let y = 0; y < floor.height; y++) {
       for (let x = 0; x < floor.width; x++) {
+        // 差分更新の場合、変更されたセルのみを描画
+        if (changedCellsOnly && !changedCells.has(`${x},${y}`)) {
+          continue
+        }
         const cell = floor.cells[y][x]
         if (cell.decorations.length > 0) {
           cell.decorations.forEach((decoration, index) => {
@@ -947,7 +1097,34 @@ const MapEditor2D: React.FC = () => {
         }
       }
     }
-  }, [floor, cellSize])
+  }, [floor, cellSize, changedCells])
+  
+  // オフスクリーンキャンバスに全体マップを描画する関数
+  const renderFullMapToOffscreen = useCallback((ctx: CanvasRenderingContext2D) => {
+    if (!floor) return
+    
+    // 背景をクリア
+    ctx.fillStyle = '#222'
+    ctx.fillRect(0, 0, floor.width * cellSize, floor.height * cellSize)
+    
+    // レイヤーの表示状態に応じて描画
+    // layerVisibilityは既にselectorで取得済み
+    
+    if (layerVisibility.floor) {
+      drawFloor(ctx, false) // 完全描画
+    }
+    if (layerVisibility.walls) {
+      drawWalls(ctx, false) // 完全描画
+    }
+    if (layerVisibility.events) {
+      drawEvents(ctx, false) // 完全描画
+    }
+    if (layerVisibility.decorations) {
+      drawDecorations(ctx, false) // 完全描画
+    }
+    
+    setNeedsFullRedraw(false)
+  }, [floor, cellSize, drawFloor, drawWalls, drawEvents, drawDecorations, layerVisibility, setNeedsFullRedraw])
 
   const drawTemplatePreview = useCallback((ctx: CanvasRenderingContext2D) => {
     if (!selectedTemplate || selectedTool !== 'template') return
@@ -1444,9 +1621,11 @@ const MapEditor2D: React.FC = () => {
     }
   }, [selectedTool, selectedLayer, hoveredCellPosition, hoveredWallInfo, selectedFloorType, selectedWallType, isShiftPressed, cellSize])
 
-  const redraw = useCallback(() => {
+  const redraw = useCallback((differentialUpdate = false) => {
     try {
       const canvas = canvasRef.current
+      const offscreenCanvas = offscreenCanvasRef.current
+      const offscreenCtx = offscreenCtxRef.current
       if (!canvas || !floor) return
 
       const ctx = canvas.getContext('2d')
@@ -1458,28 +1637,107 @@ const MapEditor2D: React.FC = () => {
       if (canvas.width !== newWidth || canvas.height !== newHeight) {
         canvas.width = newWidth
         canvas.height = newHeight
+        // サイズ変更時は必ず完全再描画
+        differentialUpdate = false
+        setNeedsFullRedraw(true)
       }
 
-      // 背景をクリア
-      ctx.fillStyle = '#222'
-      ctx.fillRect(0, 0, canvas.width, canvas.height)
+      // オフスクリーンキャンバスがある場合の処理
+      if (offscreenCanvas && offscreenCtx) {
+        // 完全再描画が必要な場合はオフスクリーンに全体を描画
+        if (needsFullRedraw || !differentialUpdate) {
+          renderFullMapToOffscreen(offscreenCtx)
+        }
+        
+        // 差分更新がある場合はオフスクリーンに変更部分を描画
+        else if (differentialUpdate && changedCells.size > 0) {
+          // layerVisibilityは既にselectorで取得済み
+          
+          // 変更されたセルの領域をクリア
+          changedCells.forEach(cellKey => {
+            const [x, y] = cellKey.split(',').map(Number)
+            const xPos = x * cellSize
+            const yPos = y * cellSize
+            offscreenCtx.fillStyle = '#222'
+            offscreenCtx.fillRect(xPos, yPos, cellSize, cellSize)
+          })
+          
+          // 変更されたセルのみをオフスクリーンに描画
+          if (layerVisibility.floor) {
+            drawFloor(offscreenCtx, true)
+          }
+          if (layerVisibility.walls) {
+            drawWalls(offscreenCtx, true)
+          }
+          if (layerVisibility.events) {
+            drawEvents(offscreenCtx, true)
+          }
+          if (layerVisibility.decorations) {
+            drawDecorations(offscreenCtx, true)
+          }
+          
+          // 変更されたセルのリストをクリア
+          setChangedCells(new Set())
+        }
+        
+        // オフスクリーンキャンバスをメインキャンバスにコピー
+        ctx.drawImage(offscreenCanvas, 0, 0)
+      } else {
+        // フォールバック: 直接メインキャンバスに描画
+        if (differentialUpdate && changedCells.size > 0) {
+          // 変更されたセルのみを再描画
+          // layerVisibilityは既にselectorで取得済み
+          
+          // 変更されたセルの領域をクリア
+          changedCells.forEach(cellKey => {
+            const [x, y] = cellKey.split(',').map(Number)
+            const xPos = x * cellSize
+            const yPos = y * cellSize
+            ctx.fillStyle = '#222'
+            ctx.fillRect(xPos, yPos, cellSize, cellSize)
+          })
+          
+          // 変更されたセルのみを描画
+          if (layerVisibility.floor) {
+            drawFloor(ctx, true)
+          }
+          if (layerVisibility.walls) {
+            drawWalls(ctx, true)
+          }
+          if (layerVisibility.events) {
+            drawEvents(ctx, true)
+          }
+          if (layerVisibility.decorations) {
+            drawDecorations(ctx, true)
+          }
+          
+          // 変更されたセルのリストをクリア
+          setChangedCells(new Set())
+        } else {
+          // 完全再描画
+          // 背景をクリア
+          ctx.fillStyle = '#222'
+          ctx.fillRect(0, 0, canvas.width, canvas.height)
 
-      // レイヤーの表示状態に応じて描画
-      const { layerVisibility } = editorState
+          // レイヤーの表示状態に応じて描画
+          // layerVisibilityは既にselectorで取得済み
+          
+          if (layerVisibility.floor) {
+            drawFloor(ctx)
+          }
+          if (layerVisibility.walls) {
+            drawWalls(ctx)
+          }
+          if (layerVisibility.events) {
+            drawEvents(ctx)
+          }
+          if (layerVisibility.decorations) {
+            drawDecorations(ctx)
+          }
+        }
+      }
       
-      if (layerVisibility.floor) {
-        drawFloor(ctx)
-      }
-      if (layerVisibility.walls) {
-        drawWalls(ctx)
-      }
-      if (layerVisibility.events) {
-        drawEvents(ctx)
-      }
-      if (layerVisibility.decorations) {
-        drawDecorations(ctx)
-      }
-      
+      // プレビューとUI要素は常に再描画
       // 矩形プレビューを描画
       drawRectanglePreview(ctx)
       
@@ -1501,7 +1759,7 @@ const MapEditor2D: React.FC = () => {
     } catch (error) {
       console.error('MapEditor2D redraw error:', error)
     }
-  }, [floor, cellSize, drawFloor, drawWalls, drawEvents, drawDecorations, drawGrid, drawRectanglePreview, drawTemplatePreview, drawDragPreview, drawHoveredCell, drawSelection, editorState])
+  }, [floor, cellSize, drawFloor, drawWalls, drawEvents, drawDecorations, drawGrid, drawRectanglePreview, drawTemplatePreview, drawDragPreview, drawHoveredCell, drawSelection, layerVisibility, changedCells, setChangedCells, needsFullRedraw, renderFullMapToOffscreen, setNeedsFullRedraw])
 
   const getCellPosition = useCallback((event: React.MouseEvent): Position | null => {
     const canvas = canvasRef.current
@@ -1651,14 +1909,14 @@ const MapEditor2D: React.FC = () => {
       
       // 通常のテンプレートは指定位置に配置
       // 最新のtemplateRotationを直接editorStateから取得
-      const currentTemplateRotation = editorState.templateRotation
+      const currentTemplateRotation = templateRotation
       console.log('テンプレート配置前の状態:', {
         templateName: selectedTemplate.name,
         templateId: selectedTemplate.id,
         position,
         templateRotation,
         currentTemplateRotation,
-        editorStateTemplateRotation: editorState.templateRotation,
+        editorStateTemplateRotation: templateRotation,
         selectedTemplateAddress: selectedTemplate
       })
       dispatch(placeTemplate({
@@ -2097,7 +2355,7 @@ const MapEditor2D: React.FC = () => {
         }
       }
     }
-  }, [selectedLayer, selectedTool, selectedFloorType, selectedWallType, selectedDecorationType, selectedEventType, isShiftPressed, currentFloor, capturedCellData, dispatch, floor, getCellPosition, selectedTemplate, templateRotation, editorState, isDragging, isActuallyDragging, rectangleStart, isDrawingRectangle])
+  }, [selectedLayer, selectedTool, selectedFloorType, selectedWallType, selectedDecorationType, selectedEventType, isShiftPressed, currentFloor, capturedCellData, dispatch, floor, getCellPosition, selectedTemplate, templateRotation, isDragging, isActuallyDragging, rectangleStart, isDrawingRectangle])
 
   // イベントタイプに基づいてイベントを作成するヘルパー関数
   const createEventByType = useCallback((eventType: EventType, position: Position) => {
@@ -2491,8 +2749,11 @@ const MapEditor2D: React.FC = () => {
   }, [isDragging, isActuallyDragging, dragStart, dragEnd, dragStartMouse, selectedLayer, selectedTool, selectedWallType, selectedFloorType, dispatch, currentFloor, getCellPosition, floor, cellSize, capturedCellData])
 
   useEffect(() => {
-    redraw()
-  }, [redraw])
+    // 変更されたセルがある場合は差分更新、そうでなければ完全再描画
+    const totalCells = floor ? floor.width * floor.height : 0
+    const shouldUseDifferentialUpdate = changedCells.size > 0 && changedCells.size < totalCells * 0.1
+    redraw(shouldUseDifferentialUpdate)
+  }, [redraw, changedCells, floor])
 
 
   if (!floor) {
@@ -2544,6 +2805,9 @@ const MapEditor2D: React.FC = () => {
       />
     </Box>
   )
-}
+})
+
+// メモ化されたコンポーネントで不要な再レンダリングを防止
+MapEditor2D.displayName = 'MapEditor2D'
 
 export default MapEditor2D

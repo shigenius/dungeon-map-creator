@@ -88,7 +88,7 @@ const MenuBar: React.FC = () => {
     handleMenuClose()
   }
 
-  const handleSwitchView = (mode: '2d' | '3d' | 'preview') => {
+  const handleSwitchView = (mode: '2d') => {
     dispatch(setViewMode(mode))
     handleMenuClose()
   }
@@ -312,8 +312,6 @@ const MenuBar: React.FC = () => {
         onClose={handleMenuClose}
       >
         <MenuItem onClick={() => handleSwitchView('2d')}>2D編集モード</MenuItem>
-        <MenuItem onClick={() => handleSwitchView('3d')}>3D編集モード</MenuItem>
-        <MenuItem onClick={() => handleSwitchView('preview')}>プレビューモード</MenuItem>
       </Menu>
 
       {/* ヘルプメニュー */}

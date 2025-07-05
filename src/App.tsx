@@ -1,5 +1,5 @@
-import { useEffect } from 'react'
-import { Box } from '@mui/material'
+import { useEffect, lazy, Suspense } from 'react'
+import { Box, CircularProgress } from '@mui/material'
 import { useSelector, useDispatch } from 'react-redux'
 import { RootState } from './store'
 import { undo, redo, loadDungeon, addEventToCell, updateEventInCell, removeEventFromCell } from './store/mapSlice'
@@ -9,14 +9,28 @@ import MenuBar from './components/MenuBar'
 import ToolBar from './components/ToolBar'
 import LeftPanel from './components/LeftPanel'
 import RightPanel from './components/RightPanel'
-import MainCanvas from './components/MainCanvas'
 import BottomPanel from './components/BottomPanel'
-import NewProjectDialog from './components/NewProjectDialog'
-import CustomTypeDialog from './components/CustomTypeDialog'
-import EventEditDialog from './components/EventEditDialog'
-import CreateTemplateDialog from './components/CreateTemplateDialog'
-import HelpDialog from './components/HelpDialog'
-import MapValidationDialog from './components/MapValidationDialog'
+
+// コード分割: 大きなコンポーネントを遅延読み込み
+const MainCanvas = lazy(() => import('./components/MainCanvas'))
+const NewProjectDialog = lazy(() => import('./components/NewProjectDialog'))
+const CustomTypeDialog = lazy(() => import('./components/CustomTypeDialog'))
+const EventEditDialog = lazy(() => import('./components/EventEditDialog'))
+const CreateTemplateDialog = lazy(() => import('./components/CreateTemplateDialog'))
+const HelpDialog = lazy(() => import('./components/HelpDialog'))
+const MapValidationDialog = lazy(() => import('./components/MapValidationDialog'))
+
+// サスペンス用のローディングコンポーネント
+const LoadingSpinner = () => (
+  <Box 
+    display="flex" 
+    justifyContent="center" 
+    alignItems="center" 
+    height="100px"
+  >
+    <CircularProgress size={24} />
+  </Box>
+)
 
 function App() {
   const dispatch = useDispatch()
@@ -224,28 +238,31 @@ function App() {
         <LeftPanel />
         
         <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
-          <MainCanvas />
+          <Suspense fallback={<LoadingSpinner />}>
+            <MainCanvas />
+          </Suspense>
           <BottomPanel />
         </Box>
         
         <RightPanel />
       </Box>
       
-      {showNewProjectDialog && <NewProjectDialog />}
-      <CustomTypeDialog />
-      <CreateTemplateDialog />
-      <HelpDialog 
-        open={showHelpDialog}
-        onClose={() => dispatch(closeHelpDialog())}
-      />
+      <Suspense fallback={<LoadingSpinner />}>
+        {showNewProjectDialog && <NewProjectDialog />}
+        <CustomTypeDialog />
+        <CreateTemplateDialog />
+        <HelpDialog 
+          open={showHelpDialog}
+          onClose={() => dispatch(closeHelpDialog())}
+        />
 
-      {/* マップ検証ダイアログ */}
-      <MapValidationDialog
-        open={showMapValidationDialog}
-        onClose={() => dispatch(closeMapValidationDialog())}
-        dungeon={dungeon}
-      />
-      <EventEditDialog 
+        {/* マップ検証ダイアログ */}
+        <MapValidationDialog
+          open={showMapValidationDialog}
+          onClose={() => dispatch(closeMapValidationDialog())}
+          dungeon={dungeon}
+        />
+        <EventEditDialog 
         open={showEventEditDialog}
         event={editingEvent}
         onClose={() => dispatch(closeEventEditDialog())}
@@ -298,6 +315,7 @@ function App() {
           }
         }}
       />
+      </Suspense>
     </Box>
   )
 }

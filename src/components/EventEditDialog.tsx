@@ -48,6 +48,8 @@ import { DungeonEvent, EventType, TriggerType, ActionType, EventAction } from '.
 import EventTemplateDialog from './EventTemplateDialog'
 import { EventTemplate } from '../data/eventTemplates'
 import { validateEvent, EventValidationResult, getValidationSummary } from '../utils/eventValidation'
+import { useSelector } from 'react-redux'
+import { RootState } from '../store'
 
 interface TabPanelProps {
   children?: React.ReactNode
@@ -83,6 +85,9 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
   const [showTemplateDialog, setShowTemplateDialog] = useState(false)
   const [validationResult, setValidationResult] = useState<EventValidationResult | null>(null)
   const [showValidation, setShowValidation] = useState(true)
+  
+  // Redux から全フロア情報を取得
+  const { dungeon } = useSelector((state: RootState) => state.map)
 
   useEffect(() => {
     // console.log('EventEditDialog useEffect実行:', { 
@@ -763,13 +768,20 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
                           onChange={(e) => updateAction(index, 'params', { ...action.params, y: parseInt(e.target.value) })}
                           size="small"
                         />
-                        <TextField
-                          label="フロア"
-                          type="number"
-                          value={action.params.floor || 0}
-                          onChange={(e) => updateAction(index, 'params', { ...action.params, floor: parseInt(e.target.value) })}
-                          size="small"
-                        />
+                        <FormControl size="small" sx={{ minWidth: 120 }}>
+                          <InputLabel>フロア</InputLabel>
+                          <Select
+                            value={action.params.targetFloor ?? ''}
+                            onChange={(e) => updateAction(index, 'params', { ...action.params, targetFloor: Number(e.target.value) })}
+                            label="フロア"
+                          >
+                            {dungeon?.floors.map((floor, floorIndex) => (
+                              <MenuItem key={floor.id} value={floorIndex}>
+                                {floor.name}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
                       </Box>
                     )}
                   </Box>

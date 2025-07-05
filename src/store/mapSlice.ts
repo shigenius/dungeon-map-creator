@@ -16,14 +16,38 @@ const initialState: MapState = {
   maxHistory: 50,
 }
 
-// ヘルパー関数：履歴に追加
+// ヘルパー関数：最適化された履歴管理
 const addToHistoryHelper = (state: MapState) => {
   if (!state.dungeon) return
   
   state.dungeon.metadata.modified = new Date().toISOString()
   
+  // パフォーマンス最適化: シャローコピー + 改良されたディープコピー
   const newHistory = state.history.slice(0, state.historyIndex + 1)
-  newHistory.push(JSON.parse(JSON.stringify(state.dungeon)))
+  
+  try {
+    // structuredCloneを試行し、失敗時はJSON方式にフォールバック
+    let clonedDungeon: Dungeon
+    
+    if (typeof structuredClone === 'function') {
+      try {
+        clonedDungeon = structuredClone(state.dungeon)
+      } catch (structuredCloneError) {
+        // structuredCloneが失敗（DataCloneError等）の場合、JSON方式を使用
+        console.warn('structuredClone failed, falling back to JSON method:', structuredCloneError)
+        clonedDungeon = JSON.parse(JSON.stringify(state.dungeon))
+      }
+    } else {
+      // structuredCloneが利用できない場合、JSON方式を使用
+      clonedDungeon = JSON.parse(JSON.stringify(state.dungeon))
+    }
+    
+    newHistory.push(clonedDungeon)
+  } catch (error) {
+    // 全てのコピー方法が失敗した場合は履歴追加をスキップ
+    console.warn('All cloning methods failed, skipping history:', error)
+    return
+  }
   
   if (newHistory.length > state.maxHistory) {
     newHistory.shift()
@@ -92,13 +116,47 @@ const mapSlice = createSlice({
       }
       
       state.dungeon = newDungeon
-      state.history = [JSON.parse(JSON.stringify(newDungeon))]
+      // 初期化時は最適化されたコピーを使用
+      try {
+        let clonedDungeon: Dungeon
+        if (typeof structuredClone === 'function') {
+          try {
+            clonedDungeon = structuredClone(newDungeon)
+          } catch (structuredCloneError) {
+            console.warn('structuredClone failed during initialization, falling back to JSON method:', structuredCloneError)
+            clonedDungeon = JSON.parse(JSON.stringify(newDungeon))
+          }
+        } else {
+          clonedDungeon = JSON.parse(JSON.stringify(newDungeon))
+        }
+        state.history = [clonedDungeon]
+      } catch (error) {
+        console.warn('Failed to initialize history:', error)
+        state.history = []
+      }
       state.historyIndex = 0
     },
     
     loadDungeon: (state, action: PayloadAction<Dungeon>) => {
       state.dungeon = action.payload
-      state.history = [JSON.parse(JSON.stringify(action.payload))]
+      // ロード時は最適化されたコピーを使用
+      try {
+        let clonedDungeon: Dungeon
+        if (typeof structuredClone === 'function') {
+          try {
+            clonedDungeon = structuredClone(action.payload)
+          } catch (structuredCloneError) {
+            console.warn('structuredClone failed during load, falling back to JSON method:', structuredCloneError)
+            clonedDungeon = JSON.parse(JSON.stringify(action.payload))
+          }
+        } else {
+          clonedDungeon = JSON.parse(JSON.stringify(action.payload))
+        }
+        state.history = [clonedDungeon]
+      } catch (error) {
+        console.warn('Failed to initialize history on load:', error)
+        state.history = []
+      }
       state.historyIndex = 0
     },
     
@@ -116,19 +174,8 @@ const mapSlice = createSlice({
         Object.assign(floor.cells[position.y][position.x], cell)
       })
       
-      state.dungeon.metadata.modified = new Date().toISOString()
-      
-      // 履歴に追加（バッチ操作全体で1つの履歴エントリ）
-      const newHistory = state.history.slice(0, state.historyIndex + 1)
-      newHistory.push(JSON.parse(JSON.stringify(state.dungeon)))
-      
-      if (newHistory.length > state.maxHistory) {
-        newHistory.shift()
-      } else {
-        state.historyIndex++
-      }
-      
-      state.history = newHistory
+      // 最適化された履歴管理を使用
+      addToHistoryHelper(state)
     },
 
     updateCell: (state, action: PayloadAction<{ floorIndex: number; position: Position; cell: Partial<Cell> }>) => {
@@ -141,19 +188,9 @@ const mapSlice = createSlice({
       if (position.y >= floor.height || position.x >= floor.width) return
       
       Object.assign(floor.cells[position.y][position.x], cell)
-      state.dungeon.metadata.modified = new Date().toISOString()
       
-      // 履歴に追加
-      const newHistory = state.history.slice(0, state.historyIndex + 1)
-      newHistory.push(JSON.parse(JSON.stringify(state.dungeon)))
-      
-      if (newHistory.length > state.maxHistory) {
-        newHistory.shift()
-      } else {
-        state.historyIndex++
-      }
-      
-      state.history = newHistory
+      // 最適化された履歴管理を使用
+      addToHistoryHelper(state)
     },
     
     undo: (state) => {

@@ -10,11 +10,19 @@ import {
   Slider,
   Typography,
   Box,
+  Tabs,
+  Tab,
+  Card,
+  CardContent,
+  CardActions,
+  Chip,
+  Divider,
 } from '@mui/material'
 import { useDispatch, useSelector } from 'react-redux'
-import { createNewDungeon } from '../store/mapSlice'
+import { createNewDungeon, loadDungeon } from '../store/mapSlice'
 import { closeNewProjectDialog } from '../store/editorSlice'
 import { RootState } from '../store'
+import { getSampleDungeonsList, sampleDungeons } from '../data/sampleDungeons'
 
 const NewProjectDialog: React.FC = () => {
   const dispatch = useDispatch()
@@ -26,6 +34,9 @@ const NewProjectDialog: React.FC = () => {
   const [author, setAuthor] = useState('')
   const [width, setWidth] = useState(20)
   const [height, setHeight] = useState(20)
+  const [currentTab, setCurrentTab] = useState(0)
+  
+  const sampleDungeonsList = getSampleDungeonsList()
 
   const open = !dungeon || showNewProjectDialog
 
@@ -53,17 +64,42 @@ const NewProjectDialog: React.FC = () => {
     dispatch(closeNewProjectDialog())
   }
 
+  const handleSampleSelect = (sampleId: string) => {
+    const sampleDungeon = sampleDungeons[sampleId]
+    if (sampleDungeon) {
+      dispatch(loadDungeon(sampleDungeon))
+      dispatch(closeNewProjectDialog())
+    }
+  }
+
+  const getDifficultyColor = (difficulty: string) => {
+    switch (difficulty) {
+      case 'easy': return 'success'
+      case 'medium': return 'warning'
+      case 'hard': return 'error'
+      default: return 'default'
+    }
+  }
+
   return (
     <Dialog
       open={open}
       onClose={handleCancel}
-      maxWidth="sm"
+      maxWidth="md"
       fullWidth
       disableEscapeKeyDown
     >
       <DialogTitle>新規プロジェクト作成</DialogTitle>
       <DialogContent>
-        <Grid container spacing={3} sx={{ mt: 1 }}>
+        <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
+          <Tabs value={currentTab} onChange={(_, newValue) => setCurrentTab(newValue)}>
+            <Tab label="空のプロジェクト" />
+            <Tab label="サンプルから選択" />
+          </Tabs>
+        </Box>
+
+        {currentTab === 0 && (
+          <Grid container spacing={3} sx={{ mt: 1 }}>
           <Grid item xs={12}>
             <TextField
               fullWidth
@@ -129,17 +165,70 @@ const NewProjectDialog: React.FC = () => {
               </Typography>
             </Box>
           </Grid>
-        </Grid>
+          </Grid>
+        )}
+
+        {currentTab === 1 && (
+          <Box sx={{ mt: 1 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              以下のサンプルダンジョンから選択してプロジェクトを開始できます
+            </Typography>
+            <Grid container spacing={2}>
+              {sampleDungeonsList.map((sample) => (
+                <Grid item xs={12} key={sample.id}>
+                  <Card variant="outlined">
+                    <CardContent>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                        <Typography variant="h6" component="h3">
+                          {sample.name}
+                        </Typography>
+                        <Chip
+                          label={sample.difficulty}
+                          color={getDifficultyColor(sample.difficulty) as any}
+                          size="small"
+                        />
+                      </Box>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                        {sample.description}
+                      </Typography>
+                      <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
+                        <Chip label={`${sample.floors}階`} size="small" variant="outlined" />
+                        <Chip label={sample.size} size="small" variant="outlined" />
+                        {sample.tags.map((tag) => (
+                          <Chip key={tag} label={tag} size="small" variant="outlined" />
+                        ))}
+                      </Box>
+                      <Typography variant="caption" color="text.secondary">
+                        作成者: {sample.author}
+                      </Typography>
+                    </CardContent>
+                    <CardActions>
+                      <Button
+                        size="small"
+                        variant="contained"
+                        onClick={() => handleSampleSelect(sample.id)}
+                      >
+                        このサンプルを使用
+                      </Button>
+                    </CardActions>
+                  </Card>
+                </Grid>
+              ))}
+            </Grid>
+          </Box>
+        )}
       </DialogContent>
       <DialogActions>
         <Button onClick={handleCancel}>キャンセル</Button>
-        <Button 
-          onClick={handleCreate} 
-          variant="contained"
-          disabled={!dungeonName.trim()}
-        >
-          作成
-        </Button>
+        {currentTab === 0 && (
+          <Button 
+            onClick={handleCreate} 
+            variant="contained"
+            disabled={!dungeonName.trim()}
+          >
+            作成
+          </Button>
+        )}
       </DialogActions>
     </Dialog>
   )

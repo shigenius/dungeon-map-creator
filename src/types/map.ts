@@ -325,4 +325,4 @@ export interface MapEditorState {
 
 export type DrawingTool = 'pen' | 'rectangle' | 'fill' | 'eyedropper' | 'eraser' | 'template'
 export type Layer = 'floor' | 'walls' | 'events' | 'decorations'
-export type ViewMode = '2d' | '3d' | 'preview'
+export type ViewMode = '2d'

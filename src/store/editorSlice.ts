@@ -38,7 +38,7 @@ interface EditorState {
   selectedFloorType: FloorType
   selectedWallType: WallType
   selectedDecorationType: DecorationType
-  selectedEventType: EventType
+  selectedEventType: EventType | null
   capturedCellData: CapturedCellData | null
   hoveredCellInfo: HoveredCellInfo | null
   hoveredCellPosition: { x: number; y: number } | null
@@ -88,6 +88,8 @@ interface EditorState {
   viewCenter: { x: number; y: number } | null
   // ミニマップの状態
   minimapVisible: boolean
+  // イベントハイライト関連の状態
+  highlightedEventId: string | null
 }
 
 const initialState: EditorState = {
@@ -97,7 +99,7 @@ const initialState: EditorState = {
   selectedFloorType: 'normal',
   selectedWallType: 'normal',
   selectedDecorationType: 'furniture',
-  selectedEventType: 'treasure',
+  selectedEventType: null,
   capturedCellData: null,
   hoveredCellInfo: null,
   hoveredCellPosition: null,
@@ -152,6 +154,8 @@ const initialState: EditorState = {
   viewCenter: null,
   // ミニマップの初期状態
   minimapVisible: true,
+  // イベントハイライト関連の初期状態
+  highlightedEventId: null,
 }
 
 const editorSlice = createSlice({
@@ -175,6 +179,8 @@ const editorSlice = createSlice({
         state.accordionStates.wallTypeAccordion = true
       } else if (action.payload === 'events') {
         state.accordionStates.eventTypeAccordion = true
+        // イベントレイヤー選択時はイベントテンプレートを未選択状態にする
+        state.selectedEventType = null
       } else if (action.payload === 'decorations') {
         state.accordionStates.decorationTypeAccordion = true
       }
@@ -192,7 +198,7 @@ const editorSlice = createSlice({
       state.selectedDecorationType = action.payload
     },
     
-    setSelectedEventType: (state, action: PayloadAction<EventType>) => {
+    setSelectedEventType: (state, action: PayloadAction<EventType | null>) => {
       state.selectedEventType = action.payload
     },
     
@@ -479,6 +485,11 @@ const editorSlice = createSlice({
     setMinimapVisible: (state, action: PayloadAction<boolean>) => {
       state.minimapVisible = action.payload
     },
+
+    // イベントハイライト関連のアクション
+    setHighlightedEventId: (state, action: PayloadAction<string | null>) => {
+      state.highlightedEventId = action.payload
+    },
   },
 })
 
@@ -557,6 +568,8 @@ export const {
   // ミニマップ関連のアクション
   toggleMinimap,
   setMinimapVisible,
+  // イベントハイライト関連のアクション
+  setHighlightedEventId,
 } = editorSlice.actions
 
 export default editorSlice.reducer

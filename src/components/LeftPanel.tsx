@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useCallback, useRef, useEffect } from 'react'
 import {
   Box,
   Typography,
@@ -17,6 +17,9 @@ import {
   Menu,
   MenuItem,
   ListItemSecondaryAction,
+  TextField,
+  Chip,
+  Stack,
 } from '@mui/material'
 import {
   ExpandMore as ExpandMoreIcon,
@@ -31,10 +34,11 @@ import {
   ContentCopy as CopyIcon,
   MoreVert as MoreVertIcon,
   ViewModule as TemplateIcon,
+  Search as SearchIcon,
 } from '@mui/icons-material'
 import { useDispatch, useSelector } from 'react-redux'
 import { RootState } from '../store'
-import { setSelectedFloorType, setSelectedWallType, setSelectedDecorationType, setSelectedEventType, clearCapturedCellData, toggleFloorTypeAccordion, toggleWallTypeAccordion, toggleEventTypeAccordion, toggleDecorationTypeAccordion, openCustomTypeDialog, openEventEditDialog, setSelectedTemplate, setSelectedTool, setSelectedEventId } from '../store/editorSlice'
+import { setSelectedFloorType, setSelectedWallType, setSelectedDecorationType, setSelectedEventType, clearCapturedCellData, toggleFloorTypeAccordion, toggleWallTypeAccordion, toggleEventTypeAccordion, toggleDecorationTypeAccordion, openCustomTypeDialog, openEventEditDialog, setSelectedTemplate, setSelectedTool, setSelectedEventId, setHighlightedEventId } from '../store/editorSlice'
 import { removeEventFromCell, addEventToCell } from '../store/mapSlice'
 import { Layer, FloorType, WallType, DecorationType, EventType } from '../types/map'
 import FloorManagerPanel from './FloorManagerPanel'
@@ -50,6 +54,22 @@ const LeftPanel: React.FC = () => {
   const [eventMenuAnchor, setEventMenuAnchor] = useState<null | HTMLElement>(null)
   const [selectedEventForMenu, setSelectedEventForMenu] = useState<any>(null)
   const [showEventTemplateDialog, setShowEventTemplateDialog] = useState(false)
+  
+  // イベント検索・フィルタの状態管理
+  const [eventSearchQuery, setEventSearchQuery] = useState('')
+  const [eventTypeFilter, setEventTypeFilter] = useState('all')
+  
+  // ホバー最適化のためのref
+  const hoverTimeoutRef = useRef<number | null>(null)
+
+  // クリーンアップ
+  useEffect(() => {
+    return () => {
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current)
+      }
+    }
+  }, [])
 
   const layers: Array<{ key: Layer; name: string; icon: React.ReactNode }> = [
     { key: 'floor', name: '床レイヤー', icon: <FloorIcon /> },
@@ -152,7 +172,13 @@ const LeftPanel: React.FC = () => {
   }
 
   const handleEventTypeSelect = (eventType: EventType) => {
-    dispatch(setSelectedEventType(eventType))
+    // 既に選択されているイベントタイプを再度クリックした場合は選択解除
+    if (selectedEventType === eventType) {
+      // 選択を解除（nullにする）
+      dispatch(setSelectedEventType(null))
+    } else {
+      dispatch(setSelectedEventType(eventType))
+    }
     // テンプレート選択を解除し、ペンツールに切り替え
     dispatch(setSelectedTemplate(null))
     dispatch(setSelectedTool('pen'))
@@ -237,6 +263,40 @@ const LeftPanel: React.FC = () => {
       dispatch(openEventEditDialog(newEvent))
       setShowEventTemplateDialog(false)
     }
+  }
+
+  // デバウンス機能付きホバーハンドラー
+  const handleEventHover = useCallback((eventId: string | null) => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current)
+    }
+    
+    hoverTimeoutRef.current = window.setTimeout(() => {
+      dispatch(setHighlightedEventId(eventId))
+    }, 100) // 100ms のデバウンス
+  }, [dispatch])
+
+  const handleEventLeave = useCallback(() => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current)
+    }
+    dispatch(setHighlightedEventId(null))
+  }, [dispatch])
+
+  // イベントフィルタリング関数
+  const filterEvents = (events: any[]) => {
+    return events.filter(event => {
+      // 検索クエリでフィルタ
+      const searchMatch = eventSearchQuery === '' || 
+        event.name.toLowerCase().includes(eventSearchQuery.toLowerCase()) ||
+        (event.description && event.description.toLowerCase().includes(eventSearchQuery.toLowerCase())) ||
+        event.type.toLowerCase().includes(eventSearchQuery.toLowerCase())
+      
+      // タイプフィルタ
+      const typeMatch = eventTypeFilter === 'all' || event.type === eventTypeFilter
+      
+      return searchMatch && typeMatch
+    })
   }
 
   return (
@@ -472,15 +532,89 @@ const LeftPanel: React.FC = () => {
                   </Typography>
                 </Box>
                 
-                <List dense sx={{ maxHeight: 200, overflow: 'auto' }}>
-                  {dungeon?.floors[currentFloor]?.cells?.flat().flatMap((cell, cellIndex) => 
-                    cell.events.map((event, eventIndex) => (
+                {/* イベント検索・フィルタ */}
+                <Box sx={{ mb: 2 }}>
+                  <TextField
+                    size="small"
+                    placeholder="イベント名、説明、タイプで検索..."
+                    value={eventSearchQuery}
+                    onChange={(e) => setEventSearchQuery(e.target.value)}
+                    InputProps={{
+                      startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />,
+                      endAdornment: eventSearchQuery && (
+                        <IconButton
+                          size="small"
+                          onClick={() => setEventSearchQuery('')}
+                        >
+                          <ClearIcon fontSize="small" />
+                        </IconButton>
+                      ),
+                    }}
+                    sx={{ width: '100%', mb: 1 }}
+                  />
+                  
+                  <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
+                    <Chip
+                      label="全て"
+                      size="small"
+                      variant={eventTypeFilter === 'all' ? 'filled' : 'outlined'}
+                      onClick={() => setEventTypeFilter('all')}
+                    />
+                    <Chip
+                      label="階段"
+                      size="small"
+                      variant={eventTypeFilter === 'stairs' ? 'filled' : 'outlined'}
+                      onClick={() => setEventTypeFilter('stairs')}
+                    />
+                    <Chip
+                      label="宝箱"
+                      size="small"
+                      variant={eventTypeFilter === 'treasure' ? 'filled' : 'outlined'}
+                      onClick={() => setEventTypeFilter('treasure')}
+                    />
+                    <Chip
+                      label="NPC"
+                      size="small"
+                      variant={eventTypeFilter === 'npc' ? 'filled' : 'outlined'}
+                      onClick={() => setEventTypeFilter('npc')}
+                    />
+                    <Chip
+                      label="敵"
+                      size="small"
+                      variant={eventTypeFilter === 'enemy' ? 'filled' : 'outlined'}
+                      onClick={() => setEventTypeFilter('enemy')}
+                    />
+                    <Chip
+                      label="回復"
+                      size="small"
+                      variant={eventTypeFilter === 'heal' ? 'filled' : 'outlined'}
+                      onClick={() => setEventTypeFilter('heal')}
+                    />
+                    <Chip
+                      label="セーブ"
+                      size="small"
+                      variant={eventTypeFilter === 'save' ? 'filled' : 'outlined'}
+                      onClick={() => setEventTypeFilter('save')}
+                    />
+                  </Stack>
+                </Box>
+                
+                <List dense sx={{ maxHeight: 400, overflow: 'auto' }}>
+                  {(() => {
+                    const allEvents = dungeon?.floors[currentFloor]?.cells?.flat().flatMap((cell, cellIndex) => 
+                      cell.events.map((event, eventIndex) => ({ event, cellIndex, eventIndex }))
+                    ) || []
+                    const filteredEvents = filterEvents(allEvents.map(item => item.event))
+                    
+                    return allEvents.filter(item => filteredEvents.includes(item.event)).map(({ event, cellIndex, eventIndex }) => (
                       <ListItem key={`${event.id}-${cellIndex}-${eventIndex}`} disablePadding>
                         <ListItemButton 
                           onClick={() => {
                             dispatch(setSelectedEventId(event.id))
                             dispatch(openEventEditDialog(event))
                           }}
+                          onMouseEnter={() => handleEventHover(event.id)}
+                          onMouseLeave={handleEventLeave}
                         >
                           <ListItemIcon sx={{ minWidth: 28 }}>
                             <Box
@@ -517,7 +651,7 @@ const LeftPanel: React.FC = () => {
                         </ListItemSecondaryAction>
                       </ListItem>
                     ))
-                  ) || []}
+                  })()}
                 </List>
                 
                 {(!dungeon?.floors[currentFloor]?.cells?.flat().some(cell => cell.events.length > 0)) && (
@@ -535,25 +669,39 @@ const LeftPanel: React.FC = () => {
               <Typography>イベントテンプレート選択</Typography>
             </AccordionSummary>
             <AccordionDetails sx={{ p: 0 }}>
+              <Typography variant="caption" sx={{ px: 2, py: 1, color: 'text.secondary', display: 'block' }}>
+                選択済みのテンプレートを再度クリックで選択解除
+              </Typography>
               <List dense>
                 {eventTypes.map((eventType) => (
                   <ListItem key={eventType.key} disablePadding>
-                    <ListItemButton
-                      selected={selectedEventType === eventType.key}
-                      onClick={() => handleEventTypeSelect(eventType.key)}
-                      disabled={!dungeon}
-                      sx={{ pl: 2 }}
-                    >
+                    <Tooltip title={selectedEventType === eventType.key ? "クリックで選択解除" : "クリックで選択"} placement="right">
+                      <ListItemButton
+                        selected={selectedEventType === eventType.key}
+                        onClick={() => handleEventTypeSelect(eventType.key)}
+                        disabled={!dungeon}
+                        sx={{ 
+                          pl: 2,
+                          '&.Mui-selected': {
+                            backgroundColor: 'primary.main',
+                            color: 'primary.contrastText',
+                            '&:hover': {
+                              backgroundColor: 'primary.dark',
+                            }
+                          }
+                        }}
+                      >
                       <ListItemIcon sx={{ minWidth: 32 }}>
                         <Typography sx={{ fontSize: '16px' }}>
                           {eventType.icon}
                         </Typography>
                       </ListItemIcon>
-                      <ListItemText 
-                        primary={eventType.name}
-                        secondary={eventType.description}
-                      />
-                    </ListItemButton>
+                        <ListItemText 
+                          primary={eventType.name}
+                          secondary={eventType.description}
+                        />
+                      </ListItemButton>
+                    </Tooltip>
                   </ListItem>
                 ))}
               </List>
