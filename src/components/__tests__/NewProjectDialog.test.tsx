@@ -459,6 +459,51 @@ describe('NewProjectDialog 統合テスト', () => {
   })
 
   describe('アクセシビリティ機能', () => {
+    beforeEach(() => {
+      // 各テストの前にストアを新しく作成して確実にダイアログが開いた状態にする
+      store = configureStore({
+        reducer: {
+          map: mapSliceReducer,
+          editor: editorSliceReducer
+        },
+        preloadedState: {
+          map: {
+            dungeon: null,
+            history: [],
+            currentHistoryIndex: -1,
+            isUndoRedoOperation: false
+          },
+          editor: {
+            activeTool: 'pen',
+            activeLayer: 'floor',
+            showGrid: true,
+            zoom: 100,
+            hoveredCell: null,
+            hoveredCellInfo: null,
+            selectedCells: [],
+            isSelecting: false,
+            selectionStart: null,
+            selectionEnd: null,
+            selectedTemplate: null,
+            templateRotation: 0,
+            showNewProjectDialog: true, // 確実にダイアログを表示
+            showEventEditDialog: false,
+            showTemplateCreateDialog: false,
+            editingEvent: null,
+            rangeSelection: null,
+            viewMode: '2D',
+            sidebarCollapsed: false,
+            layerVisibility: {
+              floor: true,
+              walls: true,
+              events: true,
+              decorations: true
+            }
+          }
+        }
+      })
+    })
+
     it('フォームラベルが正しく関連付けられている', () => {
       render(
         <Provider store={store}>

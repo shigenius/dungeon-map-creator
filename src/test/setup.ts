@@ -18,6 +18,7 @@ global.ResizeObserver = class ResizeObserver {
 // Mock HTMLCanvasElement.getContext
 HTMLCanvasElement.prototype.getContext = vi.fn(() => ({
   fillRect: vi.fn(),
+  strokeRect: vi.fn(), // 追加: RightPanelで使用されている
   clearRect: vi.fn(),
   getImageData: vi.fn(),
   putImageData: vi.fn(),
@@ -37,6 +38,12 @@ HTMLCanvasElement.prototype.getContext = vi.fn(() => ({
   scale: vi.fn(),
   rotate: vi.fn(),
   arc: vi.fn(),
+  setLineDash: vi.fn(), // 追加: 点線描画で使用
+  globalAlpha: 1, // 追加: 透明度設定
+  lineWidth: 1, // 追加: 線幅設定
+  font: '10px Arial', // 追加: フォント設定
+  textAlign: 'left', // 追加: テキスト配置
+  textBaseline: 'alphabetic', // 追加: テキストベースライン
   fillStyle: '',
   strokeStyle: '',
 }))
