@@ -2110,13 +2110,29 @@ const MapEditor2D: React.FC = () => {
     }
 
     const config = eventConfigs[eventType as keyof typeof eventConfigs] || eventConfigs.treasure
+    
+    // 現在のフロアの既存イベントから同じタイプのイベント数をカウント
+    let eventCount = 0
+    if (floor) {
+      for (let y = 0; y < floor.height; y++) {
+        for (let x = 0; x < floor.width; x++) {
+          const cell = floor.cells[y][x]
+          eventCount += cell.events.filter(event => event.type === eventType).length
+        }
+      }
+    }
+    
+    // 同じタイプのイベントが既に存在する場合はインデックスを追加
+    const baseName = config.name
+    const eventName = eventCount > 0 ? `${baseName} ${eventCount + 1}` : baseName
+    
     const generatedId = crypto.randomUUID()
-    console.log('createEventByType: 新しいID生成 =', generatedId)
+    console.log('createEventByType: 新しいID生成 =', generatedId, 'イベント名:', eventName)
 
     return {
       id: generatedId,
       type: eventType,
-      name: config.name,
+      name: eventName,
       description: config.description,
       position: position,
       appearance: {
@@ -2149,7 +2165,7 @@ const MapEditor2D: React.FC = () => {
       },
       conditions: []
     }
-  }, [])
+  }, [floor])
 
   // 装飾名を取得するヘルパー関数
   const getDecorationName = useCallback((decorationType: string) => {
