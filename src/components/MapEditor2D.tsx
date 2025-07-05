@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useCallback, useState } from 'react'
+import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react'
 import { Box } from '@mui/material'
 import { useSelector, useDispatch } from 'react-redux'
 import { RootState } from '../store'
@@ -427,8 +427,8 @@ const MapEditor2D: React.FC = () => {
   const editorState = useSelector((state: RootState) => state.editor)
   const { currentFloor, selectedTool, selectedLayer, selectedFloorType, selectedWallType, selectedDecorationType, selectedEventType, capturedCellData, hoveredCellPosition, hoveredWallInfo, isShiftPressed, zoom, gridVisible, selectedTemplate, templatePreviewPosition, templateRotation, selectionMode, selectionStart, selectionEnd, selectionConfirmed, selectedEventId, highlightedEventId } = editorState
 
-  // セルサイズを整数に丸めて座標のズレを防ぐ
-  const cellSize = Math.round(32 * zoom)
+  // セルサイズを整数に丸めて座標のズレを防ぐ（useMemoで最適化）
+  const cellSize = useMemo(() => Math.round(32 * zoom), [zoom])
   const floor = dungeon?.floors[currentFloor]
 
   // マウス位置から最も近い壁を検出する関数
@@ -1452,52 +1452,56 @@ const MapEditor2D: React.FC = () => {
       const ctx = canvas.getContext('2d')
       if (!ctx) return
 
-    // キャンバスサイズを設定
-    canvas.width = floor.width * cellSize
-    canvas.height = floor.height * cellSize
+      // キャンバスサイズが変更された場合のみサイズを設定
+      const newWidth = floor.width * cellSize
+      const newHeight = floor.height * cellSize
+      if (canvas.width !== newWidth || canvas.height !== newHeight) {
+        canvas.width = newWidth
+        canvas.height = newHeight
+      }
 
-    // 背景をクリア
-    ctx.fillStyle = '#222'
-    ctx.fillRect(0, 0, canvas.width, canvas.height)
+      // 背景をクリア
+      ctx.fillStyle = '#222'
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
 
-    // レイヤーの表示状態に応じて描画
-    const { layerVisibility } = editorState
-    
-    if (layerVisibility.floor) {
-      drawFloor(ctx)
-    }
-    if (layerVisibility.walls) {
-      drawWalls(ctx)
-    }
-    if (layerVisibility.events) {
-      drawEvents(ctx)
-    }
-    if (layerVisibility.decorations) {
-      drawDecorations(ctx)
-    }
-    
-    // 矩形プレビューを描画
-    drawRectanglePreview(ctx)
-    
-    // テンプレートプレビューを描画
-    drawTemplatePreview(ctx)
-    
-    // ドラッグプレビューを描画
-    drawDragPreview(ctx)
-    
-    // 選択されたセルを描画
-    
-    // ホバー中のセルをハイライト
-    drawHoveredCell(ctx)
-    
-    // 範囲選択を描画
-    drawSelection(ctx)
-    
-    drawGrid(ctx)
+      // レイヤーの表示状態に応じて描画
+      const { layerVisibility } = editorState
+      
+      if (layerVisibility.floor) {
+        drawFloor(ctx)
+      }
+      if (layerVisibility.walls) {
+        drawWalls(ctx)
+      }
+      if (layerVisibility.events) {
+        drawEvents(ctx)
+      }
+      if (layerVisibility.decorations) {
+        drawDecorations(ctx)
+      }
+      
+      // 矩形プレビューを描画
+      drawRectanglePreview(ctx)
+      
+      // テンプレートプレビューを描画
+      drawTemplatePreview(ctx)
+      
+      // ドラッグプレビューを描画
+      drawDragPreview(ctx)
+      
+      // 選択されたセルを描画
+      
+      // ホバー中のセルをハイライト
+      drawHoveredCell(ctx)
+      
+      // 範囲選択を描画
+      drawSelection(ctx)
+      
+      drawGrid(ctx)
     } catch (error) {
       console.error('MapEditor2D redraw error:', error)
     }
-  }, [floor, cellSize, drawFloor, drawWalls, drawEvents, drawDecorations, drawGrid, drawRectanglePreview, drawTemplatePreview, drawDragPreview, drawHoveredCell, drawSelection, editorState, templateRotation])
+  }, [floor, cellSize, drawFloor, drawWalls, drawEvents, drawDecorations, drawGrid, drawRectanglePreview, drawTemplatePreview, drawDragPreview, drawHoveredCell, drawSelection, editorState])
 
   const getCellPosition = useCallback((event: React.MouseEvent): Position | null => {
     const canvas = canvasRef.current
