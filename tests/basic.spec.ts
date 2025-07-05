@@ -19,19 +19,19 @@ test.describe('ダンジョンマップクリエイター 基本機能', () => {
     await expect(page.locator('h2')).toContainText('新規プロジェクト作成');
     
     // フォーム要素の確認 - MUIのTextField用のセレクタ
-    await expect(page.locator('input[value="新しいダンジョン"]')).toBeVisible();
+    await expect(page.locator('input[placeholder="新しいダンジョン"]')).toBeVisible();
     await expect(page.locator('input[placeholder="名前を入力（任意）"]')).toBeVisible();
   });
 
   test('新規プロジェクトを作成できる', async ({ page }) => {
     await page.goto('/');
 
-    // プロジェクト名を入力
-    await page.fill('input[value="新しいダンジョン"]', 'テストダンジョン');
-    await page.fill('input[placeholder="名前を入力（任意）"]', 'テストユーザー');
+    // プロジェクト名を入力 - より具体的なセレクターを使用
+    await page.locator('input[placeholder="新しいダンジョン"]').fill('テストダンジョン');
+    await page.locator('input[placeholder="名前を入力（任意）"]').fill('テストユーザー');
 
-    // 作成ボタンをクリック
-    await page.click('button:has-text("作成")');
+    // ダイアログ内の作成ボタンをクリック
+    await page.locator('[role="dialog"] button:has-text("作成")').click();
 
     // ダイアログが閉じて、メインのUIが表示されることを確認
     await expect(page.locator('[role="dialog"]')).not.toBeVisible();
@@ -42,7 +42,7 @@ test.describe('ダンジョンマップクリエイター 基本機能', () => {
     await page.goto('/');
     
     // プロジェクト作成
-    await page.click('button:has-text("作成")');
+    await page.locator('[role="dialog"] button:has-text("作成")').click();
     
     // メニューバーの項目を確認
     await expect(page.locator('button:has-text("ファイル")')).toBeVisible();
@@ -59,7 +59,7 @@ test.describe('ダンジョンマップクリエイター 基本機能', () => {
     await page.goto('/');
     
     // プロジェクト作成
-    await page.click('button:has-text("作成")');
+    await page.locator('[role="dialog"] button:has-text("作成")').click();
     
     // ツールバーのツールを確認 - MUIのToggleButtonGroup用のセレクタ
     const tools = ['pen', 'rectangle', 'fill', 'eyedropper', 'select'];
@@ -77,7 +77,7 @@ test.describe('ダンジョンマップクリエイター 基本機能', () => {
     await page.goto('/');
     
     // プロジェクト作成
-    await page.click('button:has-text("作成")');
+    await page.locator('[role="dialog"] button:has-text("作成")').click();
     
     // レイヤーパネルの確認
     await expect(page.locator('text=レイヤー管理')).toBeVisible();
@@ -91,7 +91,7 @@ test.describe('ダンジョンマップクリエイター 基本機能', () => {
     await page.goto('/');
     
     // プロジェクト作成
-    await page.click('button:has-text("作成")');
+    await page.locator('[role="dialog"] button:has-text("作成")').click();
     
     // キャンバスが表示されることを確認
     await expect(page.locator('canvas')).toBeVisible();
