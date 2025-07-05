@@ -3,9 +3,9 @@ import { Box } from '@mui/material'
 import { useSelector, useDispatch } from 'react-redux'
 import { RootState } from '../store'
 import { updateCell, updateCells, placeTemplate, addDecorationToCell } from '../store/mapSlice'
-import { setCapturedCellData, setHoveredCellInfo, clearHoveredCellInfo, setHoveredCellPosition, clearHoveredCellPosition, setHoveredWallInfo, clearHoveredWallInfo, setTemplatePreviewPosition, setSelectionStart, setSelectionEnd, confirmSelection, setViewCenter } from '../store/editorSlice'
+import { setCapturedCellData, setHoveredCellInfo, clearHoveredCellInfo, setHoveredCellPosition, clearHoveredCellPosition, setHoveredWallInfo, clearHoveredWallInfo, setTemplatePreviewPosition, setSelectionStart, setSelectionEnd, confirmSelection, setViewCenter, openEventEditDialog } from '../store/editorSlice'
 import { rotateTemplate as rotateTemplateUtil } from '../utils/templateUtils'
-import { Position, WallType, DecorationType, Decoration } from '../types/map'
+import { Position, WallType, DecorationType, Decoration, EventType } from '../types/map'
 
 
 // 床タイプに応じた通行可否を決定する関数
@@ -425,7 +425,7 @@ const MapEditor2D: React.FC = () => {
   
   const dungeon = useSelector((state: RootState) => state.map.dungeon)
   const editorState = useSelector((state: RootState) => state.editor)
-  const { currentFloor, selectedTool, selectedLayer, selectedFloorType, selectedWallType, selectedDecorationType, selectedEventType, capturedCellData, hoveredCellPosition, hoveredWallInfo, isShiftPressed, zoom, gridVisible, selectedTemplate, templatePreviewPosition, templateRotation, selectionMode, selectionStart, selectionEnd, selectionConfirmed, selectedEventId } = editorState
+  const { currentFloor, selectedTool, selectedLayer, selectedFloorType, selectedWallType, selectedDecorationType, selectedEventType, capturedCellData, hoveredCellPosition, hoveredWallInfo, isShiftPressed, zoom, gridVisible, selectedTemplate, templatePreviewPosition, templateRotation, selectionMode, selectionStart, selectionEnd, selectionConfirmed, selectedEventId, highlightedEventId } = editorState
 
   // セルサイズを整数に丸めて座標のズレを防ぐ
   const cellSize = Math.round(32 * zoom)
@@ -876,11 +876,22 @@ const MapEditor2D: React.FC = () => {
               ctx.stroke()
               ctx.setLineDash([])  // 点線をリセット
             }
+
+            // ホバーされたイベントをハイライト表示
+            if (highlightedEventId === event.id) {
+              ctx.strokeStyle = '#ffaa00'  // オレンジ色
+              ctx.lineWidth = 3
+              ctx.setLineDash([3, 3])  // 短い点線でハイライト
+              ctx.beginPath()
+              ctx.arc(xPos + size / 2, yPos + size / 2, size / 2.2, 0, Math.PI * 2)
+              ctx.stroke()
+              ctx.setLineDash([])  // 点線をリセット
+            }
           })
         }
       }
     }
-  }, [floor, cellSize, selectedEventId])
+  }, [floor, cellSize, selectedEventId, highlightedEventId])
 
   const drawDecorations = useCallback((ctx: CanvasRenderingContext2D) => {
     if (!floor) return
@@ -1849,7 +1860,7 @@ const MapEditor2D: React.FC = () => {
                       walls
                     }
                   })
-                } else if (selectedLayer === 'events') {
+                } else if (selectedLayer === 'events' && selectedEventType) {
                   // 既存のイベントに新しいイベントを追加（上書きしない）
                   const newEvent = createEventByType(selectedEventType, cellPosition)
                   const newEvents = [...cell.events, newEvent]
@@ -2030,7 +2041,7 @@ const MapEditor2D: React.FC = () => {
               cell: { events: newEvents }
             }))
           }
-        } else {
+        } else if (selectedEventType) {
           // 新しいイベントを追加
           const newEvent = createEventByType(selectedEventType, position)
           console.log('新しいイベント作成:', newEvent.id, newEvent.name)
@@ -2042,6 +2053,10 @@ const MapEditor2D: React.FC = () => {
             position,
             cell: { events: newEvents }
           }))
+        } else {
+          // 何も選択されていない場合は新規イベント作成ダイアログを開く
+          const newEvent = createEventByType('treasure', position) // デフォルトで宝箱タイプを作成
+          dispatch(openEventEditDialog(newEvent))
         }
       }
     } else if (selectedLayer === 'decorations') {
@@ -2081,7 +2096,7 @@ const MapEditor2D: React.FC = () => {
   }, [selectedLayer, selectedTool, selectedFloorType, selectedWallType, selectedDecorationType, selectedEventType, isShiftPressed, currentFloor, capturedCellData, dispatch, floor, getCellPosition, selectedTemplate, templateRotation, editorState, isDragging, isActuallyDragging, rectangleStart, isDrawingRectangle])
 
   // イベントタイプに基づいてイベントを作成するヘルパー関数
-  const createEventByType = useCallback((eventType: string, position: Position) => {
+  const createEventByType = useCallback((eventType: EventType, position: Position) => {
     const eventConfigs = {
       treasure: { name: '宝箱', description: 'アイテムを入手できる宝箱', color: '#ffd700', icon: '💰' },
       npc: { name: 'NPC', description: '話しかけられるキャラクター', color: '#40e0d0', icon: '👤' },
@@ -2100,7 +2115,7 @@ const MapEditor2D: React.FC = () => {
 
     return {
       id: generatedId,
-      type: eventType as any,
+      type: eventType,
       name: config.name,
       description: config.description,
       position: position,
