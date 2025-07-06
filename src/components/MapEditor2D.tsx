@@ -8,6 +8,16 @@ import { setCapturedCellData, setHoveredCellInfo, clearHoveredCellInfo, setHover
 import { rotateTemplate as rotateTemplateUtil } from '../utils/templateUtils'
 import { Position, WallType, DecorationType, Decoration, EventType } from '../types/map'
 
+// Hexカラーコードをrgbに変換するユーティリティ関数
+const hexToRgb = (hex: string) => {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
+  return result ? {
+    r: parseInt(result[1], 16),
+    g: parseInt(result[2], 16),
+    b: parseInt(result[3], 16)
+  } : null
+}
+
 // メモ化されたReduxセレクター
 const selectDungeon = (state: RootState) => state.map.dungeon
 const selectCurrentFloor = (state: RootState) => state.editor.currentFloor
@@ -28,6 +38,8 @@ const selectTemplatePreviewPosition = (state: RootState) => state.editor.templat
 const selectSelectedEventId = (state: RootState) => state.editor.selectedEventId
 const selectHighlightedEventId = (state: RootState) => state.editor.highlightedEventId
 const selectCapturedCellData = (state: RootState) => state.editor.capturedCellData
+const selectCustomFloorTypes = (state: RootState) => state.editor.customFloorTypes
+const selectCustomWallTypes = (state: RootState) => state.editor.customWallTypes
 
 // コンパウンドセレクター（複数の状態を組み合わせる）
 const selectCurrentFloorData = createSelector(
@@ -83,11 +95,25 @@ const getFloorHighlightColor = (floorType: string, isShiftPressed: boolean) => {
 }
 
 // 壁タイプごとのハイライト色を取得する関数
-const getWallHighlightColor = (wallType: string, isShiftPressed: boolean) => {
+const getWallHighlightColor = (wallType: string, isShiftPressed: boolean, customWallTypes: any[] = []) => {
   if (isShiftPressed) {
     return { fill: 'rgba(255, 100, 100, 0.4)', stroke: '#ff6464' } // 削除モード（赤）
   }
   
+  // カスタム壁タイプかどうかを確認
+  const customWall = customWallTypes.find(custom => custom.id === wallType)
+  if (customWall) {
+    // カスタム壁タイプの色を薄い透明度で使用
+    const rgb = hexToRgb(customWall.color)
+    if (rgb) {
+      return { 
+        fill: `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.4)`, 
+        stroke: customWall.color 
+      }
+    }
+  }
+  
+  // 基本壁タイプの処理
   switch (wallType) {
     case 'normal': return { fill: 'rgba(255, 200, 100, 0.4)', stroke: '#ffc864' } // オレンジ
     case 'door': return { fill: 'rgba(139, 69, 19, 0.4)', stroke: '#8b4513' } // 茶色
@@ -117,7 +143,18 @@ const getTransparentForWallType = (wallType: string) => {
 }
 
 // 壁タイプごとの視覚的スタイルを取得する関数
-const getWallStyle = (wallType: WallType) => {
+const getWallStyle = (wallType: WallType, customWallTypes: any[] = []) => {
+  // カスタム壁タイプかどうかを確認
+  const customWall = customWallTypes.find(custom => custom.id === wallType)
+  if (customWall) {
+    return { 
+      color: customWall.color, 
+      lineWidth: 2, 
+      pattern: customWall.transparent ? 'dotted' : 'solid' 
+    }
+  }
+  
+  // 基本壁タイプの処理
   switch (wallType) {
     case 'normal': return { color: '#fff', lineWidth: 2, pattern: 'solid' }
     case 'door': return { color: '#8B4513', lineWidth: 3, pattern: 'solid' }
@@ -209,14 +246,14 @@ const convertBoundaryToCell = (boundaryX: number, boundaryY: number, cellSize: n
 }
 
 // 床タイプのドラッグ描画関数：開始点から終了点までの直線上のセルの床タイプを変更
-const generateFloorsAlongLine = (start: Position, end: Position, selectedFloorType: string, resetMode: boolean = false) => {
+const generateFloorsAlongLine = (start: Position, end: Position, selectedFloorType: string, selectedFloorPassable: boolean, resetMode: boolean = false) => {
   const updates: Array<{ position: Position; cell: Partial<{ floor: any }> }> = []
   
   // 開始点と終了点が同じ場合は、単一セルの操作として扱う
   if (start.x === end.x && start.y === end.y) {
     const newFloorData = resetMode ? 
       { type: 'normal' as const, passable: true } : 
-      { type: selectedFloorType as any, passable: getPassableForFloorType(selectedFloorType) }
+      { type: selectedFloorType as any, passable: selectedFloorPassable }
     
     updates.push({
       position: start,
@@ -240,7 +277,7 @@ const generateFloorsAlongLine = (start: Position, end: Position, selectedFloorTy
     if (x >= 0 && y >= 0) {
       const newFloorData = resetMode ? 
         { type: 'normal' as const, passable: true } : 
-        { type: selectedFloorType as any, passable: getPassableForFloorType(selectedFloorType) }
+        { type: selectedFloorType as any, passable: selectedFloorPassable }
       
       updates.push({
         position: { x, y },
@@ -490,8 +527,56 @@ const MapEditor2D: React.FC = React.memo(() => {
   const highlightedEventId = useSelector(selectHighlightedEventId)
   const capturedCellData = useSelector(selectCapturedCellData)
   const selectedFloorType = useSelector(selectSelectedFloorType)
+  const selectedFloorPassable = useSelector((state: RootState) => state.editor.selectedFloorPassable)
   const selectedWallType = useSelector(selectSelectedWallType)
   const selectedDecorationType = useSelector(selectSelectedDecorationType)
+  const customFloorTypes = useSelector(selectCustomFloorTypes)
+  const customWallTypes = useSelector(selectCustomWallTypes)
+  
+  // カスタム床タイプを考慮した床の色を取得する関数
+  const getFloorColor = useCallback((floorType: string, passable: boolean) => {
+    // カスタム床タイプかどうかを確認
+    const customFloor = customFloorTypes.find(custom => custom.id === floorType)
+    if (customFloor) {
+      return customFloor.color
+    }
+    
+    // 基本床タイプの色
+    switch (floorType) {
+      case 'normal':
+        return passable ? '#666' : '#333'
+      case 'damage':
+        return '#800'
+      case 'slippery':
+        return '#048'
+      case 'pit':
+        return '#000'
+      case 'warp':
+        return '#840'
+      default:
+        return '#666'
+    }
+  }, [customFloorTypes])
+  
+  // カスタム床タイプを考慮した床の名前を取得する関数
+  const getFloorName = useCallback((floorType: string) => {
+    // カスタム床タイプかどうかを確認
+    const customFloor = customFloorTypes.find(custom => custom.id === floorType)
+    if (customFloor) {
+      return customFloor.name
+    }
+    
+    // 基本床タイプの名前
+    switch (floorType) {
+      case 'normal': return '床'
+      case 'normal_blocked': return '床(×)'
+      case 'damage': return 'ダメージ'
+      case 'slippery': return '滑'
+      case 'pit': return '穴'
+      case 'warp': return 'ワープ'
+      default: return '床'
+    }
+  }, [customFloorTypes])
   
   // その他のエディター状態（個別に取得）
   const selectedEventType = useSelector((state: RootState) => state.editor.selectedEventType)
@@ -650,27 +735,8 @@ const MapEditor2D: React.FC = React.memo(() => {
         const xPos = Math.round(x * cellSize)
         const yPos = Math.round(y * cellSize)
 
-        // 床の描画
-        let floorColor = '#444'
-        switch (cell.floor.type) {
-          case 'normal':
-            floorColor = cell.floor.passable ? '#666' : '#333'
-            break
-          case 'damage':
-            floorColor = '#800'
-            break
-          case 'slippery':
-            floorColor = '#048'
-            break
-          case 'pit':
-            floorColor = '#000'
-            break
-          case 'warp':
-            floorColor = '#840'
-            break
-          default:
-            floorColor = '#666'
-        }
+        // 床の描画（カスタム床タイプ対応）
+        const floorColor = getFloorColor(cell.floor.type, cell.floor.passable)
 
         ctx.fillStyle = floorColor
         // 床を整数座標とサイズで描画
@@ -696,7 +762,7 @@ const MapEditor2D: React.FC = React.memo(() => {
           ctx.font = `${Math.min(cellSize / 4, 12)}px Arial`
           ctx.textAlign = 'center'
           ctx.fillText(
-            cell.floor.type === 'normal' ? '床' : cell.floor.type,
+            getFloorName(cell.floor.type),
             xPos + cellSize / 2,
             yPos + cellSize / 2 + 4
           )
@@ -725,7 +791,7 @@ const MapEditor2D: React.FC = React.memo(() => {
 
         // 北の壁
         if (cell.walls.north) {
-          const style = getWallStyle(cell.walls.north.type)
+          const style = getWallStyle(cell.walls.north.type, customWallTypes)
           ctx.strokeStyle = style.color
           ctx.lineWidth = 2 // 線の太さを統一
           setLinePattern(ctx, style.pattern)
@@ -739,7 +805,7 @@ const MapEditor2D: React.FC = React.memo(() => {
 
         // 東の壁
         if (cell.walls.east) {
-          const style = getWallStyle(cell.walls.east.type)
+          const style = getWallStyle(cell.walls.east.type, customWallTypes)
           ctx.strokeStyle = style.color
           ctx.lineWidth = 2 // 線の太さを統一
           setLinePattern(ctx, style.pattern)
@@ -753,7 +819,7 @@ const MapEditor2D: React.FC = React.memo(() => {
 
         // 南の壁
         if (cell.walls.south) {
-          const style = getWallStyle(cell.walls.south.type)
+          const style = getWallStyle(cell.walls.south.type, customWallTypes)
           ctx.strokeStyle = style.color
           ctx.lineWidth = 2 // 線の太さを統一
           setLinePattern(ctx, style.pattern)
@@ -767,7 +833,7 @@ const MapEditor2D: React.FC = React.memo(() => {
 
         // 西の壁
         if (cell.walls.west) {
-          const style = getWallStyle(cell.walls.west.type)
+          const style = getWallStyle(cell.walls.west.type, customWallTypes)
           ctx.strokeStyle = style.color
           ctx.lineWidth = 2 // 線の太さを統一
           setLinePattern(ctx, style.pattern)
@@ -785,7 +851,7 @@ const MapEditor2D: React.FC = React.memo(() => {
     ctx.setLineDash([])
     // アンチエイリアシングを元に戻す
     ctx.imageSmoothingEnabled = true
-  }, [floor, cellSize])
+  }, [floor, cellSize, customWallTypes])
 
   const drawDragPreview = useCallback((ctx: CanvasRenderingContext2D) => {
     if (!isDragging || !dragStart || !dragEnd) return
@@ -889,7 +955,7 @@ const MapEditor2D: React.FC = React.memo(() => {
       ctx.stroke()
       
       // 実際に変更される床のプレビューを描画
-      const previewUpdates = generateFloorsAlongLine(dragStart, dragEnd, selectedFloorType, isShiftPressed)
+      const previewUpdates = generateFloorsAlongLine(dragStart, dragEnd, selectedFloorType, selectedFloorPassable, isShiftPressed)
       
       // 各セルの境界線を描画
       ctx.strokeStyle = isShiftPressed ? '#ff4444' : '#44ff44' // 削除=赤、配置=緑
@@ -1252,47 +1318,21 @@ const MapEditor2D: React.FC = React.memo(() => {
           if (!wall) return
           
           // 壁タイプに応じた色とスタイル
-          let strokeColor = '#fff'
-          let lineWidth = 3
+          const style = getWallStyle(wall.type, customWallTypes)
+          let strokeColor = style.color
+          let lineWidth = style.lineWidth
           let lineDash: number[] = []
           
-          switch (wall.type) {
-            case 'normal':
-              strokeColor = '#ffffff'
-              lineWidth = 4
+          // スタイルパターンに応じた線の設定
+          switch (style.pattern) {
+            case 'dashed':
+              lineDash = [5, 5]
               break
-            case 'door':
-              strokeColor = '#8B4513'
-              lineWidth = 5
+            case 'dotted':
+              lineDash = [2, 3]
               break
-            case 'locked_door':
-              strokeColor = '#FFD700'
-              lineWidth = 5
-              break
-            case 'hidden_door':
-              strokeColor = '#888888'
-              lineWidth = 2
-              lineDash = [4, 4]
-              break
-            case 'breakable':
-              strokeColor = '#FF6B35'
-              lineWidth = 3
-              lineDash = [6, 3]
-              break
-            case 'oneway':
-              strokeColor = '#00CED1'
-              lineWidth = 4
-              break
-            case 'invisible':
-              strokeColor = '#666666'
-              lineWidth = 1
-              lineDash = [2, 6]
-              break
-            case 'event':
-              strokeColor = '#FF1493'
-              lineWidth = 3
-              lineDash = [3, 3]
-              break
+            default:
+              lineDash = []
           }
           
           ctx.strokeStyle = strokeColor
@@ -1590,7 +1630,7 @@ const MapEditor2D: React.FC = React.memo(() => {
       const baseY = y * cellSize
 
       // 壁タイプに応じた色を取得
-      const colors = getWallHighlightColor(selectedWallType, isShiftPressed)
+      const colors = getWallHighlightColor(selectedWallType, isShiftPressed, customWallTypes)
       
       ctx.fillStyle = colors.fill
       ctx.strokeStyle = colors.stroke
@@ -2087,7 +2127,7 @@ const MapEditor2D: React.FC = React.memo(() => {
                   } else {
                     newFloorData = {
                       type: selectedFloorType,
-                      passable: getPassableForFloorType(selectedFloorType)
+                      passable: selectedFloorPassable
                     }
                   }
                   updates.push({
@@ -2186,8 +2226,9 @@ const MapEditor2D: React.FC = React.memo(() => {
         } else {
           newFloorData = {
             type: selectedFloorType,
-            passable: getPassableForFloorType(selectedFloorType)
+            passable: selectedFloorPassable
           }
+          console.log('床タイプ更新:', { type: selectedFloorType, passable: selectedFloorPassable, position })
         }
 
         dispatch(updateCell({
@@ -2212,7 +2253,7 @@ const MapEditor2D: React.FC = React.memo(() => {
         } else {
           newFloorDataForFill = {
             type: selectedFloorType,
-            passable: getPassableForFloorType(selectedFloorType)
+            passable: selectedFloorPassable
           }
         }
         
@@ -2316,9 +2357,17 @@ const MapEditor2D: React.FC = React.memo(() => {
             cell: { events: newEvents }
           }))
         } else {
-          // 何も選択されていない場合は新規イベント作成ダイアログを開く
-          const newEvent = createEventByType('treasure', position) // デフォルトで宝箱タイプを作成
-          dispatch(openEventEditDialog(newEvent))
+          // 何も選択されていない場合
+          if (currentCell.events.length > 0) {
+            // 既存のイベントがある場合は最初のイベントを編集
+            const eventToEdit = currentCell.events[0]
+            console.log('既存イベントの編集:', eventToEdit.id, eventToEdit.name)
+            dispatch(openEventEditDialog(eventToEdit))
+          } else {
+            // イベントがない場合は新規イベント作成ダイアログを開く（テンプレートなし）
+            console.log('新規イベント作成ダイアログを開きます')
+            dispatch(openEventEditDialog(null))
+          }
         }
       }
     } else if (selectedLayer === 'decorations') {
@@ -2657,7 +2706,7 @@ const MapEditor2D: React.FC = React.memo(() => {
     if (dragStartMouse && dragStart && selectedLayer === 'floor' && selectedTool === 'pen') {
       if (isActuallyDragging && isDragging && dragEnd) {
         // 実際にドラッグが行われた場合：床を描画
-        const floorUpdates = generateFloorsAlongLine(dragStart, dragEnd, selectedFloorType, isShiftPressed)
+        const floorUpdates = generateFloorsAlongLine(dragStart, dragEnd, selectedFloorType, selectedFloorPassable, isShiftPressed)
         if (floorUpdates.length > 0) {
           dispatch(updateCells({
             floorIndex: currentFloor,
@@ -2683,7 +2732,7 @@ const MapEditor2D: React.FC = React.memo(() => {
           } else {
             newFloorData = {
               type: selectedFloorType,
-              passable: getPassableForFloorType(selectedFloorType)
+              passable: selectedFloorPassable
             }
           }
 
