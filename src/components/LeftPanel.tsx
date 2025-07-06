@@ -38,7 +38,7 @@ import {
 } from '@mui/icons-material'
 import { useDispatch, useSelector } from 'react-redux'
 import { RootState } from '../store'
-import { setSelectedFloorType, setSelectedWallType, setSelectedDecorationType, setSelectedEventType, clearCapturedCellData, toggleFloorTypeAccordion, toggleWallTypeAccordion, toggleEventTypeAccordion, toggleDecorationTypeAccordion, openCustomTypeDialog, openEventEditDialog, setSelectedTemplate, setSelectedTool, setSelectedEventId, setHighlightedEventId } from '../store/editorSlice'
+import { setSelectedFloorType, setSelectedFloorPassable, setSelectedWallType, setSelectedDecorationType, setSelectedEventType, clearCapturedCellData, toggleFloorTypeAccordion, toggleWallTypeAccordion, toggleEventTypeAccordion, toggleDecorationTypeAccordion, openCustomTypeDialog, openEventEditDialog, setSelectedTemplate, setSelectedTool, setSelectedEventId, setHighlightedEventId } from '../store/editorSlice'
 import { removeEventFromCell, addEventToCell } from '../store/mapSlice'
 import { Layer, FloorType, WallType, DecorationType, EventType } from '../types/map'
 import FloorManagerPanel from './FloorManagerPanel'
@@ -47,7 +47,7 @@ import { EventTemplate } from '../data/eventTemplates'
 
 const LeftPanel: React.FC = () => {
   const dispatch = useDispatch()
-  const { selectedLayer, selectedFloorType, selectedWallType, selectedDecorationType, selectedEventType, capturedCellData, accordionStates, customFloorTypes, customWallTypes, currentFloor } = useSelector((state: RootState) => state.editor)
+  const { selectedLayer, selectedFloorType, selectedFloorPassable, selectedWallType, selectedDecorationType, selectedEventType, capturedCellData, accordionStates, customFloorTypes, customWallTypes, currentFloor } = useSelector((state: RootState) => state.editor)
   const dungeon = useSelector((state: RootState) => state.map.dungeon)
 
   // イベント操作メニューの状態管理
@@ -78,8 +78,9 @@ const LeftPanel: React.FC = () => {
     { key: 'decorations', name: '装飾レイヤー', icon: <DecorationIcon /> },
   ]
 
-  const floorTypes: Array<{ key: FloorType; name: string; color: string; description: string }> = [
-    { key: 'normal', name: '通常', color: '#666', description: '通常の床' },
+  const floorTypes: Array<{ key: FloorType | 'normal_impassable'; name: string; color: string; description: string; passable?: boolean }> = [
+    { key: 'normal', name: '通常', color: '#666', description: '通常の床', passable: true },
+    { key: 'normal_impassable', name: '通常床（通行不可）', color: '#333', description: '通常の床だが通行不可', passable: false },
     { key: 'damage', name: 'ダメージ', color: '#800', description: 'ダメージを与える床' },
     { key: 'slippery', name: '滑りやすい', color: '#048', description: '滑りやすい床' },
     { key: 'pit', name: '落とし穴', color: '#000', description: '通行不可の穴' },
@@ -122,8 +123,29 @@ const LeftPanel: React.FC = () => {
   ]
 
 
-  const handleFloorTypeSelect = (floorType: FloorType) => {
-    dispatch(setSelectedFloorType(floorType))
+  const handleFloorTypeSelect = (floorType: FloorType | 'normal_impassable' | string) => {
+    console.log('床タイプ選択:', floorType)
+    
+    // normal_impassableの場合は通常床として扱い、通行不可に設定
+    if (floorType === 'normal_impassable') {
+      console.log('通常床（通行不可）を選択')
+      dispatch(setSelectedFloorType('normal'))
+      dispatch(setSelectedFloorPassable(false))
+    } else {
+      // カスタム床タイプかどうかを確認
+      const customFloorType = customFloorTypes.find(custom => custom.id === floorType)
+      if (customFloorType) {
+        console.log('カスタム床タイプを選択:', customFloorType)
+        dispatch(setSelectedFloorType(customFloorType.id as any))
+        dispatch(setSelectedFloorPassable(customFloorType.passable))
+      } else {
+        // 通常の床タイプの場合
+        const passable = floorType === 'pit' ? false : true
+        console.log('基本床タイプを選択:', { type: floorType, passable })
+        dispatch(setSelectedFloorType(floorType as FloorType))
+        dispatch(setSelectedFloorPassable(passable))
+      }
+    }
     // テンプレート選択を解除し、ペンツールに切り替え
     dispatch(setSelectedTemplate(null))
     dispatch(setSelectedTool('pen'))
@@ -344,7 +366,10 @@ const LeftPanel: React.FC = () => {
               <Typography>床タイプ選択</Typography>
               <Box sx={{ ml: 'auto', mr: 1 }}>
                 <Tooltip title="カスタム床タイプを追加">
-                  <IconButton size="small" onClick={handleAddCustomFloorType}>
+                  <IconButton size="small" onClick={(e) => {
+                    e.stopPropagation()
+                    handleAddCustomFloorType()
+                  }}>
                     <AddIcon fontSize="small" />
                   </IconButton>
                 </Tooltip>
@@ -355,7 +380,13 @@ const LeftPanel: React.FC = () => {
                 {floorTypes.map((floorType) => (
                   <ListItem key={floorType.key} disablePadding>
                     <ListItemButton
-                      selected={selectedFloorType === floorType.key}
+                      selected={
+                        floorType.key === 'normal_impassable' 
+                          ? selectedFloorType === 'normal' && selectedFloorPassable === false
+                          : floorType.passable !== undefined 
+                            ? selectedFloorType === floorType.key && selectedFloorPassable === floorType.passable
+                            : selectedFloorType === floorType.key
+                      }
                       onClick={() => handleFloorTypeSelect(floorType.key)}
                       disabled={!dungeon}
                       sx={{ pl: 2 }}
@@ -375,6 +406,26 @@ const LeftPanel: React.FC = () => {
                         primary={floorType.name}
                         secondary={floorType.description}
                       />
+                      {floorType.key !== 'normal' && (
+                        <ListItemSecondaryAction>
+                          <IconButton 
+                            size="small" 
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              console.log('基本床タイプ編集:', {
+                                key: floorType.key,
+                                name: floorType.name,
+                                passable: floorType.passable,
+                                color: floorType.color
+                              })
+                              // TODO: 基本床タイプ編集機能を実装
+                              alert(`${floorType.name}の編集機能は今後実装予定です`)
+                            }}
+                          >
+                            <MoreVertIcon fontSize="small" />
+                          </IconButton>
+                        </ListItemSecondaryAction>
+                      )}
                     </ListItemButton>
                   </ListItem>
                 ))}
@@ -383,8 +434,8 @@ const LeftPanel: React.FC = () => {
                 {customFloorTypes.map((customType) => (
                   <ListItem key={customType.id} disablePadding>
                     <ListItemButton
-                      selected={selectedFloorType === 'custom'}
-                      onClick={() => handleFloorTypeSelect('custom')}
+                      selected={selectedFloorType === customType.id && selectedFloorPassable === customType.passable}
+                      onClick={() => handleFloorTypeSelect(customType.id)}
                       disabled={!dungeon}
                       sx={{ pl: 2 }}
                     >
@@ -400,9 +451,31 @@ const LeftPanel: React.FC = () => {
                         />
                       </ListItemIcon>
                       <ListItemText 
-                        primary={customType.name}
+                        primary={`${customType.name} ${customType.passable ? '(通行可)' : '(通行不可)'}`}
                         secondary={customType.description}
                       />
+                      <ListItemSecondaryAction>
+                        <IconButton 
+                          size="small" 
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            console.log('カスタム床タイプ編集:', {
+                              id: customType.id,
+                              name: customType.name,
+                              passable: customType.passable,
+                              color: customType.color,
+                              description: customType.description,
+                              properties: customType.properties,
+                              currentlySelected: selectedFloorType === customType.id,
+                              selectedFloorPassable: selectedFloorPassable
+                            })
+                            // TODO: カスタム床タイプ編集機能を実装
+                            alert(`${customType.name}の編集機能は今後実装予定です`)
+                          }}
+                        >
+                          <MoreVertIcon fontSize="small" />
+                        </IconButton>
+                      </ListItemSecondaryAction>
                     </ListItemButton>
                   </ListItem>
                 ))}
@@ -422,7 +495,10 @@ const LeftPanel: React.FC = () => {
               <Typography>壁タイプ選択</Typography>
               <Box sx={{ ml: 'auto', mr: 1 }}>
                 <Tooltip title="カスタム壁タイプを追加">
-                  <IconButton size="small" onClick={handleAddCustomWallType}>
+                  <IconButton size="small" onClick={(e) => {
+                    e.stopPropagation()
+                    handleAddCustomWallType()
+                  }}>
                     <AddIcon fontSize="small" />
                   </IconButton>
                 </Tooltip>
