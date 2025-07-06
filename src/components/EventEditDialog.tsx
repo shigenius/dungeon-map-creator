@@ -85,9 +85,49 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
   const [showTemplateDialog, setShowTemplateDialog] = useState(false)
   const [validationResult, setValidationResult] = useState<EventValidationResult | null>(null)
   const [showValidation, setShowValidation] = useState(true)
+  const [idError, setIdError] = useState<string>('')
   
   // Redux から全フロア情報を取得
   const { dungeon } = useSelector((state: RootState) => state.map)
+
+  // ID重複チェック関数
+  const checkIdDuplicate = (newId: string): string => {
+    if (!dungeon || !newId.trim()) return ''
+    
+    // 現在編集中のイベントのIDと同じ場合は重複でない
+    if (event && event.id === newId) return ''
+    
+    // 全フロアの全イベントをチェック
+    for (const floor of dungeon.floors) {
+      for (const row of floor.cells) {
+        for (const cell of row) {
+          for (const existingEvent of cell.events) {
+            if (existingEvent.id === newId) {
+              return `ID "${newId}" は既に使用されています`
+            }
+          }
+        }
+      }
+    }
+    
+    // フロアIDとの重複もチェック
+    for (const floor of dungeon.floors) {
+      if (floor.id === newId) {
+        return `ID "${newId}" はフロアIDとして使用されています`
+      }
+    }
+    
+    return ''
+  }
+
+  // ID更新ハンドラー
+  const handleIdChange = (newId: string) => {
+    // 常に入力値を更新
+    updateEvent('id', newId)
+    // エラーチェックは入力値とは独立して行う
+    const error = checkIdDuplicate(newId)
+    setIdError(error)
+  }
 
   useEffect(() => {
     // console.log('EventEditDialog useEffect実行:', { 
@@ -119,6 +159,7 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
           repeatPolicy: { type: 'once' }
         },
         actions: [],
+        properties: {},
         flags: {},
         enabled: true,
         priority: 1,
@@ -156,6 +197,13 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
     })
     
     if (editingEvent) {
+      // ID重複チェック
+      const error = checkIdDuplicate(editingEvent.id)
+      if (error) {
+        setIdError(error)
+        return
+      }
+      
       const updatedEvent = {
         ...editingEvent,
         metadata: {
@@ -467,6 +515,16 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
                   value={editingEvent.name}
                   onChange={(e) => updateEvent('name', e.target.value)}
                   margin="normal"
+                  required
+                />
+                <TextField
+                  fullWidth
+                  label="イベントID"
+                  value={editingEvent.id}
+                  onChange={(e) => handleIdChange(e.target.value)}
+                  margin="normal"
+                  error={!!idError}
+                  helperText={idError || 'ユニークなIDを設定してください'}
                   required
                 />
                 <TextField
@@ -859,7 +917,7 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
         <Button 
           onClick={handleSave} 
           variant="contained"
-          disabled={!editingEvent.name.trim()}
+          disabled={!editingEvent.name.trim() || !!idError}
         >
           保存
         </Button>

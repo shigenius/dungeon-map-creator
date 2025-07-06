@@ -15,8 +15,8 @@ import {
   Visibility,
   VisibilityOff,
   Layers,
-  Home,
-  CropSquare as Wall,
+  GridOn as FloorIcon,
+  ViewWeek as WallIcon,
   Event,
   Palette,
   Grid3x3 as GridIcon,
@@ -94,7 +94,7 @@ const MenuBar: React.FC = () => {
   }
 
   const handleNewProject = () => {
-    dispatch(openNewProjectDialog())
+    dispatch(openNewProjectDialog({}))
     handleMenuClose()
   }
 
@@ -129,9 +129,9 @@ const MenuBar: React.FC = () => {
   const getLayerIcon = (layer: Layer) => {
     switch (layer) {
       case 'floor':
-        return <Home />
+        return <FloorIcon />
       case 'walls':
-        return <Wall />
+        return <WallIcon />
       case 'events':
         return <Event />
       case 'decorations':
