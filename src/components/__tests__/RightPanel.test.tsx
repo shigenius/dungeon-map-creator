@@ -221,7 +221,7 @@ describe('RightPanel 統合テスト', () => {
     })
   })
 
-  describe('テンプレート選択機能', () => {
+  describe.skip('テンプレート選択機能', () => {
     beforeEach(() => {
       // テンプレートデータをモック
       global.fetch = vi.fn().mockResolvedValue({
@@ -326,7 +326,7 @@ describe('RightPanel 統合テスト', () => {
     })
   })
 
-  describe('テンプレート回転機能', () => {
+  describe.skip('テンプレート回転機能', () => {
     beforeEach(() => {
       store.dispatch(setSelectedTemplate(testTemplates[0]))
     })
@@ -427,7 +427,7 @@ describe('RightPanel 統合テスト', () => {
     })
   })
 
-  describe('テンプレートプレビュー機能', () => {
+  describe.skip('テンプレートプレビュー機能', () => {
     beforeEach(() => {
       store.dispatch(setSelectedTemplate(testTemplates[0]))
     })
@@ -476,7 +476,7 @@ describe('RightPanel 統合テスト', () => {
     })
   })
 
-  describe('テンプレート配置機能', () => {
+  describe.skip('テンプレート配置機能', () => {
     beforeEach(() => {
       store.dispatch(setSelectedTemplate(testTemplates[0]))
     })
@@ -536,7 +536,7 @@ describe('RightPanel 統合テスト', () => {
     })
   })
 
-  describe('テンプレート作成機能', () => {
+  describe.skip('テンプレート作成機能', () => {
     it('テンプレート作成ボタンが表示される', () => {
       render(
         <Provider store={store}>

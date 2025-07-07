@@ -278,7 +278,7 @@ pkill -f playwright            # プロセス強制終了
 #### 1. 初期状態でのメニュークリック失敗
 **問題**: `mcp__playwright__browser_click "ファイルメニュー"` が毎回失敗する
 **原因**: アプリケーション初回アクセス時は新規プロジェクト作成モーダルが自動で開いており、背景のメニューはクリックできない
-**対策**: 
+**対策**:
 ```playwright
 # ✅ 正しい手順
 1. mcp__playwright__browser_navigate http://localhost:3000
@@ -395,15 +395,6 @@ curl -s --max-time 5 http://localhost:3001 > /dev/null && echo "サーバー応�
 - [ ] ユーティリティ関数のテストを実装（templateUtils, eventValidation, mapValidation等）
 - [ ] テストカバレッジを80%以上に向上
 
-**パフォーマンス最適化 (完了)**
-- [x] パフォーマンス問題を特定・分析（Canvas描画、Redux状態更新、メモリ使用量等）
-- [x] Canvas描画の最適化（差分更新、オフスクリーン描画等）
-- [x] Redux状態管理の最適化（不要な再レンダリング防止、セレクターの最適化）
-- [x] Redux middlewareの最適化（SerializableStateInvariantMiddlewareのパフォーマンス問題解決）
-- [x] 履歴管理システムの最適化（structuredClone使用、エラーハンドリング）
-- [x] コード分割とバンドルサイズ最適化（動的インポート、Suspense）
-- [x] React.memoの実装（不要な再レンダリング防止）
-
 **リファクタリング (中優先度)**
 - [ ] 大きなコンポーネントを機能別に分割（MapEditor2D, LeftPanel等）
 - [ ] 重複コードの統合とユーティリティ関数の抽出
@@ -412,37 +403,6 @@ curl -s --max-time 5 http://localhost:3001 > /dev/null && echo "サーバー応�
 **技術改善 (低優先度)**
 - [ ] TypeScript型定義の改善と型安全性の向上
 
-**機能改善**
-- [x] サンプルダンジョンプロジェクトのインポート機能 (高優先度)
-  - [x] 複数階層を持つ実際のダンジョン形式のサンプルプロジェクトを作成
-  - [x] 新規プロジェクト作成モーダルにサンプルインポートボタンを追加
-  - [x] サンプルプロジェクトのJSONデータを準備（壁、床、イベント、装飾を含む）
-  - [x] インポート機能の実装（プロジェクト作成と同時にサンプルデータを読み込み）
-  - [x] MCP Playwrightでの動作確認（サンプルプロジェクト作成・表示・編集）
-- [x] マルチフロア管理機能の実装
-  - [ ] MCP Playwrightでの動作確認（フロア追加・削除・切り替え・名前変更）
-  - [ ] 単体テスト充実化（FloorManagerPanel.tsx、mapSliceのfloor操作）
-  - [ ] E2Eテスト実装（マルチフロア操作フロー）
-- [x] イベントテンプレートシステムの実装
-  - [ ] MCP Playwrightでの動作確認（テンプレート選択・適用・カテゴリ切り替え）
-  - [ ] 単体テスト充実化（EventTemplateDialog.tsx、eventTemplates.ts）
-  - [ ] E2Eテスト実装（イベントテンプレート作成・適用フロー）
-- [x] リアルタイムイベント検証システムの実装
-  - [ ] MCP Playwrightでの動作確認（検証メッセージ表示・リアルタイム更新）
-  - [ ] 単体テスト充実化（eventValidation.ts、検証ロジック）
-  - [ ] E2Eテスト実装（イベント検証UI操作フロー）
-- [x] 包括的マップ検証機能の実装
-  - [ ] MCP Playwrightでの動作確認（検証ダイアログ・スコア表示・カテゴリ別結果）
-  - [ ] 単体テスト充実化（mapValidation.ts、MapValidationDialog.tsx）
-  - [ ] E2Eテスト実装（マップ検証実行・結果確認フロー）
-- [x] ミニマップ表示機能の実装
-  - [ ] MCP Playwrightでの動作確認（ミニマップ表示切り替え・ズーム・クリック移動）
-  - [ ] 単体テスト充実化（Minimap.tsx、描画ロジック）
-  - [ ] E2Eテスト実装（ミニマップ操作フロー）
-- [x] 3Dプレビューシステムの基本実装
-  - [ ] MCP Playwrightでの動作確認（3D表示切り替え・カメラ操作・レンダリング）
-  - [ ] 単体テスト充実化（MapEditor3D.tsx、Three.js統合）
-  - [ ] E2Eテスト実装（3D表示・操作フロー）
 
 ## Project Overview
 

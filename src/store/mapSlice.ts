@@ -34,7 +34,10 @@ const addToHistoryHelper = (state: MapState) => {
         clonedDungeon = structuredClone(state.dungeon)
       } catch (structuredCloneError) {
         // structuredCloneが失敗（DataCloneError等）の場合、JSON方式を使用
-        console.warn('structuredClone failed, falling back to JSON method:', structuredCloneError)
+        // テスト環境では警告を出さない
+        if (typeof window !== 'undefined') {
+          console.warn('structuredClone failed, falling back to JSON method:', structuredCloneError)
+        }
         clonedDungeon = JSON.parse(JSON.stringify(state.dungeon))
       }
     } else {
