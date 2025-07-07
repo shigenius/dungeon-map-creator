@@ -40,7 +40,7 @@ function App() {
   // ダンジョンが存在しない場合に新規プロジェクトダイアログを表示
   useEffect(() => {
     if (!dungeon && !showNewProjectDialog) {
-      dispatch(openNewProjectDialog())
+      dispatch(openNewProjectDialog({ isInitial: true }))
     }
   }, [dungeon, showNewProjectDialog, dispatch])
 
@@ -105,7 +105,7 @@ function App() {
           case 'n':
             if (!event.shiftKey) {
               event.preventDefault()
-              dispatch(openNewProjectDialog())
+              dispatch(openNewProjectDialog({}))
             }
             break
           case 'o':
@@ -267,30 +267,37 @@ function App() {
         event={editingEvent}
         onClose={() => dispatch(closeEventEditDialog())}
         onSave={(event) => {
-          // propsとして渡された元のイベント（編集対象）があるかどうかで判定
-          // editingEventはダイアログ内部の状態で、新規作成時は毎回新しいオブジェクトが作られる
-          const originalEvent = editingEvent // App.tsxで管理されているeditingEvent（propsとして渡されたもの）
-          const isExistingEvent = originalEvent && dungeon?.floors[currentFloor]?.cells
-            ?.flat()
-            .some(cell => cell.events.some(e => e.id === originalEvent.id))
+          // 元のイベントがApp.tsxで管理されているeditingEventとして存在するかで判定
+          // ID変更時も考慮して、元の位置にあるイベントを検索
+          const originalEvent = editingEvent
+          let isExistingEvent = false
+          
+          if (originalEvent && dungeon?.floors[currentFloor]?.cells) {
+            // 元の位置で元のIDを持つイベントが存在するかチェック
+            const originalCell = dungeon.floors[currentFloor].cells[originalEvent.position.y]?.[originalEvent.position.x]
+            isExistingEvent = originalCell?.events.some(e => e.id === originalEvent.id) || false
+          }
           
           console.log('EventEditDialog onSave:', {
             hasOriginalEvent: !!originalEvent,
             originalEventId: originalEvent?.id,
+            originalPosition: originalEvent?.position,
             isExistingEvent,
             saveEventId: event.id,
-            saveEventName: event.name
+            saveEventName: event.name,
+            savePosition: event.position
           })
           
-          if (isExistingEvent) {
+          if (isExistingEvent && originalEvent) {
             // 既存イベントの更新
             console.log('既存イベント更新実行')
             dispatch(updateEventInCell({
-              oldX: originalEvent!.position.x,
-              oldY: originalEvent!.position.y,
+              oldX: originalEvent.position.x,
+              oldY: originalEvent.position.y,
               newX: event.position.x,
               newY: event.position.y,
               event,
+              originalEventId: originalEvent.id, // 元のIDを渡す
               floorIndex: currentFloor
             }))
           } else {

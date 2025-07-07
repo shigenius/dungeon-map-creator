@@ -52,7 +52,8 @@ test.describe('ダンジョンマップクリエイター 基本機能', () => {
     // ファイルメニューを開く
     await page.click('button:has-text("ファイル")');
     await expect(page.locator('li:has-text("新規作成")')).toBeVisible();
-    await expect(page.locator('li:has-text("JSONエクスポート")')).toBeVisible();
+    await expect(page.locator('li:has-text("保存")')).toBeVisible();
+    await expect(page.locator('li:has-text("開く")')).toBeVisible();
   });
 
   test('ツールバーの操作', async ({ page }) => {
@@ -62,7 +63,7 @@ test.describe('ダンジョンマップクリエイター 基本機能', () => {
     await page.locator('[role="dialog"] button:has-text("作成")').click();
     
     // ツールバーのツールを確認 - MUIのToggleButtonGroup用のセレクタ
-    const tools = ['pen', 'rectangle', 'fill', 'eyedropper', 'select'];
+    const tools = ['pen', 'rectangle', 'fill', 'eyedropper', 'eraser'];
     
     for (const tool of tools) {
       await expect(page.locator(`[role="group"] button[value="${tool}"]`)).toBeVisible();
@@ -80,11 +81,12 @@ test.describe('ダンジョンマップクリエイター 基本機能', () => {
     await page.locator('[role="dialog"] button:has-text("作成")').click();
     
     // レイヤーパネルの確認
-    await expect(page.locator('text=レイヤー管理')).toBeVisible();
-    await expect(page.locator('text=床レイヤー')).toBeVisible();
-    await expect(page.locator('text=壁レイヤー')).toBeVisible();
-    await expect(page.locator('text=イベントレイヤー')).toBeVisible();
-    await expect(page.locator('text=装飾レイヤー')).toBeVisible();
+    await expect(page.locator('text=編集レイヤー:')).toBeVisible();
+    // レイヤーボタンをより具体的なセレクタで確認
+    await expect(page.locator('[role="group"] button[value="floor"]')).toBeVisible();
+    await expect(page.locator('[role="group"] button[value="walls"]')).toBeVisible();
+    await expect(page.locator('[role="group"] button[value="events"]')).toBeVisible();
+    await expect(page.locator('[role="group"] button[value="decorations"]')).toBeVisible();
   });
 
   test('2Dマップエディタの基本表示', async ({ page }) => {

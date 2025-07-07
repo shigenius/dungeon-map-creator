@@ -33,6 +33,8 @@ import {
   closeCustomTypeDialog,
   addCustomFloorType,
   addCustomWallType,
+  updateCustomFloorType,
+  updateCustomWallType,
 } from '../store/editorSlice'
 import { CustomFloorType, CustomWallType } from '../types/map'
 
@@ -52,14 +54,16 @@ const TabPanel: React.FC<TabPanelProps> = ({ children, value, index }) => {
 
 const CustomTypeDialog: React.FC = () => {
   const dispatch = useDispatch()
-  const { showCustomTypeDialog, customTypeDialogMode } = useSelector(
+  const { showCustomTypeDialog, customTypeDialogMode, editingCustomType, customFloorTypes, customWallTypes } = useSelector(
     (state: RootState) => state.editor
   )
 
   const [tabValue, setTabValue] = useState(0)
+  const [isEditMode, setIsEditMode] = useState(false)
   
   // 床タイプのフォーム状態
   const [floorForm, setFloorForm] = useState({
+    id: '',
     name: '',
     description: '',
     color: '#666666',
@@ -77,6 +81,7 @@ const CustomTypeDialog: React.FC = () => {
 
   // 壁タイプのフォーム状態
   const [wallForm, setWallForm] = useState({
+    id: '',
     name: '',
     description: '',
     color: '#ffffff',
@@ -93,11 +98,116 @@ const CustomTypeDialog: React.FC = () => {
 
   const [newPropertyKey, setNewPropertyKey] = useState('')
   const [newPropertyValue, setNewPropertyValue] = useState('')
+  
+  // ID編集のエラー状態
+  const [floorIdError, setFloorIdError] = useState('')
+  const [wallIdError, setWallIdError] = useState('')
+
+  // ID重複チェック関数
+  const checkFloorIdDuplicate = (newId: string) => {
+    if (!newId.trim()) {
+      return 'IDは必須です'
+    }
+    
+    // 現在編集中のアイテムのIDは除外
+    const originalId = isEditMode && editingCustomType ? (editingCustomType as CustomFloorType).id : null
+    if (originalId === newId) {
+      return ''
+    }
+    
+    // カスタム床タイプとの重複チェック
+    const duplicateFloor = customFloorTypes.find(floor => floor.id === newId)
+    if (duplicateFloor) {
+      return 'このIDは既に床タイプで使用されています'
+    }
+    
+    // カスタム壁タイプとの重複チェック
+    const duplicateWall = customWallTypes.find(wall => wall.id === newId)
+    if (duplicateWall) {
+      return 'このIDは既に壁タイプで使用されています'
+    }
+    
+    return ''
+  }
+
+  const checkWallIdDuplicate = (newId: string) => {
+    if (!newId.trim()) {
+      return 'IDは必須です'
+    }
+    
+    // 現在編集中のアイテムのIDは除外
+    const originalId = isEditMode && editingCustomType ? (editingCustomType as CustomWallType).id : null
+    if (originalId === newId) {
+      return ''
+    }
+    
+    // カスタム壁タイプとの重複チェック
+    const duplicateWall = customWallTypes.find(wall => wall.id === newId)
+    if (duplicateWall) {
+      return 'このIDは既に壁タイプで使用されています'
+    }
+    
+    // カスタム床タイプとの重複チェック
+    const duplicateFloor = customFloorTypes.find(floor => floor.id === newId)
+    if (duplicateFloor) {
+      return 'このIDは既に床タイプで使用されています'
+    }
+    
+    return ''
+  }
+
+  // 編集モード時の初期化とタブ設定
+  React.useEffect(() => {
+    if (showCustomTypeDialog) {
+      // ダイアログが開かれた時にタブを適切に設定
+      if (customTypeDialogMode === 'wall') {
+        setTabValue(1)
+      } else {
+        setTabValue(0)
+      }
+    }
+    
+    if (editingCustomType && showCustomTypeDialog) {
+      setIsEditMode(true)
+      if (customTypeDialogMode === 'floor') {
+        const floorType = editingCustomType as CustomFloorType
+        setFloorForm({
+          id: floorType.id,
+          name: floorType.name,
+          description: floorType.description || '',
+          color: floorType.color,
+          passable: floorType.passable,
+          properties: floorType.properties || {},
+          effects: floorType.effects || []
+        })
+      } else if (customTypeDialogMode === 'wall') {
+        const wallType = editingCustomType as CustomWallType
+        setWallForm({
+          id: wallType.id,
+          name: wallType.name,
+          description: wallType.description || '',
+          color: wallType.color,
+          transparent: wallType.transparent,
+          passable: wallType.passable,
+          properties: wallType.properties || {},
+          behavior: {
+            type: wallType.behavior?.type || 'custom',
+            requiresKey: wallType.behavior?.requiresKey || '',
+            durability: wallType.behavior?.durability || 1,
+            script: wallType.behavior?.script || ''
+          }
+        })
+      }
+    } else {
+      setIsEditMode(false)
+    }
+  }, [editingCustomType, showCustomTypeDialog, customTypeDialogMode])
 
   const handleClose = () => {
     dispatch(closeCustomTypeDialog())
     // フォームをリセット
     setFloorForm({
+      id: '',
       name: '',
       description: '',
       color: '#666666',
@@ -106,6 +216,7 @@ const CustomTypeDialog: React.FC = () => {
       effects: []
     })
     setWallForm({
+      id: '',
       name: '',
       description: '',
       color: '#ffffff',
@@ -120,6 +231,7 @@ const CustomTypeDialog: React.FC = () => {
       }
     })
     setTabValue(0)
+    setIsEditMode(false)
   }
 
   const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
@@ -186,7 +298,7 @@ const CustomTypeDialog: React.FC = () => {
       if (!floorForm.name.trim()) return
       
       const customFloorType: CustomFloorType = {
-        id: crypto.randomUUID(),
+        id: floorForm.id || crypto.randomUUID(),
         name: floorForm.name,
         description: floorForm.description,
         color: floorForm.color,
@@ -195,12 +307,16 @@ const CustomTypeDialog: React.FC = () => {
         effects: floorForm.effects.length > 0 ? floorForm.effects : undefined
       }
       
-      dispatch(addCustomFloorType(customFloorType))
+      if (isEditMode) {
+        dispatch(updateCustomFloorType(customFloorType))
+      } else {
+        dispatch(addCustomFloorType(customFloorType))
+      }
     } else if (customTypeDialogMode === 'wall') {
       if (!wallForm.name.trim()) return
       
       const customWallType: CustomWallType = {
-        id: crypto.randomUUID(),
+        id: wallForm.id || crypto.randomUUID(),
         name: wallForm.name,
         description: wallForm.description,
         color: wallForm.color,
@@ -210,7 +326,11 @@ const CustomTypeDialog: React.FC = () => {
         behavior: wallForm.behavior
       }
       
-      dispatch(addCustomWallType(customWallType))
+      if (isEditMode) {
+        dispatch(updateCustomWallType(customWallType))
+      } else {
+        dispatch(addCustomWallType(customWallType))
+      }
     }
     
     handleClose()
@@ -228,7 +348,7 @@ const CustomTypeDialog: React.FC = () => {
     >
       <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <PaletteIcon />
-        カスタムタイプ作成
+        {isEditMode ? 'カスタムタイプ編集' : 'カスタムタイプ作成'}
         <Box sx={{ ml: 'auto' }}>
           <IconButton onClick={handleClose}>
             <CloseIcon />
@@ -254,6 +374,21 @@ const CustomTypeDialog: React.FC = () => {
         <TabPanel value={tabValue} index={0}>
           <Grid container spacing={3}>
             <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                label="ID"
+                value={floorForm.id}
+                onChange={(e) => {
+                  setFloorForm({ ...floorForm, id: e.target.value })
+                  const error = checkFloorIdDuplicate(e.target.value)
+                  setFloorIdError(error)
+                }}
+                margin="normal"
+                required
+                error={!!floorIdError}
+                helperText={floorIdError || 'カスタム床タイプの一意識別子'}
+                placeholder={isEditMode ? '現在のID' : '例: my_custom_floor'}
+              />
               <TextField
                 fullWidth
                 label="名前"
@@ -391,6 +526,21 @@ const CustomTypeDialog: React.FC = () => {
         <TabPanel value={tabValue} index={1}>
           <Grid container spacing={3}>
             <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                label="ID"
+                value={wallForm.id}
+                onChange={(e) => {
+                  setWallForm({ ...wallForm, id: e.target.value })
+                  const error = checkWallIdDuplicate(e.target.value)
+                  setWallIdError(error)
+                }}
+                margin="normal"
+                required
+                error={!!wallIdError}
+                helperText={wallIdError || 'カスタム壁タイプの一意識別子'}
+                placeholder={isEditMode ? '現在のID' : '例: my_custom_wall'}
+              />
               <TextField
                 fullWidth
                 label="名前"
@@ -563,11 +713,11 @@ const CustomTypeDialog: React.FC = () => {
           onClick={handleSave} 
           variant="contained"
           disabled={
-            customTypeDialogMode === 'floor' ? !floorForm.name.trim() : 
-            customTypeDialogMode === 'wall' ? !wallForm.name.trim() : true
+            customTypeDialogMode === 'floor' ? (!floorForm.name.trim() || !!floorIdError) : 
+            customTypeDialogMode === 'wall' ? (!wallForm.name.trim() || !!wallIdError) : true
           }
         >
-          作成
+          {isEditMode ? '更新' : '作成'}
         </Button>
       </DialogActions>
     </Dialog>

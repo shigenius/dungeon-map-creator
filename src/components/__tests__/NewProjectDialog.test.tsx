@@ -17,6 +17,12 @@ describe('NewProjectDialog 統合テスト', () => {
         map: mapSliceReducer,
         editor: editorSliceReducer
       },
+      middleware: (getDefaultMiddleware) =>
+        getDefaultMiddleware({
+          // テスト環境では重いmiddlewareを無効化
+          serializableCheck: false,
+          immutableCheck: false,
+        }),
       preloadedState: {
         map: {
           dungeon: null,
@@ -70,7 +76,7 @@ describe('NewProjectDialog 統合テスト', () => {
         </Provider>
       )
 
-      expect(screen.getByText('新しいプロジェクト')).toBeInTheDocument()
+      expect(screen.getByText('新規プロジェクト作成')).toBeInTheDocument()
       expect(screen.getByLabelText('プロジェクト名')).toBeInTheDocument()
       expect(screen.getByLabelText('作者名')).toBeInTheDocument()
       expect(screen.getByLabelText('幅')).toBeInTheDocument()
@@ -87,7 +93,7 @@ describe('NewProjectDialog 統合テスト', () => {
         </Provider>
       )
 
-      expect(screen.queryByText('新しいプロジェクト')).not.toBeInTheDocument()
+      expect(screen.queryByText('新規プロジェクト作成')).not.toBeInTheDocument()
     })
   })
 

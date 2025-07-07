@@ -8,16 +8,11 @@ import {
   IconButton,
   Tooltip,
 } from '@mui/material'
-import {
-  Map as MapIcon,
-} from '@mui/icons-material'
-import { useSelector, useDispatch } from 'react-redux'
+import { useSelector } from 'react-redux'
 import { RootState } from '../store'
-import { toggleMinimap } from '../store/editorSlice'
 
 const BottomPanel: React.FC = () => {
-  const dispatch = useDispatch()
-  const { zoom, selectedTool, selectedLayer, viewMode, minimapVisible } = useSelector((state: RootState) => state.editor)
+  const { zoom, selectedTool, selectedLayer, viewMode, hoveredCellPosition } = useSelector((state: RootState) => state.editor)
   const dungeon = useSelector((state: RootState) => state.map.dungeon)
 
   return (
@@ -35,7 +30,7 @@ const BottomPanel: React.FC = () => {
       }}
     >
       <Typography variant="body2" color="text.secondary">
-        座標: マウス位置に応じて更新
+        座標: {hoveredCellPosition ? `(${hoveredCellPosition.x}, ${hoveredCellPosition.y})` : '(未選択)'}
       </Typography>
       
       <Divider orientation="vertical" flexItem />
@@ -66,24 +61,6 @@ const BottomPanel: React.FC = () => {
           disabled={!dungeon}
         />
       </Box>
-      
-      <Divider orientation="vertical" flexItem />
-      
-      <Tooltip title={minimapVisible ? 'ミニマップを非表示' : 'ミニマップを表示'}>
-        <IconButton
-          size="small"
-          onClick={() => dispatch(toggleMinimap())}
-          disabled={!dungeon}
-          sx={{ 
-            color: minimapVisible ? 'primary.main' : 'text.secondary',
-            '&:hover': {
-              color: 'primary.main'
-            }
-          }}
-        >
-          <MapIcon fontSize="small" />
-        </IconButton>
-      </Tooltip>
       
       <Box sx={{ ml: 'auto' }}>
         <Typography variant="body2" color="text.secondary">

@@ -27,7 +27,7 @@ import { getSampleDungeonsList, sampleDungeons } from '../data/sampleDungeons'
 const NewProjectDialog: React.FC = () => {
   const dispatch = useDispatch()
   const dungeon = useSelector((state: RootState) => state.map.dungeon)
-  const showNewProjectDialog = useSelector((state: RootState) => state.editor.showNewProjectDialog)
+  const { showNewProjectDialog, isInitialProjectDialog } = useSelector((state: RootState) => state.editor)
   
   // 既存プロジェクトがある場合は、確認のためフィールドをリセット
   const [dungeonName, setDungeonName] = useState(dungeon ? '' : '新しいダンジョン')
@@ -219,7 +219,9 @@ const NewProjectDialog: React.FC = () => {
         )}
       </DialogContent>
       <DialogActions>
-        <Button onClick={handleCancel}>キャンセル</Button>
+        {!isInitialProjectDialog && (
+          <Button onClick={handleCancel}>キャンセル</Button>
+        )}
         {currentTab === 0 && (
           <Button 
             onClick={handleCreate} 

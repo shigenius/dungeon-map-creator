@@ -103,6 +103,7 @@ const mapSlice = createSlice({
             },
             audio: {},
           },
+          properties: {}, // カスタムプロパティ
         }],
         resources: {
           textures: {},
@@ -113,6 +114,7 @@ const mapSlice = createSlice({
           created: new Date().toISOString(),
           modified: new Date().toISOString(),
         },
+        properties: {},
       }
       
       state.dungeon = newDungeon
@@ -355,15 +357,16 @@ const mapSlice = createSlice({
       }
     },
 
-    updateEventInCell: (state, action: PayloadAction<{ oldX: number; oldY: number; newX: number; newY: number; event: DungeonEvent; floorIndex?: number }>) => {
+    updateEventInCell: (state, action: PayloadAction<{ oldX: number; oldY: number; newX: number; newY: number; event: DungeonEvent; originalEventId?: string; floorIndex?: number }>) => {
       if (!state.dungeon) return
       
-      const { oldX, oldY, newX, newY, event, floorIndex = 0 } = action.payload
+      const { oldX, oldY, newX, newY, event, originalEventId, floorIndex = 0 } = action.payload
       
-      // 古い位置からイベントを削除
+      // 古い位置からイベントを削除（originalEventIdが指定されていればそれを使用、なければevent.idを使用）
       const oldCell = state.dungeon.floors[floorIndex]?.cells[oldY]?.[oldX]
       if (oldCell) {
-        const eventIndex = oldCell.events.findIndex(e => e.id === event.id)
+        const searchId = originalEventId || event.id
+        const eventIndex = oldCell.events.findIndex(e => e.id === searchId)
         if (eventIndex !== -1) {
           oldCell.events.splice(eventIndex, 1)
         }
@@ -376,16 +379,7 @@ const mapSlice = createSlice({
         newCell.events.push(eventWithPosition)
         
         // 履歴に追加
-        const newHistory = state.history.slice(0, state.historyIndex + 1)
-        newHistory.push(JSON.parse(JSON.stringify(state.dungeon)))
-        
-        if (newHistory.length > state.maxHistory) {
-          newHistory.shift()
-        } else {
-          state.historyIndex++
-        }
-        
-        state.history = newHistory
+        addToHistoryHelper(state)
       }
     },
 
@@ -607,6 +601,7 @@ const mapSlice = createSlice({
             ambient: undefined,
           },
         },
+        properties: {}, // カスタムプロパティ
       }
       
       state.dungeon.floors.push(newFloor)
@@ -624,15 +619,18 @@ const mapSlice = createSlice({
       }
     },
 
-    renameFloor: (state, action: PayloadAction<{ floorIndex: number; newName: string }>) => {
+    renameFloor: (state, action: PayloadAction<{ floorIndex: number; newName: string; newId?: string }>) => {
       if (!state.dungeon) return
       
       addToHistoryHelper(state)
       
-      const { floorIndex, newName } = action.payload
+      const { floorIndex, newName, newId } = action.payload
       const floor = state.dungeon.floors[floorIndex]
       if (floor) {
         floor.name = newName
+        if (newId) {
+          floor.id = newId
+        }
       }
     },
 
@@ -653,8 +651,75 @@ const mapSlice = createSlice({
       
       state.dungeon.floors.push(duplicatedFloor)
     },
+
+    // カスタム床タイプ削除時のセル更新
+    replaceFloorTypeInCells: (state, action: PayloadAction<{ deletedFloorTypeId: string; replacementFloorType: string; replacementPassable: boolean }>) => {
+      if (!state.dungeon) return
+      
+      const { deletedFloorTypeId, replacementFloorType, replacementPassable } = action.payload
+      
+      // 全フロアの全セルを確認し、削除された床タイプを使用しているセルを通常床に変更
+      state.dungeon.floors.forEach(floor => {
+        floor.cells.forEach(row => {
+          row.forEach(cell => {
+            if (cell.floor.type === deletedFloorTypeId) {
+              cell.floor.type = replacementFloorType as any
+              cell.floor.passable = replacementPassable
+            }
+          })
+        })
+      })
+      
+      // 履歴に追加
+      addToHistoryHelper(state)
+    },
+
+    // カスタム壁タイプ削除時のセル更新
+    replaceWallTypeInCells: (state, action: PayloadAction<{ deletedWallTypeId: string }>) => {
+      if (!state.dungeon) return
+      
+      const { deletedWallTypeId } = action.payload
+      
+      // 全フロアの全セルを確認し、削除された壁タイプを使用している壁を削除（null設定）
+      state.dungeon.floors.forEach(floor => {
+        floor.cells.forEach(row => {
+          row.forEach(cell => {
+            // 各方向の壁をチェック
+            Object.keys(cell.walls).forEach(direction => {
+              const wall = cell.walls[direction as keyof typeof cell.walls]
+              if (wall && wall.type === deletedWallTypeId) {
+                cell.walls[direction as keyof typeof cell.walls] = null
+              }
+            })
+          })
+        })
+      })
+      
+      // 履歴に追加
+      addToHistoryHelper(state)
+    },
+
+    // ダンジョンプロパティ更新
+    updateDungeonProperties: (state, action: PayloadAction<Record<string, any>>) => {
+      if (!state.dungeon) return
+      
+      state.dungeon.properties = action.payload
+      addToHistoryHelper(state)
+    },
+
+    // フロアプロパティ更新
+    updateFloorProperties: (state, action: PayloadAction<{ floorIndex: number; properties: Record<string, any> }>) => {
+      if (!state.dungeon) return
+      
+      const { floorIndex, properties } = action.payload
+      const floor = state.dungeon.floors[floorIndex]
+      if (floor) {
+        floor.properties = properties
+        addToHistoryHelper(state)
+      }
+    },
   },
 })
 
-export const { createNewDungeon, loadDungeon, updateCell, updateCells, undo, redo, placeTemplate, addEventToCell, updateEventInCell, removeEventFromCell, addDecorationToCell, updateDecorationInCell, removeDecorationFromCell, createTemplateFromSelection, addFloor, removeFloor, renameFloor, duplicateFloor } = mapSlice.actions
+export const { createNewDungeon, loadDungeon, updateCell, updateCells, undo, redo, placeTemplate, addEventToCell, updateEventInCell, removeEventFromCell, addDecorationToCell, updateDecorationInCell, removeDecorationFromCell, createTemplateFromSelection, addFloor, removeFloor, renameFloor, duplicateFloor, replaceFloorTypeInCells, replaceWallTypeInCells, updateDungeonProperties, updateFloorProperties } = mapSlice.actions
 export default mapSlice.reducer

@@ -36,6 +36,7 @@ interface EditorState {
   selectedTool: DrawingTool
   selectedLayer: Layer
   selectedFloorType: FloorType
+  selectedFloorPassable: boolean
   selectedWallType: WallType
   selectedDecorationType: DecorationType
   selectedEventType: EventType | null
@@ -66,6 +67,7 @@ interface EditorState {
   customWallTypes: CustomWallType[]
   showCustomTypeDialog: boolean
   customTypeDialogMode: 'floor' | 'wall' | null
+  editingCustomType: CustomFloorType | CustomWallType | null
   // イベント関連の状態
   showEventEditDialog: boolean
   editingEvent: DungeonEvent | null
@@ -86,10 +88,10 @@ interface EditorState {
   showMapValidationDialog: boolean
   // ビューポート関連の状態
   viewCenter: { x: number; y: number } | null
-  // ミニマップの状態
-  minimapVisible: boolean
   // イベントハイライト関連の状態
   highlightedEventId: string | null
+  // 初回自動プロジェクト作成ダイアログかどうか
+  isInitialProjectDialog: boolean
 }
 
 const initialState: EditorState = {
@@ -97,6 +99,7 @@ const initialState: EditorState = {
   selectedTool: 'pen',
   selectedLayer: 'floor',
   selectedFloorType: 'normal',
+  selectedFloorPassable: true,
   selectedWallType: 'normal',
   selectedDecorationType: 'furniture',
   selectedEventType: null,
@@ -132,6 +135,7 @@ const initialState: EditorState = {
   customWallTypes: [],
   showCustomTypeDialog: false,
   customTypeDialogMode: null,
+  editingCustomType: null,
   // イベント関連の初期状態
   showEventEditDialog: false,
   editingEvent: null,
@@ -152,10 +156,10 @@ const initialState: EditorState = {
   showMapValidationDialog: false,
   // ビューポート関連の初期状態
   viewCenter: null,
-  // ミニマップの初期状態
-  minimapVisible: true,
   // イベントハイライト関連の初期状態
   highlightedEventId: null,
+  // 初回自動プロジェクト作成ダイアログの初期状態
+  isInitialProjectDialog: false,
 }
 
 const editorSlice = createSlice({
@@ -188,6 +192,10 @@ const editorSlice = createSlice({
     
     setSelectedFloorType: (state, action: PayloadAction<FloorType>) => {
       state.selectedFloorType = action.payload
+    },
+    
+    setSelectedFloorPassable: (state, action: PayloadAction<boolean>) => {
+      state.selectedFloorPassable = action.payload
     },
     
     setSelectedWallType: (state, action: PayloadAction<WallType>) => {
@@ -258,12 +266,14 @@ const editorSlice = createSlice({
       state.isShiftPressed = action.payload
     },
     
-    openNewProjectDialog: (state) => {
+    openNewProjectDialog: (state, action: PayloadAction<{ isInitial?: boolean }> = { payload: {}, type: '' }) => {
       state.showNewProjectDialog = true
+      state.isInitialProjectDialog = action.payload.isInitial || false
     },
     
     closeNewProjectDialog: (state) => {
       state.showNewProjectDialog = false
+      state.isInitialProjectDialog = false
     },
 
     toggleFloorTypeAccordion: (state) => {
@@ -330,6 +340,11 @@ const editorSlice = createSlice({
     // カスタムタイプ関連のアクション
     addCustomFloorType: (state, action: PayloadAction<CustomFloorType>) => {
       state.customFloorTypes.push(action.payload)
+      // カスタム床タイプ作成後にアコーディオンを開いたままにする
+      state.accordionStates.floorTypeAccordion = true
+      // 新しく作成されたカスタム床タイプを自動的に選択
+      state.selectedFloorType = action.payload.id as any
+      state.selectedFloorPassable = action.payload.passable
     },
 
     removeCustomFloorType: (state, action: PayloadAction<string>) => {
@@ -358,14 +373,23 @@ const editorSlice = createSlice({
       }
     },
 
-    openCustomTypeDialog: (state, action: PayloadAction<'floor' | 'wall'>) => {
+    openCustomTypeDialog: (state, action: PayloadAction<{ mode: 'floor' | 'wall', editingType?: CustomFloorType | CustomWallType }>) => {
       state.showCustomTypeDialog = true
-      state.customTypeDialogMode = action.payload
+      state.customTypeDialogMode = action.payload.mode
+      state.editingCustomType = action.payload.editingType || null
+      // カスタムタイプダイアログを開く時に対応するアコーディオンを開いておく
+      if (action.payload.mode === 'floor') {
+        state.accordionStates.floorTypeAccordion = true
+      } else if (action.payload.mode === 'wall') {
+        state.accordionStates.wallTypeAccordion = true
+      }
     },
 
     closeCustomTypeDialog: (state) => {
       state.showCustomTypeDialog = false
-      state.customTypeDialogMode = null
+      state.editingCustomType = null
+      // アコーディオン状態を維持するためcustomTypeDialogModeはリセットしない
+      // state.customTypeDialogMode = null
     },
 
     // イベント関連のアクション
@@ -478,14 +502,6 @@ const editorSlice = createSlice({
       state.viewCenter = action.payload
     },
 
-    toggleMinimap: (state) => {
-      state.minimapVisible = !state.minimapVisible
-    },
-
-    setMinimapVisible: (state, action: PayloadAction<boolean>) => {
-      state.minimapVisible = action.payload
-    },
-
     // イベントハイライト関連のアクション
     setHighlightedEventId: (state, action: PayloadAction<string | null>) => {
       state.highlightedEventId = action.payload
@@ -498,6 +514,7 @@ export const {
   setSelectedTool,
   setSelectedLayer,
   setSelectedFloorType,
+  setSelectedFloorPassable,
   setSelectedWallType,
   setSelectedDecorationType,
   setSelectedEventType,
@@ -565,9 +582,6 @@ export const {
   closeMapValidationDialog,
   // ビューポート関連のアクション
   setViewCenter,
-  // ミニマップ関連のアクション
-  toggleMinimap,
-  setMinimapVisible,
   // イベントハイライト関連のアクション
   setHighlightedEventId,
 } = editorSlice.actions

@@ -36,9 +36,71 @@ export const sampleDungeons: Record<string, Dungeon> = {
                 type: 'npc' as const,
                 description: '遺跡を守る古い精霊',
                 position: { x, y },
-                appearance: { color: '#4169e1', icon: 'npc', visible: true },
-                trigger: { type: 'interact' as const, repeatPolicy: { type: 'always' as const } },
-                actions: [],
+                appearance: { 
+                  color: '#4169e1', 
+                  icon: 'npc', 
+                  visible: true,
+                  properties: {
+                    // 外観カスタムプロパティ例
+                    animationType: 'floating', // アニメーション種類
+                    glowEffect: true, // 発光エフェクト
+                    opacity: 0.9, // 透明度
+                    scale: 1.2, // サイズ倍率
+                    rotation: 0, // 回転角度
+                    blinkInterval: 2000, // 点滅間隔（ミリ秒）
+                    shadowOffset: { x: 2, y: 2 }, // 影のオフセット
+                    borderStyle: 'mystical', // 枠線スタイル
+                    priority: 'high' // 描画優先度
+                  }
+                },
+                trigger: { 
+                  type: 'interact' as const, 
+                  properties: {
+                    // トリガーカスタムプロパティ例
+                    triggerDistance: 1.5, // 接触判定距離
+                    requiresFacing: true, // プレイヤーの向きが必要
+                    allowWhileMoving: false, // 移動中の実行許可
+                    soundEffect: 'interaction_chime',
+                    visualFeedback: 'highlight_border'
+                  },
+                  repeatPolicy: { 
+                    type: 'always' as const,
+                    properties: {
+                      // 実行ポリシーカスタムプロパティ例
+                      cooldownTime: 0, // クールダウン時間（秒）
+                      maxPerSession: -1, // セッションあたりの最大実行回数
+                      resetOnFloorChange: false,
+                      persistAcrossSaves: true
+                    }
+                  }
+                },
+                actions: [{
+                  id: 'guard-dialogue',
+                  type: 'message' as const,
+                  params: { text: 'この遺跡に何の用だ？危険が潜んでいるぞ。' },
+                  properties: {
+                    // アクションカスタムプロパティ例
+                    messageType: 'dialogue',
+                    speakerName: '古い精霊',
+                    voiceId: 'ethereal_male',
+                    displayDuration: 3000, // ミリ秒
+                    fontSize: 'large',
+                    textColor: '#4169e1',
+                    backgroundEffect: 'mystical_glow',
+                    autoAdvance: false,
+                    requiresAcknowledgment: true
+                  }
+                }],
+                properties: {
+                  // カスタムプロパティの設定例
+                  npcLevel: 5,
+                  faction: 'neutral',
+                  dialogueKey: 'entrance_guard_intro',
+                  merchantType: 'information',
+                  maxInteractions: 3,
+                  specialItems: ['ancient_key', 'relic_map'],
+                  isImmortal: true
+                },
                 flags: {},
                 enabled: true,
                 priority: 1,
@@ -56,6 +118,17 @@ export const sampleDungeons: Record<string, Dungeon> = {
                 appearance: { color: '#20b2aa', icon: 'heal', visible: true },
                 trigger: { type: 'interact' as const, repeatPolicy: { type: 'always' as const } },
                 actions: [],
+                properties: {
+                  // 回復系のカスタムプロパティ例
+                  healAmount: 50,
+                  healType: 'both', // 'hp', 'mp', 'both'
+                  cooldownTime: 300, // 秒
+                  maxUses: -1, // -1は無制限
+                  requiresItem: false,
+                  soundEffect: 'water_splash',
+                  particleEffect: 'healing_sparkles',
+                  blessingDuration: 600 // 祝福効果の持続時間
+                },
                 flags: {},
                 enabled: true,
                 priority: 1,
@@ -95,6 +168,19 @@ export const sampleDungeons: Record<string, Dungeon> = {
                 appearance: { color: '#daa520', icon: 'treasure', visible: true },
                 trigger: { type: 'interact' as const, repeatPolicy: { type: 'once' as const } },
                 actions: [],
+                properties: {
+                  // 宝箱系のカスタムプロパティ例
+                  lootTable: 'common_ruins',
+                  lockDifficulty: 3, // 1-10の難易度
+                  requiredKey: 'rusty_key',
+                  trapType: 'poison_needle', // 罠の種類
+                  trapDamage: 15,
+                  goldRange: [50, 150], // 最小-最大ゴールド
+                  itemDropRate: 0.75, // アイテムドロップ率
+                  rareItemChance: 0.1, // レアアイテム確率
+                  isLocked: true,
+                  openAnimation: 'chest_creak'
+                },
                 flags: {},
                 enabled: true,
                 priority: 1,
@@ -108,8 +194,28 @@ export const sampleDungeons: Record<string, Dungeon> = {
                 id: 'torch-1',
                 name: '松明',
                 type: 'light' as const,
-                appearance: { color: '#ff4500', icon: 'torch', visible: true },
-                position: { x, y }
+                appearance: { 
+                  color: '#ff4500', 
+                  icon: 'torch', 
+                  visible: true, 
+                  layer: 1, 
+                  rotation: 0, 
+                  scale: 1.0 
+                },
+                position: { x, y },
+                properties: {
+                  // 照明系装飾のカスタムプロパティ例
+                  lightRadius: 3, // 光の届く範囲
+                  lightIntensity: 0.8, // 光の強度
+                  fuelType: 'oil',
+                  burnDuration: 480, // 燃焼時間（分）
+                  flickerPattern: 'normal',
+                  lightColor: '#ffaa33',
+                  smokeDensity: 0.3,
+                  isEternal: false, // 永久燃焼かどうか
+                  fuelConsumed: 0.1, // 燃料消費率
+                  lightQuality: 'warm' // 'warm', 'cold', 'magical'
+                }
               })
             }
             
@@ -123,6 +229,50 @@ export const sampleDungeons: Record<string, Dungeon> = {
               })
             }
             
+            // セルのカスタムプロパティ設定例
+            let cellProperties: Record<string, any> = {}
+            
+            // 入口セルの例
+            if (isEntrance) {
+              cellProperties = {
+                // 入口セルのカスタムプロパティ例
+                cellType: 'entrance',
+                spawnPoint: true,
+                safeZone: true,
+                weatherEffect: 'none',
+                ambientSounds: ['wind_whistle', 'distant_echo'],
+                temperature: 'cool',
+                magicLevel: 'low',
+                historicalSignificance: '古代の入口'
+              }
+            }
+            // 中央の部屋
+            else if (x === 6 && y === 6) {
+              cellProperties = {
+                // 特別な部屋のカスタムプロパティ例
+                cellType: 'sacred_chamber',
+                magicLevel: 'high',
+                ambientEnergy: 'healing',
+                echoDuration: 3.5,
+                resonanceFrequency: 440,
+                energyRegenRate: 1.2,
+                protectedZone: true,
+                spiritualSignificance: 'healing_sanctum'
+              }
+            }
+            // 宝箱の場所
+            else if (x === 9 && y === 2) {
+              cellProperties = {
+                // 宝箱周辺のカスタムプロパティ例
+                cellType: 'treasure_alcove',
+                dangerLevel: 'moderate',
+                hiddenTrap: true,
+                archaeologyValue: 'high',
+                cursedGround: false,
+                magicalResonance: 'gold_detection'
+              }
+            }
+
             return {
               x,
               y,
@@ -138,7 +288,7 @@ export const sampleDungeons: Record<string, Dungeon> = {
               },
               events,
               decorations,
-              properties: {}
+              properties: cellProperties
             }
           })
         ),
@@ -146,6 +296,18 @@ export const sampleDungeons: Record<string, Dungeon> = {
           lighting: { ambient: 0.4, sources: [] },
           ceiling: { height: 3 },
           audio: {}
+        },
+        properties: {
+          // フロア1のカスタムプロパティ例
+          floorTheme: 'entrance',
+          difficulty: 1,
+          recommendedLevel: [1, 3],
+          timeLimit: -1, // -1は無制限
+          monstersAllowed: true,
+          respawnRate: 300, // 秒
+          environmentEffects: ['echo', 'dust'],
+          magicZone: false,
+          safeZone: true
         }
       },
       
@@ -226,6 +388,23 @@ export const sampleDungeons: Record<string, Dungeon> = {
                 appearance: { color: '#9400d3', icon: 'treasure', visible: true },
                 trigger: { type: 'interact' as const, repeatPolicy: { type: 'once' as const } },
                 actions: [],
+                properties: {
+                  // 魔法の宝箱のカスタムプロパティ例
+                  lootTable: 'magic_ruins',
+                  lockType: 'magical_seal',
+                  lockDifficulty: 5, // 魔法的な難易度
+                  requiredSpell: 'dispel_magic',
+                  magicResistance: true,
+                  trapType: 'magic_lightning',
+                  trapDamage: 25,
+                  goldRange: [100, 300],
+                  itemDropRate: 0.9,
+                  rareItemChance: 0.25,
+                  magicItemChance: 0.5,
+                  cursedItemChance: 0.1,
+                  auraType: 'enchantment',
+                  manaRegeneration: true
+                },
                 flags: {},
                 enabled: true,
                 priority: 1,
@@ -244,6 +423,26 @@ export const sampleDungeons: Record<string, Dungeon> = {
                 appearance: { color: '#696969', icon: 'enemy', visible: true },
                 trigger: { type: 'contact' as const, repeatPolicy: { type: 'always' as const } },
                 actions: [],
+                properties: {
+                  // 石の番兵のカスタムプロパティ例
+                  enemyType: 'construct',
+                  level: 8,
+                  hp: 120,
+                  attack: 25,
+                  defense: 15,
+                  magicResistance: 0.3,
+                  physicalResistance: 0.5,
+                  elementalWeakness: ['lightning', 'acid'],
+                  immunities: ['poison', 'charm', 'sleep'],
+                  dropTable: 'construct_parts',
+                  experienceValue: 150,
+                  territoryRadius: 2,
+                  aggroRange: 3,
+                  canRespawn: true,
+                  respawnTime: 1800, // 30分
+                  patrolPattern: 'stationary',
+                  alertsNearbyEnemies: true
+                },
                 flags: {},
                 enabled: true,
                 priority: 1,
@@ -254,6 +453,53 @@ export const sampleDungeons: Record<string, Dungeon> = {
             // ダメージ床（トラップエリア）
             if (x === 6 && y === 9) {
               floorType = 'damage'
+            }
+            
+            // 2階のセルカスタムプロパティ設定例
+            let cellProperties: Record<string, any> = {}
+            
+            // 中央の十字通路
+            if (isCorridor) {
+              cellProperties = {
+                // 通路のカスタムプロパティ例
+                cellType: 'main_corridor',
+                trafficLevel: 'high',
+                echoLevel: 2.0,
+                windFlow: true,
+                dustAccumulation: 'low',
+                structuralIntegrity: 'good',
+                hiddenCompartments: false,
+                ambientMagic: 'medium'
+              }
+            }
+            // 宝物の間（魔法の宝箱の場所）
+            else if (x === 9 && y === 2) {
+              cellProperties = {
+                // 宝物の間のカスタムプロパティ例
+                cellType: 'treasure_chamber',
+                magicLevel: 'very_high',
+                protectiveWards: true,
+                detectionDifficulty: 8,
+                antiTheftTraps: true,
+                valuableItems: 'magical_artifacts',
+                sanctificationLevel: 'blessed',
+                timeDistortion: 'slight'
+              }
+            }
+            // ダメージ床エリア
+            else if (x === 6 && y === 9) {
+              cellProperties = {
+                // ダメージトラップのカスタムプロパティ例
+                cellType: 'damage_trap',
+                trapType: 'pressure_spikes',
+                damageAmount: 15,
+                triggerWeight: 20, // kg
+                resetTime: 5, // 秒
+                bypassMechanism: 'levitation',
+                detectionDifficulty: 6,
+                disarmDifficulty: 7,
+                trapOrigin: 'ancient_security'
+              }
             }
             
             return {
@@ -271,7 +517,7 @@ export const sampleDungeons: Record<string, Dungeon> = {
               },
               events,
               decorations,
-              properties: {}
+              properties: cellProperties
             }
           })
         ),
@@ -279,6 +525,21 @@ export const sampleDungeons: Record<string, Dungeon> = {
           lighting: { ambient: 0.3, sources: [] },
           ceiling: { height: 4 },
           audio: {}
+        },
+        properties: {
+          // フロア2のカスタムプロパティ例
+          floorTheme: 'mystery_chambers',
+          difficulty: 2,
+          recommendedLevel: [3, 6],
+          timeLimit: 1800, // 30分制限
+          monstersAllowed: true,
+          respawnRate: 240, // 4分
+          environmentEffects: ['darkness', 'magical_aura'],
+          magicZone: true,
+          safeZone: false,
+          puzzleFloor: true,
+          hiddenSecrets: 3,
+          magicalTraps: true
         }
       },
       
@@ -335,6 +596,34 @@ export const sampleDungeons: Record<string, Dungeon> = {
                 appearance: { color: '#800080', icon: 'enemy', visible: true },
                 trigger: { type: 'contact' as const, repeatPolicy: { type: 'once' as const } },
                 actions: [],
+                properties: {
+                  // 最終ボスのカスタムプロパティ例
+                  bossType: 'undead_ruler',
+                  level: 15,
+                  hp: 500,
+                  maxHp: 500,
+                  attack: 45,
+                  defense: 30,
+                  magicPower: 60,
+                  agility: 20,
+                  magicResistance: 0.6,
+                  physicalResistance: 0.4,
+                  undeadImmunities: ['poison', 'disease', 'charm', 'sleep', 'paralysis'],
+                  elementalAffinities: ['dark', 'necromancy'],
+                  weaknesses: ['holy', 'light'],
+                  phaseTransitions: [
+                    { hpThreshold: 0.75, newAbilities: ['summon_minions'] },
+                    { hpThreshold: 0.5, newAbilities: ['area_curse'] },
+                    { hpThreshold: 0.25, newAbilities: ['berserk_mode'] }
+                  ],
+                  dropTable: 'legendary_boss',
+                  experienceValue: 2000,
+                  uniqueDrops: ['crown_of_ancient_kings', 'spectral_scepter'],
+                  defeatConditions: 'hp_zero',
+                  cannotFlee: true,
+                  fightMusic: 'ancient_king_battle',
+                  victoryEvents: ['ending_cutscene', 'dungeon_clear']
+                },
                 flags: {},
                 enabled: true,
                 priority: 10,
@@ -354,6 +643,25 @@ export const sampleDungeons: Record<string, Dungeon> = {
                 appearance: { color: '#ffd700', icon: 'treasure', visible: true },
                 trigger: { type: 'interact' as const, repeatPolicy: { type: 'once' as const } },
                 actions: [],
+                properties: {
+                  // 最終宝箱のカスタムプロパティ例
+                  treasureClass: 'legendary',
+                  lootTable: 'ancient_royalty',
+                  requiresBossDefeat: true,
+                  requiredBossId: 'ancient-king',
+                  lockType: 'royal_seal',
+                  unsealsOnBossDeath: true,
+                  goldRange: [1000, 2000],
+                  guaranteedUniqueItems: ['orb_of_ancient_wisdom', 'eternal_flame_gem'],
+                  artifactChance: 1.0, // 100% chance
+                  cursedItemChance: 0.0, // 最終宝箱は呪われない
+                  blessingType: 'ancient_kings_favor',
+                  experienceBonus: 500,
+                  questCompletion: ['main_quest_ruins'],
+                  unlocksCutscene: 'treasure_discovery',
+                  historicalValue: 'priceless',
+                  dungeonClearReward: true
+                },
                 flags: {},
                 enabled: true,
                 priority: 1,
@@ -372,6 +680,24 @@ export const sampleDungeons: Record<string, Dungeon> = {
                 appearance: { color: '#00ff00', icon: 'save', visible: true },
                 trigger: { type: 'interact' as const, repeatPolicy: { type: 'always' as const } },
                 actions: [],
+                properties: {
+                  // セーブポイントのカスタムプロパティ例
+                  saveType: 'ancient_monument',
+                  fullHealOnSave: true,
+                  fullManaOnSave: true,
+                  statusCureOnSave: true,
+                  saveSlots: 3,
+                  autosaveEnabled: true,
+                  backupFrequency: 'every_save',
+                  encryptedSave: true,
+                  saveCompressionLevel: 'high',
+                  includesScreenshot: true,
+                  savesCharacterStats: true,
+                  savesInventory: true,
+                  savesQuestProgress: true,
+                  quickSaveAvailable: true,
+                  lastUsedTimestamp: null
+                },
                 flags: {},
                 enabled: true,
                 priority: 1,
@@ -385,9 +711,93 @@ export const sampleDungeons: Record<string, Dungeon> = {
                 id: `pillar-${x}-${y}`,
                 name: '古代の柱',
                 type: 'structure' as const,
-                appearance: { color: '#708090', icon: 'pillar', visible: true },
-                position: { x, y }
+                appearance: { 
+                  color: '#708090', 
+                  icon: 'pillar', 
+                  visible: true, 
+                  layer: 2, 
+                  rotation: 0, 
+                  scale: 1.2 
+                },
+                position: { x, y },
+                properties: {
+                  // 古代の柱のカスタムプロパティ例
+                  materialType: 'ancient_marble',
+                  structuralIntegrity: 'excellent',
+                  height: 5.0, // メートル
+                  diameter: 0.8,
+                  carvingStyle: 'royal_hieroglyphs',
+                  magicalResonance: true,
+                  supportLoad: 'very_high',
+                  weatherResistance: 'immortal',
+                  archaeologicalValue: 'priceless',
+                  inscriptions: ['ancient_royal_lineage', 'power_blessing'],
+                  magicalAura: 'protection',
+                  constructionPeriod: 'first_dynasty',
+                  craftmanshipLevel: 'master_artisan'
+                }
               })
+            }
+            
+            // 3階のセルカスタムプロパティ設定例
+            let cellProperties: Record<string, any> = {}
+            
+            // 王座の間（中央の特別エリア）
+            if (isThroneRoom) {
+              cellProperties = {
+                // 王座の間のカスタムプロパティ例
+                cellType: 'throne_chamber',
+                royalSanctity: 'highest',
+                magicLevel: 'legendary',
+                ancientPower: true,
+                kinglyAura: 'overwhelming',
+                spiritualSignificance: 'seat_of_power',
+                historicalImportance: 'founding_dynasty',
+                protectiveEnchantments: 'ancient_kings_ward',
+                powerAmplification: 2.5,
+                voiceEcho: 'royal_authority',
+                crownResonance: true
+              }
+            }
+            // 王座（ボス戦エリア）
+            else if (x === 6 && y === 6) {
+              cellProperties = {
+                // ボス戦エリアのカスタムプロパティ例
+                cellType: 'boss_arena',
+                battleZone: true,
+                escapePrevention: true,
+                magicAmplification: 'boss_power',
+                combatTerrain: 'royal_marble',
+                atmosphericEffect: 'supernatural_dread',
+                powerNode: true,
+                ancientCurse: 'undead_king_wrath',
+                finalBattleGround: true
+              }
+            }
+            // 最終宝箱の間
+            else if (x === 5 && y === 5) {
+              cellProperties = {
+                // 最終宝物の間のカスタムプロパティ例
+                cellType: 'royal_treasury',
+                treasureGrade: 'legendary',
+                securityLevel: 'maximum',
+                vaultProtection: 'ancient_kings_seal',
+                valueBeyondMeasure: true,
+                finalReward: true,
+                questCulminationPoint: true
+              }
+            }
+            // セーブポイント
+            else if (x === 9 && y === 9) {
+              cellProperties = {
+                // 記録の石碑エリアのカスタムプロパティ例
+                cellType: 'record_monument',
+                memorialSite: true,
+                historicalRecord: 'complete_adventure',
+                safeZone: true,
+                timelessPreservation: true,
+                heroicCommemoration: true
+              }
             }
             
             return {
@@ -405,7 +815,7 @@ export const sampleDungeons: Record<string, Dungeon> = {
               },
               events,
               decorations,
-              properties: {}
+              properties: cellProperties
             }
           })
         ),
@@ -413,6 +823,23 @@ export const sampleDungeons: Record<string, Dungeon> = {
           lighting: { ambient: 0.2, sources: [] },
           ceiling: { height: 5 },
           audio: {}
+        },
+        properties: {
+          // フロア3のカスタムプロパティ例（ボス階）
+          floorTheme: 'ancient_throne_room',
+          difficulty: 5,
+          recommendedLevel: [8, 12],
+          timeLimit: 3600, // 1時間制限
+          monstersAllowed: false, // ボス戦のみ
+          respawnRate: -1, // リスポーンなし
+          environmentEffects: ['divine_aura', 'ancient_power', 'echoing_grandeur'],
+          magicZone: true,
+          safeZone: false,
+          bossFloor: true,
+          finalFloor: true,
+          epicEncounter: true,
+          royalSignificance: true,
+          archaeologicalTreasure: 'priceless'
         }
       }
     ],
@@ -425,6 +852,25 @@ export const sampleDungeons: Record<string, Dungeon> = {
       created: new Date('2024-01-01').toISOString(),
       modified: new Date('2024-01-01').toISOString(),
       description: '3階層からなる本格的なダンジョン遺跡。入口から王座の間まで段階的に難易度が上がる完全なRPGダンジョン体験ができます。'
+    },
+    properties: {
+      // ダンジョン全体のカスタムプロパティ例
+      dungeonType: 'ancient_ruins',
+      difficultyLevel: 'intermediate',
+      recommendedLevel: 15,
+      maxPartySize: 4,
+      estimatedCompletionTime: 120, // 分
+      dungeonTheme: 'royal_tomb',
+      specialFeatures: ['multi_floor', 'boss_battle', 'treasure_hunting', 'npc_interaction'],
+      magicLevel: 'high',
+      historicalPeriod: 'ancient_kingdom',
+      architecturalStyle: 'royal_palace',
+      ambientMusic: 'mysterious_ruins',
+      lightingCondition: 'dim_magical',
+      weatherEffects: 'none',
+      dangerRating: 'moderate',
+      treasureValue: 'high',
+      explorationComplexity: 'medium'
     }
   }
 }

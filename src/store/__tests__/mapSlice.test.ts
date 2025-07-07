@@ -19,7 +19,13 @@ describe('mapSlice', () => {
     store = configureStore({
       reducer: {
         map: mapReducer
-      }
+      },
+      middleware: (getDefaultMiddleware) =>
+        getDefaultMiddleware({
+          // テスト環境では重いmiddlewareを無効化
+          serializableCheck: false,
+          immutableCheck: false,
+        }),
     })
   })
 

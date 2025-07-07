@@ -1,13 +1,13 @@
 export type FloorType = 
-  | 'normal'      // 通常床
-  | 'damage'      // ダメージ床
-  | 'slippery'    // 滑る床
-  | 'pit'         // 落とし穴
-  | 'oneway'      // 一方通行床
-  | 'switch'      // スイッチ床
-  | 'warp'        // ワープ床
-  | 'rotate'      // 回転床
-  | 'custom'      // カスタム床
+  | 'normal'         // 通常床
+  | 'damage'         // ダメージ床
+  | 'slippery'       // 滑る床
+  | 'pit'            // 落とし穴
+  | 'oneway'         // 一方通行床
+  | 'switch'         // スイッチ床
+  | 'warp'           // ワープ床
+  | 'rotate'         // 回転床
+  | 'custom'         // カスタム床
 
 export type WallType = 
   | 'normal'      // 通常壁
@@ -181,6 +181,7 @@ export type TriggerType =
   | 'random'    // ランダム
   | 'battle'    // 戦闘後
   | 'combo'     // 複合条件
+  | 'custom'    // カスタムトリガー
 
 export type ActionType = 
   | 'message'      // メッセージ表示
@@ -202,6 +203,9 @@ export type ActionType =
 
 export interface EventTrigger {
   type: TriggerType
+  customTypeName?: string // カスタムトリガータイプの名前
+  customDescription?: string // カスタムトリガータイプの説明
+  properties?: Record<string, any> // トリガーカスタムプロパティ
   conditions?: Array<{
     type: 'flag' | 'item' | 'level' | 'time' | 'random' | 'custom'
     operator: '==' | '!=' | '>' | '<' | '>=' | '<=' | 'has' | 'not_has'
@@ -210,7 +214,10 @@ export interface EventTrigger {
     probability?: number // for random
   }>
   repeatPolicy: {
-    type: 'once' | 'always' | 'daily' | 'count'
+    type: 'once' | 'always' | 'daily' | 'count' | 'custom'
+    customPolicyName?: string // カスタム実行ポリシーの名前
+    customPolicyDescription?: string // カスタム実行ポリシーの説明
+    properties?: Record<string, any> // 実行ポリシーカスタムプロパティ
     maxCount?: number
   }
 }
@@ -219,6 +226,7 @@ export interface EventAction {
   id: string
   type: ActionType
   params: Record<string, any>
+  properties?: Record<string, any> // アクションカスタムプロパティ
   conditions?: Array<{
     type: 'flag' | 'item' | 'level' | 'random' | 'custom'
     operator: '==' | '!=' | '>' | '<' | '>=' | '<=' | 'has' | 'not_has'
@@ -244,9 +252,11 @@ export interface DungeonEvent {
     visible: boolean
     color?: string
     icon?: string
+    properties?: Record<string, any> // 外観カスタムプロパティ
   }
   trigger: EventTrigger
   actions: EventAction[]
+  properties: Record<string, any> // カスタムプロパティ用
   flags: Record<string, any>
   enabled: boolean
   priority: number // 実行優先度
@@ -293,6 +303,7 @@ export interface DungeonFloor {
       ambient?: string
     }
   }
+  properties: Record<string, any> // カスタムプロパティ
 }
 
 export interface Dungeon {
@@ -311,6 +322,7 @@ export interface Dungeon {
     modified: string
     description?: string
   }
+  properties: Record<string, any> // カスタムプロパティ
 }
 
 export interface MapEditorState {

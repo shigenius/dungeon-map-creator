@@ -52,7 +52,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **1. 基本確認フロー（毎回必須）**
 ```playwright
 # 1. ページ読み込み
-mcp__playwright__browser_navigate http://localhost:5173
+mcp__playwright__browser_navigate http://localhost:3000
 
 # 2. 初期読み込みエラーチェック
 mcp__playwright__browser_console_messages  # エラーの有無を確認
@@ -60,24 +60,28 @@ mcp__playwright__browser_console_messages  # エラーの有無を確認
 # 3. 白画面チェック（重要）
 # - 白画面の場合は即座にコンソールエラーをチェック
 # - React/TypeScriptのビルドエラーが原因の可能性が高い
+
+# 4. 初期状態確認（重要）
+# - アプリケーション初回読み込み時は新規プロジェクト作成モーダルが自動で開く
+# - プロジェクトが存在しない場合はメニュー項目が無効（disabled）状態
+# - ファイルメニュークリック等は初期状態では失敗する
 ```
 
 **2. 新規プロジェクト作成フロー確認**
 ```playwright
-# プロジェクト作成ボタンクリック
-mcp__playwright__browser_click 'text=新規プロジェクト'
+# 注意: 初回アクセス時は新規プロジェクト作成モーダルが自動で開いている
 
-# エラーチェック
-mcp__playwright__browser_console_messages
-
-# ダイアログでの入力
-mcp__playwright__browser_type 'input[placeholder*="プロジェクト名"]' 'テストプロジェクト'
+# ダイアログでの入力（デフォルト値「新しいダンジョン」が入力済み）
+mcp__playwright__browser_type 'textbox[name="ダンジョン名"]' 'テストプロジェクト'
 
 # 作成実行
-mcp__playwright__browser_click 'text=作成'
+mcp__playwright__browser_click 'button[name="作成"]'
 
-# 最終確認
+# プロジェクト作成後の確認
 mcp__playwright__browser_console_messages
+
+# プロジェクト作成後はメニュー項目が有効化される
+# この時点でファイルメニュー等のクリックが可能になる
 ```
 
 **3. 主要機能動作確認**
@@ -134,6 +138,8 @@ mcp__playwright__browser_evaluate 'window.__REDUX_DEVTOOLS_EXTENSION__'
 - **キャンバス描画問題**: Canvas APIエラーまたはRedux状態の問題
 - **ダイアログ表示問題**: Material-UIコンポーネントのエラー
 - **3D表示問題**: Three.jsライブラリまたはWebGLエラー
+- **初期状態でのメニュークリック失敗**: プロジェクト未作成時は多くのメニューが無効状態
+- **モーダル遮蔽によるクリック失敗**: 新規プロジェクト作成モーダルが開いている状態では背景のクリックは失敗する
 
 **7. 問題の種類別対応**
 ```playwright
@@ -148,6 +154,10 @@ mcp__playwright__browser_evaluate 'window.__REDUX_DEVTOOLS_EXTENSION__'
 
 # Canvas描画エラー
 # → キャンバスクリック後にconsole_messagesでCanvas関連エラー確認
+
+# 初期状態での操作失敗
+# → まず新規プロジェクト作成モーダルが開いていることを確認
+# → プロジェクト作成後に再度操作を試行
 ```
 
 ### 必須開発フロー
@@ -263,6 +273,35 @@ pkill -f playwright            # プロセス強制終了
 - 動作確認なしでの「完了」報告
 - Playwrightを使わない動作確認
 
+### MCP Playwritht よくある失敗例と対策
+
+#### 1. 初期状態でのメニュークリック失敗
+**問題**: `mcp__playwright__browser_click "ファイルメニュー"` が毎回失敗する
+**原因**: アプリケーション初回アクセス時は新規プロジェクト作成モーダルが自動で開いており、背景のメニューはクリックできない
+**対策**: 
+```playwright
+# ✅ 正しい手順
+1. mcp__playwright__browser_navigate http://localhost:3000
+2. 新規プロジェクト作成モーダルが開いていることを確認
+3. プロジェクトを作成
+4. その後でメニュークリックを実行
+```
+
+#### 2. モーダル遮蔽によるクリック失敗
+**問題**: モーダルが開いている状態で背景のボタンクリックが失敗する
+**原因**: Material-UIのModalコンポーネントが背景をブロックしている
+**対策**: モーダルを先に閉じるか、モーダル内の操作を完了させる
+
+#### 3. 無効化されたボタンのクリック失敗
+**問題**: プロジェクト未作成時にメニューボタンがクリックできない
+**原因**: プロジェクトがない状態では多くの機能が無効（disabled）状態
+**対策**: まずプロジェクトを作成してからメニュー操作を行う
+
+#### 4. ポート番号の間違い
+**問題**: `http://localhost:5173` でアクセスしようとして失敗
+**実際**: このプロジェクトは `http://localhost:3000` で動作
+**対策**: 正しいポート番号を使用する
+
 ### 白画面問題の対処法（経験則）
 
 #### 問題特定手順
@@ -315,6 +354,28 @@ curl -s --max-time 5 http://localhost:3001 > /dev/null && echo "サーバー応�
 
 #### 現在のTODO
 
+
+#### 現在のTODO（2025-01-06 03:06時点）
+**未完了項目 (中優先度)**
+- [x] カスタム床タイプ新規作成時のアコーディオンが閉じる問題を修正
+- [x] 床タイプの編集/複製/削除機能を実装
+- [x] 床と壁レイヤーのアイコンを直感的なものに変更
+- [x] カスタム壁タイプ削除時のマップセル更新機能を実装
+- [x] カスタムプロパティの設定例としてサンプルプログラムに設定を追加
+- [x] イベント名表示で(ID:1)の形でプレフィックスを追加
+- [x] フロア管理のフロア名に(ID:1)の形でプレフィックスを追加
+- [ ] 各オブジェクトのIDを編集可能にして重複チェックを実装
+- [x] 壁タイプの編集/複製/削除機能を実装
+- [ ] イベントトリガータイプにカスタム入力機能を追加
+- [ ] イベント実行ポリシーにカスタム入力機能を追加
+- [ ] イベントに任意のキーバリュー設定機能を実装
+- [ ] マップ設定に任意のキーバリュー設定機能を実装
+- [x] 最初自動で開くプロジェクト新規登録モーダルではキャンセルボタンを非表示にする
+
+**未完了項目 (低優先度)**
+- [ ] カスタム壁タイプのエフェクト機能を削除
+- [ ] 右ペーンのイベントプロパティを削除
+
 **白画面問題修復 (完了)**
 - [x] TypeScriptビルドエラーを修復（テストファイルのインポートパス、型定義、Three.jsパス等）
 - [x] mapSliceのaddToHistoryHelper関数を実装
@@ -325,7 +386,7 @@ curl -s --max-time 5 http://localhost:3001 > /dev/null && echo "サーバー応�
 - [x] アプリケーション全体が正常に動作することを確認
 
 **品質向上・テスト関連 (高優先度)**
-- [ ] MapEditor2Dの最適化（複雑なCanvas描画ロジックの改善）
+- [x] MapEditor2Dの最適化（複雑なCanvas描画ロジックの改善）
 - [ ] カバレッジツールの依存関係を追加し、テスト環境を修復
 - [ ] 失敗している単体テストを修復（RightPanelコンポーネントのundefinedエラー等）
 - [ ] E2Eテスト環境の修復（Playwrightサーバー起動問題の解決）
@@ -334,15 +395,19 @@ curl -s --max-time 5 http://localhost:3001 > /dev/null && echo "サーバー応�
 - [ ] ユーティリティ関数のテストを実装（templateUtils, eventValidation, mapValidation等）
 - [ ] テストカバレッジを80%以上に向上
 
-**パフォーマンス最適化 (高優先度)**
-- [ ] パフォーマンス問題を特定・分析（Canvas描画、Redux状態更新、メモリ使用量等）
-- [ ] Canvas描画の最適化（差分更新、オフスクリーン描画等）
-- [ ] Redux状態管理の最適化（不要な再レンダリング防止、セレクターの最適化）
+**パフォーマンス最適化 (完了)**
+- [x] パフォーマンス問題を特定・分析（Canvas描画、Redux状態更新、メモリ使用量等）
+- [x] Canvas描画の最適化（差分更新、オフスクリーン描画等）
+- [x] Redux状態管理の最適化（不要な再レンダリング防止、セレクターの最適化）
+- [x] Redux middlewareの最適化（SerializableStateInvariantMiddlewareのパフォーマンス問題解決）
+- [x] 履歴管理システムの最適化（structuredClone使用、エラーハンドリング）
+- [x] コード分割とバンドルサイズ最適化（動的インポート、Suspense）
+- [x] React.memoの実装（不要な再レンダリング防止）
 
 **リファクタリング (中優先度)**
 - [ ] 大きなコンポーネントを機能別に分割（MapEditor2D, LeftPanel等）
 - [ ] 重複コードの統合とユーティリティ関数の抽出
-- [ ] コンポーネントの最適化（React.memo、useMemo、useCallback等）
+- [x] コンポーネントの最適化（React.memo、useMemo、useCallback等）
 
 **技術改善 (低優先度)**
 - [ ] TypeScript型定義の改善と型安全性の向上

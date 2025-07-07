@@ -339,7 +339,8 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
       flag: 'フラグ条件',
       random: 'ランダム',
       battle: '戦闘後',
-      combo: '複合条件'
+      combo: '複合条件',
+      custom: 'カスタム'
     }
     return labels[type] || type
   }
@@ -672,6 +673,99 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
                 </Paper>
               </Grid>
             </Grid>
+
+            {/* 外観カスタムプロパティ */}
+            <Accordion sx={{ mt: 2 }}>
+              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                <Typography>外観カスタムプロパティ</Typography>
+              </AccordionSummary>
+              <AccordionDetails>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  外観表示に関する追加のカスタムプロパティを設定できます
+                </Typography>
+                
+                {/* 外観カスタムプロパティ編集UI */}
+                {Object.entries(editingEvent.appearance.properties || {}).map(([key, value], index) => (
+                  <Box key={`appearance-property-${index}`} sx={{ display: 'flex', gap: 1, mb: 1, alignItems: 'center' }}>
+                    <TextField
+                      label="キー"
+                      value={key}
+                      onChange={(e) => {
+                        const newProperties = { ...editingEvent.appearance.properties }
+                        delete newProperties[key]
+                        newProperties[e.target.value] = value
+                        updateAppearance('properties', newProperties)
+                      }}
+                      size="small"
+                      sx={{ flex: 1 }}
+                    />
+                    <TextField
+                      label="値"
+                      value={typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                      onChange={(e) => {
+                        let parsedValue: any = e.target.value
+                        // 数値判定
+                        if (!isNaN(Number(e.target.value)) && e.target.value.trim() !== '') {
+                          parsedValue = Number(e.target.value)
+                        }
+                        // JSON判定
+                        else if (e.target.value.startsWith('{') || e.target.value.startsWith('[')) {
+                          try {
+                            parsedValue = JSON.parse(e.target.value)
+                          } catch {
+                            // JSON解析失敗時は文字列として扱う
+                          }
+                        }
+                        // boolean判定
+                        else if (e.target.value === 'true') {
+                          parsedValue = true
+                        } else if (e.target.value === 'false') {
+                          parsedValue = false
+                        }
+                        
+                        const newProperties = { ...editingEvent.appearance.properties }
+                        newProperties[key] = parsedValue
+                        updateAppearance('properties', newProperties)
+                      }}
+                      size="small"
+                      sx={{ flex: 2 }}
+                    />
+                    <Button
+                      size="small"
+                      onClick={() => {
+                        const newProperties = { ...editingEvent.appearance.properties }
+                        delete newProperties[key]
+                        updateAppearance('properties', newProperties)
+                      }}
+                      color="error"
+                      sx={{ minWidth: 'auto', px: 1 }}
+                    >
+                      ×
+                    </Button>
+                  </Box>
+                ))}
+                
+                <Button
+                  startIcon={<AddIcon />}
+                  onClick={() => {
+                    const newProperties = { ...editingEvent.appearance.properties }
+                    let newKey = 'newAppearanceProperty'
+                    let counter = 1
+                    while (newKey in newProperties) {
+                      newKey = `newAppearanceProperty${counter}`
+                      counter++
+                    }
+                    newProperties[newKey] = ''
+                    updateAppearance('properties', newProperties)
+                  }}
+                  size="small"
+                  variant="outlined"
+                  fullWidth
+                >
+                  外観プロパティを追加
+                </Button>
+              </AccordionDetails>
+            </Accordion>
           </TabPanel>
 
           {/* トリガータブ */}
@@ -683,13 +777,37 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
                 onChange={(e) => updateTrigger('type', e.target.value)}
                 label="トリガータイプ"
               >
-                {(['auto', 'interact', 'contact', 'item', 'step', 'time', 'flag', 'random', 'battle', 'combo'] as TriggerType[]).map((type) => (
+                {(['auto', 'interact', 'contact', 'item', 'step', 'time', 'flag', 'random', 'battle', 'combo', 'custom'] as TriggerType[]).map((type) => (
                   <MenuItem key={type} value={type}>
                     {getTriggerTypeLabel(type)}
                   </MenuItem>
                 ))}
               </Select>
             </FormControl>
+
+            {/* カスタムトリガータイプ用の入力フィールド */}
+            {editingEvent.trigger.type === 'custom' && (
+              <Box sx={{ mt: 2 }}>
+                <TextField
+                  fullWidth
+                  label="カスタムトリガータイプ名"
+                  value={editingEvent.trigger.customTypeName || ''}
+                  onChange={(e) => updateTrigger('customTypeName', e.target.value)}
+                  margin="normal"
+                  placeholder="例: プレイヤー接近, 時刻指定, 特定アイテム所持"
+                />
+                <TextField
+                  fullWidth
+                  label="カスタムトリガーの説明"
+                  value={editingEvent.trigger.customDescription || ''}
+                  onChange={(e) => updateTrigger('customDescription', e.target.value)}
+                  margin="normal"
+                  multiline
+                  rows={2}
+                  placeholder="このトリガーの動作や条件を詳しく説明してください"
+                />
+              </Box>
+            )}
 
             <Accordion sx={{ mt: 2 }}>
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
@@ -710,6 +828,7 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
                     <MenuItem value="always">常に実行</MenuItem>
                     <MenuItem value="daily">日次</MenuItem>
                     <MenuItem value="count">回数制限</MenuItem>
+                    <MenuItem value="custom">カスタム</MenuItem>
                   </Select>
                 </FormControl>
                 
@@ -726,6 +845,233 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
                     margin="normal"
                   />
                 )}
+                
+                {editingEvent.trigger.repeatPolicy.type === 'custom' && (
+                  <Box sx={{ mt: 1 }}>
+                    <TextField
+                      fullWidth
+                      label="カスタム実行ポリシー名"
+                      value={editingEvent.trigger.repeatPolicy.customPolicyName || ''}
+                      onChange={(e) => updateTrigger('repeatPolicy', {
+                        ...editingEvent.trigger.repeatPolicy,
+                        customPolicyName: e.target.value
+                      })}
+                      margin="normal"
+                      placeholder="例: 毎時0分, プレイヤーレベル10以上時のみ, 特定フラグ設定時"
+                    />
+                    <TextField
+                      fullWidth
+                      label="カスタム実行ポリシーの説明"
+                      value={editingEvent.trigger.repeatPolicy.customPolicyDescription || ''}
+                      onChange={(e) => updateTrigger('repeatPolicy', {
+                        ...editingEvent.trigger.repeatPolicy,
+                        customPolicyDescription: e.target.value
+                      })}
+                      margin="normal"
+                      multiline
+                      rows={2}
+                      placeholder="この実行ポリシーの条件や動作を詳しく説明してください"
+                    />
+                  </Box>
+                )}
+              </AccordionDetails>
+            </Accordion>
+
+            {/* トリガーカスタムプロパティ */}
+            <Accordion sx={{ mt: 2 }}>
+              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                <Typography>トリガーカスタムプロパティ</Typography>
+              </AccordionSummary>
+              <AccordionDetails>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  トリガー固有のカスタムプロパティを設定できます
+                </Typography>
+                
+                {/* トリガーカスタムプロパティ編集UI */}
+                {Object.entries(editingEvent.trigger.properties || {}).map(([key, value], index) => (
+                  <Box key={`trigger-property-${index}`} sx={{ display: 'flex', gap: 1, mb: 1, alignItems: 'center' }}>
+                    <TextField
+                      label="キー"
+                      value={key}
+                      onChange={(e) => {
+                        const newProperties = { ...editingEvent.trigger.properties }
+                        delete newProperties[key]
+                        newProperties[e.target.value] = value
+                        updateTrigger('properties', newProperties)
+                      }}
+                      size="small"
+                      sx={{ flex: 1 }}
+                    />
+                    <TextField
+                      label="値"
+                      value={typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                      onChange={(e) => {
+                        let parsedValue: any = e.target.value
+                        // 数値判定
+                        if (!isNaN(Number(e.target.value)) && e.target.value.trim() !== '') {
+                          parsedValue = Number(e.target.value)
+                        }
+                        // JSON判定
+                        else if (e.target.value.startsWith('{') || e.target.value.startsWith('[')) {
+                          try {
+                            parsedValue = JSON.parse(e.target.value)
+                          } catch {
+                            // JSON解析失敗時は文字列として扱う
+                          }
+                        }
+                        // boolean判定
+                        else if (e.target.value === 'true') {
+                          parsedValue = true
+                        } else if (e.target.value === 'false') {
+                          parsedValue = false
+                        }
+                        
+                        const newProperties = { ...editingEvent.trigger.properties }
+                        newProperties[key] = parsedValue
+                        updateTrigger('properties', newProperties)
+                      }}
+                      size="small"
+                      sx={{ flex: 2 }}
+                    />
+                    <Button
+                      size="small"
+                      onClick={() => {
+                        const newProperties = { ...editingEvent.trigger.properties }
+                        delete newProperties[key]
+                        updateTrigger('properties', newProperties)
+                      }}
+                      color="error"
+                      sx={{ minWidth: 'auto', px: 1 }}
+                    >
+                      ×
+                    </Button>
+                  </Box>
+                ))}
+                
+                <Button
+                  startIcon={<AddIcon />}
+                  onClick={() => {
+                    const newProperties = { ...editingEvent.trigger.properties }
+                    let newKey = 'newTriggerProperty'
+                    let counter = 1
+                    while (newKey in newProperties) {
+                      newKey = `newTriggerProperty${counter}`
+                      counter++
+                    }
+                    newProperties[newKey] = ''
+                    updateTrigger('properties', newProperties)
+                  }}
+                  size="small"
+                  variant="outlined"
+                  fullWidth
+                >
+                  トリガープロパティを追加
+                </Button>
+              </AccordionDetails>
+            </Accordion>
+
+            {/* 実行ポリシーカスタムプロパティ */}
+            <Accordion sx={{ mt: 2 }}>
+              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                <Typography>実行ポリシーカスタムプロパティ</Typography>
+              </AccordionSummary>
+              <AccordionDetails>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  実行ポリシー固有のカスタムプロパティを設定できます
+                </Typography>
+                
+                {/* 実行ポリシーカスタムプロパティ編集UI */}
+                {Object.entries(editingEvent.trigger.repeatPolicy.properties || {}).map(([key, value], index) => (
+                  <Box key={`policy-property-${index}`} sx={{ display: 'flex', gap: 1, mb: 1, alignItems: 'center' }}>
+                    <TextField
+                      label="キー"
+                      value={key}
+                      onChange={(e) => {
+                        const newProperties = { ...editingEvent.trigger.repeatPolicy.properties }
+                        delete newProperties[key]
+                        newProperties[e.target.value] = value
+                        updateTrigger('repeatPolicy', {
+                          ...editingEvent.trigger.repeatPolicy,
+                          properties: newProperties
+                        })
+                      }}
+                      size="small"
+                      sx={{ flex: 1 }}
+                    />
+                    <TextField
+                      label="値"
+                      value={typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                      onChange={(e) => {
+                        let parsedValue: any = e.target.value
+                        // 数値判定
+                        if (!isNaN(Number(e.target.value)) && e.target.value.trim() !== '') {
+                          parsedValue = Number(e.target.value)
+                        }
+                        // JSON判定
+                        else if (e.target.value.startsWith('{') || e.target.value.startsWith('[')) {
+                          try {
+                            parsedValue = JSON.parse(e.target.value)
+                          } catch {
+                            // JSON解析失敗時は文字列として扱う
+                          }
+                        }
+                        // boolean判定
+                        else if (e.target.value === 'true') {
+                          parsedValue = true
+                        } else if (e.target.value === 'false') {
+                          parsedValue = false
+                        }
+                        
+                        const newProperties = { ...editingEvent.trigger.repeatPolicy.properties }
+                        newProperties[key] = parsedValue
+                        updateTrigger('repeatPolicy', {
+                          ...editingEvent.trigger.repeatPolicy,
+                          properties: newProperties
+                        })
+                      }}
+                      size="small"
+                      sx={{ flex: 2 }}
+                    />
+                    <Button
+                      size="small"
+                      onClick={() => {
+                        const newProperties = { ...editingEvent.trigger.repeatPolicy.properties }
+                        delete newProperties[key]
+                        updateTrigger('repeatPolicy', {
+                          ...editingEvent.trigger.repeatPolicy,
+                          properties: newProperties
+                        })
+                      }}
+                      color="error"
+                      sx={{ minWidth: 'auto', px: 1 }}
+                    >
+                      ×
+                    </Button>
+                  </Box>
+                ))}
+                
+                <Button
+                  startIcon={<AddIcon />}
+                  onClick={() => {
+                    const newProperties = { ...editingEvent.trigger.repeatPolicy.properties }
+                    let newKey = 'newPolicyProperty'
+                    let counter = 1
+                    while (newKey in newProperties) {
+                      newKey = `newPolicyProperty${counter}`
+                      counter++
+                    }
+                    newProperties[newKey] = ''
+                    updateTrigger('repeatPolicy', {
+                      ...editingEvent.trigger.repeatPolicy,
+                      properties: newProperties
+                    })
+                  }}
+                  size="small"
+                  variant="outlined"
+                  fullWidth
+                >
+                  実行ポリシープロパティを追加
+                </Button>
               </AccordionDetails>
             </Accordion>
           </TabPanel>
@@ -842,6 +1188,98 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
                         </FormControl>
                       </Box>
                     )}
+
+                    {/* アクションカスタムプロパティ */}
+                    <Accordion sx={{ mt: 1 }}>
+                      <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ minHeight: 36 }}>
+                        <Typography variant="body2">アクションカスタムプロパティ</Typography>
+                      </AccordionSummary>
+                      <AccordionDetails>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                          このアクション固有のカスタムプロパティを設定できます
+                        </Typography>
+                        
+                        {Object.entries(action.properties || {}).map(([key, value], propIndex) => (
+                          <Box key={`action-${index}-property-${propIndex}`} sx={{ display: 'flex', gap: 1, mb: 1, alignItems: 'center' }}>
+                            <TextField
+                              label="キー"
+                              value={key}
+                              onChange={(e) => {
+                                const newProperties = { ...action.properties }
+                                delete newProperties[key]
+                                newProperties[e.target.value] = value
+                                updateAction(index, 'properties', newProperties)
+                              }}
+                              size="small"
+                              sx={{ flex: 1 }}
+                            />
+                            <TextField
+                              label="値"
+                              value={typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                              onChange={(e) => {
+                                let parsedValue: any = e.target.value
+                                // 数値判定
+                                if (!isNaN(Number(e.target.value)) && e.target.value.trim() !== '') {
+                                  parsedValue = Number(e.target.value)
+                                }
+                                // JSON判定
+                                else if (e.target.value.startsWith('{') || e.target.value.startsWith('[')) {
+                                  try {
+                                    parsedValue = JSON.parse(e.target.value)
+                                  } catch {
+                                    // JSON解析失敗時は文字列として扱う
+                                  }
+                                }
+                                // boolean判定
+                                else if (e.target.value === 'true') {
+                                  parsedValue = true
+                                } else if (e.target.value === 'false') {
+                                  parsedValue = false
+                                }
+                                
+                                const newProperties = { ...action.properties }
+                                newProperties[key] = parsedValue
+                                updateAction(index, 'properties', newProperties)
+                              }}
+                              size="small"
+                              sx={{ flex: 2 }}
+                            />
+                            <Button
+                              size="small"
+                              onClick={() => {
+                                const newProperties = { ...action.properties }
+                                delete newProperties[key]
+                                updateAction(index, 'properties', newProperties)
+                              }}
+                              color="error"
+                              sx={{ minWidth: 'auto', px: 1 }}
+                            >
+                              ×
+                            </Button>
+                          </Box>
+                        ))}
+                        
+                        <Button
+                          startIcon={<AddIcon />}
+                          onClick={() => {
+                            const newProperties = { ...action.properties }
+                            let newKey = 'newActionProperty'
+                            let counter = 1
+                            while (newKey in newProperties) {
+                              newKey = `newActionProperty${counter}`
+                              counter++
+                            }
+                            newProperties[newKey] = ''
+                            updateAction(index, 'properties', newProperties)
+                          }}
+                          size="small"
+                          variant="outlined"
+                          fullWidth
+                        >
+                          アクションプロパティを追加
+                        </Button>
+                      </AccordionDetails>
+                    </Accordion>
                   </Box>
                 </ListItem>
               ))}
@@ -860,11 +1298,92 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
           {/* 詳細設定タブ */}
           <TabPanel value={tabValue} index={4}>
             <Typography variant="h6" gutterBottom>
-              イベントフラグ
+              カスタムプロパティ
             </Typography>
             <Typography variant="body2" color="text.secondary" paragraph>
-              このイベントで使用するカスタムフラグを設定できます。
+              このイベントで使用するカスタムプロパティ（キー・バリュー）を設定できます。
             </Typography>
+            
+            {/* カスタムプロパティ編集UI */}
+            <Box sx={{ mb: 2 }}>
+              {Object.entries(editingEvent.properties || {}).map(([key, value], index) => (
+                <Box key={`property-${index}`} sx={{ display: 'flex', gap: 2, mb: 1, alignItems: 'center' }}>
+                  <TextField
+                    label="キー"
+                    value={key}
+                    onChange={(e) => {
+                      const newProperties = { ...editingEvent.properties }
+                      delete newProperties[key]
+                      newProperties[e.target.value] = value
+                      updateEvent('properties', newProperties)
+                    }}
+                    size="small"
+                    sx={{ flex: 1 }}
+                  />
+                  <TextField
+                    label="値"
+                    value={typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                    onChange={(e) => {
+                      let parsedValue: any = e.target.value
+                      // 数値かどうか判定
+                      if (!isNaN(Number(e.target.value)) && e.target.value.trim() !== '') {
+                        parsedValue = Number(e.target.value)
+                      }
+                      // JSON文字列かどうか判定
+                      else if (e.target.value.startsWith('{') || e.target.value.startsWith('[')) {
+                        try {
+                          parsedValue = JSON.parse(e.target.value)
+                        } catch {
+                          // JSON解析失敗時は文字列として扱う
+                        }
+                      }
+                      // boolean値の判定
+                      else if (e.target.value === 'true') {
+                        parsedValue = true
+                      } else if (e.target.value === 'false') {
+                        parsedValue = false
+                      }
+                      
+                      const newProperties = { ...editingEvent.properties }
+                      newProperties[key] = parsedValue
+                      updateEvent('properties', newProperties)
+                    }}
+                    size="small"
+                    sx={{ flex: 2 }}
+                  />
+                  <IconButton
+                    size="small"
+                    onClick={() => {
+                      const newProperties = { ...editingEvent.properties }
+                      delete newProperties[key]
+                      updateEvent('properties', newProperties)
+                    }}
+                    color="error"
+                  >
+                    <DeleteIcon />
+                  </IconButton>
+                </Box>
+              ))}
+              
+              <Button
+                startIcon={<AddIcon />}
+                onClick={() => {
+                  const newProperties = { ...editingEvent.properties }
+                  let newKey = 'newProperty'
+                  let counter = 1
+                  while (newKey in newProperties) {
+                    newKey = `newProperty${counter}`
+                    counter++
+                  }
+                  newProperties[newKey] = ''
+                  updateEvent('properties', newProperties)
+                }}
+                size="small"
+                variant="outlined"
+              >
+                プロパティを追加
+              </Button>
+            </Box>
             
             <Divider sx={{ my: 2 }} />
             

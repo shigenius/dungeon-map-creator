@@ -2466,6 +2466,7 @@ const MapEditor2D: React.FC = React.memo(() => {
           message: config.description
         }
       }],
+      properties: {},
       flags: {},
       enabled: true,
       priority: 1,

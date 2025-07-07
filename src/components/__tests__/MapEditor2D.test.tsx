@@ -96,7 +96,8 @@ describe('MapEditor2D 統合テスト', () => {
             lighting: { ambient: 0.5, sources: [] },
             ceiling: { height: 3 },
             audio: {}
-          }
+          },
+          properties: {} // カスタムプロパティ
         }
       ],
       resources: {
@@ -107,7 +108,8 @@ describe('MapEditor2D 統合テスト', () => {
       metadata: {
         created: new Date().toISOString(),
         modified: new Date().toISOString()
-      }
+      },
+      properties: {} // カスタムプロパティ
     }
 
     store = configureStore({
@@ -115,6 +117,12 @@ describe('MapEditor2D 統合テスト', () => {
         map: mapSliceReducer,
         editor: editorSliceReducer
       },
+      middleware: (getDefaultMiddleware) =>
+        getDefaultMiddleware({
+          // テスト環境では重いmiddlewareを無効化
+          serializableCheck: false,
+          immutableCheck: false,
+        }),
       preloadedState: {
         map: {
           dungeon: testDungeon,

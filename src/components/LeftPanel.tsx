@@ -23,8 +23,8 @@ import {
 } from '@mui/material'
 import {
   ExpandMore as ExpandMoreIcon,
-  Terrain as FloorIcon,
-  CropSquare as WallIcon,
+  GridOn as FloorIcon,
+  ViewWeek as WallIcon,
   Event as EventIcon,
   Palette as DecorationIcon,
   Colorize as EyedropperIcon,
@@ -35,11 +35,12 @@ import {
   MoreVert as MoreVertIcon,
   ViewModule as TemplateIcon,
   Search as SearchIcon,
+  Edit as EditIcon,
 } from '@mui/icons-material'
 import { useDispatch, useSelector } from 'react-redux'
 import { RootState } from '../store'
-import { setSelectedFloorType, setSelectedFloorPassable, setSelectedWallType, setSelectedDecorationType, setSelectedEventType, clearCapturedCellData, toggleFloorTypeAccordion, toggleWallTypeAccordion, toggleEventTypeAccordion, toggleDecorationTypeAccordion, openCustomTypeDialog, openEventEditDialog, setSelectedTemplate, setSelectedTool, setSelectedEventId, setHighlightedEventId } from '../store/editorSlice'
-import { removeEventFromCell, addEventToCell } from '../store/mapSlice'
+import { setSelectedFloorType, setSelectedFloorPassable, setSelectedWallType, setSelectedDecorationType, setSelectedEventType, clearCapturedCellData, toggleFloorTypeAccordion, toggleWallTypeAccordion, toggleEventTypeAccordion, toggleDecorationTypeAccordion, openCustomTypeDialog, openEventEditDialog, setSelectedTemplate, setSelectedTool, setSelectedEventId, setHighlightedEventId, addCustomFloorType, updateCustomFloorType, removeCustomFloorType, addCustomWallType, updateCustomWallType, removeCustomWallType } from '../store/editorSlice'
+import { removeEventFromCell, addEventToCell, replaceFloorTypeInCells, replaceWallTypeInCells } from '../store/mapSlice'
 import { Layer, FloorType, WallType, DecorationType, EventType } from '../types/map'
 import FloorManagerPanel from './FloorManagerPanel'
 import EventTemplateDialog from './EventTemplateDialog'
@@ -54,6 +55,14 @@ const LeftPanel: React.FC = () => {
   const [eventMenuAnchor, setEventMenuAnchor] = useState<null | HTMLElement>(null)
   const [selectedEventForMenu, setSelectedEventForMenu] = useState<any>(null)
   const [showEventTemplateDialog, setShowEventTemplateDialog] = useState(false)
+  
+  // カスタム床タイプ操作メニューの状態管理
+  const [floorTypeMenuAnchor, setFloorTypeMenuAnchor] = useState<null | HTMLElement>(null)
+  const [selectedFloorTypeForMenu, setSelectedFloorTypeForMenu] = useState<any>(null)
+  
+  // カスタム壁タイプ操作メニューの状態管理
+  const [wallTypeMenuAnchor, setWallTypeMenuAnchor] = useState<null | HTMLElement>(null)
+  const [selectedWallTypeForMenu, setSelectedWallTypeForMenu] = useState<any>(null)
   
   // イベント検索・フィルタの状態管理
   const [eventSearchQuery, setEventSearchQuery] = useState('')
@@ -151,8 +160,16 @@ const LeftPanel: React.FC = () => {
     dispatch(setSelectedTool('pen'))
   }
 
-  const handleWallTypeSelect = (wallType: WallType) => {
-    dispatch(setSelectedWallType(wallType))
+  const handleWallTypeSelect = (wallType: WallType | string) => {
+    // カスタム壁タイプの場合はIDがstringで渡される
+    if (typeof wallType === 'string' && customWallTypes.some(type => type.id === wallType)) {
+      console.log('カスタム壁タイプを選択:', wallType)
+      dispatch(setSelectedWallType(wallType as any))
+    } else {
+      // 基本の壁タイプの場合
+      console.log('基本壁タイプを選択:', wallType)
+      dispatch(setSelectedWallType(wallType as WallType))
+    }
     // テンプレート選択を解除し、ペンツールに切り替え
     dispatch(setSelectedTemplate(null))
     dispatch(setSelectedTool('pen'))
@@ -179,11 +196,11 @@ const LeftPanel: React.FC = () => {
   }
 
   const handleAddCustomFloorType = () => {
-    dispatch(openCustomTypeDialog('floor'))
+    dispatch(openCustomTypeDialog({ mode: 'floor' }))
   }
 
   const handleAddCustomWallType = () => {
-    dispatch(openCustomTypeDialog('wall'))
+    dispatch(openCustomTypeDialog({ mode: 'wall' }))
   }
 
   const handleDecorationTypeSelect = (decorationType: DecorationType) => {
@@ -252,6 +269,119 @@ const LeftPanel: React.FC = () => {
     handleEventMenuClose()
   }
 
+  // カスタム床タイプ操作関連のハンドラー
+  const handleFloorTypeMenuOpen = (event: React.MouseEvent<HTMLElement>, floorType: any) => {
+    event.stopPropagation()
+    setFloorTypeMenuAnchor(event.currentTarget)
+    setSelectedFloorTypeForMenu(floorType)
+  }
+
+  const handleFloorTypeMenuClose = () => {
+    setFloorTypeMenuAnchor(null)
+    setSelectedFloorTypeForMenu(null)
+  }
+
+  const handleEditFloorType = () => {
+    if (selectedFloorTypeForMenu) {
+      // カスタムタイプダイアログを編集モードで開く
+      dispatch(openCustomTypeDialog({ mode: 'floor', editingType: selectedFloorTypeForMenu }))
+      console.log('床タイプ編集:', selectedFloorTypeForMenu)
+    }
+    handleFloorTypeMenuClose()
+  }
+
+  const handleDuplicateFloorType = () => {
+    if (selectedFloorTypeForMenu) {
+      const duplicatedFloorType = {
+        ...selectedFloorTypeForMenu,
+        id: crypto.randomUUID(),
+        name: `${selectedFloorTypeForMenu.name} (コピー)`
+      }
+      dispatch(addCustomFloorType(duplicatedFloorType))
+      console.log('床タイプ複製:', duplicatedFloorType)
+    }
+    handleFloorTypeMenuClose()
+  }
+
+  const handleDeleteFloorType = () => {
+    if (selectedFloorTypeForMenu) {
+      if (window.confirm(`床タイプ「${selectedFloorTypeForMenu.name}」を削除しますか？この操作は取り消せません。`)) {
+        // マップ上のセルに使用されている削除対象の床タイプを通常床に変更
+        dispatch(replaceFloorTypeInCells({
+          deletedFloorTypeId: selectedFloorTypeForMenu.id,
+          replacementFloorType: 'normal',
+          replacementPassable: true
+        }))
+        
+        // カスタム床タイプリストから削除
+        dispatch(removeCustomFloorType(selectedFloorTypeForMenu.id))
+        console.log('床タイプ削除:', selectedFloorTypeForMenu.id)
+        
+        // 削除された床タイプが現在選択されている場合、通常床に切り替え
+        if (selectedFloorType === selectedFloorTypeForMenu.id) {
+          dispatch(setSelectedFloorType('normal'))
+          dispatch(setSelectedFloorPassable(true))
+        }
+      }
+    }
+    handleFloorTypeMenuClose()
+  }
+
+  // 壁タイプメニュー関連のハンドラー
+  const handleWallTypeMenuOpen = (event: React.MouseEvent<HTMLElement>, wallType: any) => {
+    event.stopPropagation()
+    setWallTypeMenuAnchor(event.currentTarget)
+    setSelectedWallTypeForMenu(wallType)
+  }
+
+  const handleWallTypeMenuClose = () => {
+    setWallTypeMenuAnchor(null)
+    setSelectedWallTypeForMenu(null)
+  }
+
+  const handleEditWallType = () => {
+    if (selectedWallTypeForMenu) {
+      // カスタムタイプダイアログを編集モードで開く
+      dispatch(openCustomTypeDialog({ mode: 'wall', editingType: selectedWallTypeForMenu }))
+      console.log('壁タイプ編集:', selectedWallTypeForMenu)
+    }
+    handleWallTypeMenuClose()
+  }
+
+  const handleDuplicateWallType = () => {
+    if (selectedWallTypeForMenu) {
+      const duplicatedWallType = {
+        ...selectedWallTypeForMenu,
+        id: crypto.randomUUID(),
+        name: `${selectedWallTypeForMenu.name} (コピー)`
+      }
+      dispatch(addCustomWallType(duplicatedWallType))
+      console.log('壁タイプ複製:', duplicatedWallType)
+    }
+    handleWallTypeMenuClose()
+  }
+
+  const handleDeleteWallType = () => {
+    if (selectedWallTypeForMenu) {
+      if (window.confirm(`壁タイプ「${selectedWallTypeForMenu.name}」を削除しますか？この操作は取り消せません。`)) {
+        // マップ上のセルに使用されている削除対象の壁タイプを削除（null設定）
+        dispatch(replaceWallTypeInCells({
+          deletedWallTypeId: selectedWallTypeForMenu.id
+        }))
+        
+        // カスタム壁タイプリストから削除
+        dispatch(removeCustomWallType(selectedWallTypeForMenu.id))
+        console.log('壁タイプ削除:', selectedWallTypeForMenu.id)
+        
+        // 削除された壁タイプが現在選択されている場合、通常壁に切り替え
+        if (selectedWallType === selectedWallTypeForMenu.id) {
+          dispatch(setSelectedWallType('normal'))
+        }
+      }
+    }
+    handleWallTypeMenuClose()
+  }
+
   const handleTemplateSelect = (template: EventTemplate) => {
     if (template.presetEvent && dungeon) {
       const now = new Date().toISOString()
@@ -270,6 +400,7 @@ const LeftPanel: React.FC = () => {
         },
         trigger: templateEvent.trigger || { type: 'interact', repeatPolicy: { type: 'once' } },
         actions: templateEvent.actions ? [...templateEvent.actions] : [],
+        properties: templateEvent.properties || {},
         enabled: templateEvent.enabled !== undefined ? templateEvent.enabled : true,
         priority: templateEvent.priority !== undefined ? templateEvent.priority : 1,
         flags: templateEvent.flags || {},
@@ -451,27 +582,13 @@ const LeftPanel: React.FC = () => {
                         />
                       </ListItemIcon>
                       <ListItemText 
-                        primary={`${customType.name} ${customType.passable ? '(通行可)' : '(通行不可)'}`}
+                        primary={customType.name}
                         secondary={customType.description}
                       />
                       <ListItemSecondaryAction>
                         <IconButton 
                           size="small" 
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            console.log('カスタム床タイプ編集:', {
-                              id: customType.id,
-                              name: customType.name,
-                              passable: customType.passable,
-                              color: customType.color,
-                              description: customType.description,
-                              properties: customType.properties,
-                              currentlySelected: selectedFloorType === customType.id,
-                              selectedFloorPassable: selectedFloorPassable
-                            })
-                            // TODO: カスタム床タイプ編集機能を実装
-                            alert(`${customType.name}の編集機能は今後実装予定です`)
-                          }}
+                          onClick={(e) => handleFloorTypeMenuOpen(e, customType)}
                         >
                           <MoreVertIcon fontSize="small" />
                         </IconButton>
@@ -537,8 +654,8 @@ const LeftPanel: React.FC = () => {
                 {customWallTypes.map((customType) => (
                   <ListItem key={customType.id} disablePadding>
                     <ListItemButton
-                      selected={selectedWallType === 'custom'}
-                      onClick={() => handleWallTypeSelect('custom')}
+                      selected={selectedWallType === customType.id}
+                      onClick={() => handleWallTypeSelect(customType.id)}
                       disabled={!dungeon}
                       sx={{ pl: 2 }}
                     >
@@ -557,6 +674,14 @@ const LeftPanel: React.FC = () => {
                         primary={customType.name}
                         secondary={customType.description}
                       />
+                      <ListItemSecondaryAction>
+                        <IconButton 
+                          size="small" 
+                          onClick={(e) => handleWallTypeMenuOpen(e, customType)}
+                        >
+                          <MoreVertIcon fontSize="small" />
+                        </IconButton>
+                      </ListItemSecondaryAction>
                     </ListItemButton>
                   </ListItem>
                 ))}
@@ -710,7 +835,7 @@ const LeftPanel: React.FC = () => {
                             </Box>
                           </ListItemIcon>
                           <ListItemText 
-                            primary={event.name}
+                            primary={`(ID:${event.id.slice(0, 8)}) ${event.name}`}
                             secondary={`(${event.position.x}, ${event.position.y}) ${event.type}`}
                             primaryTypographyProps={{ variant: 'body2' }}
                             secondaryTypographyProps={{ variant: 'caption' }}
@@ -1007,6 +1132,74 @@ const LeftPanel: React.FC = () => {
         onClose={() => setShowEventTemplateDialog(false)}
         onSelectTemplate={handleTemplateSelect}
       />
+
+      {/* カスタム床タイプ操作メニュー */}
+      <Menu
+        anchorEl={floorTypeMenuAnchor}
+        open={Boolean(floorTypeMenuAnchor)}
+        onClose={handleFloorTypeMenuClose}
+        anchorOrigin={{
+          vertical: 'top',
+          horizontal: 'right',
+        }}
+        transformOrigin={{
+          vertical: 'top',
+          horizontal: 'left',
+        }}
+      >
+        <MenuItem onClick={handleEditFloorType}>
+          <ListItemIcon>
+            <EditIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>編集</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={handleDuplicateFloorType}>
+          <ListItemIcon>
+            <CopyIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>複製</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={handleDeleteFloorType} sx={{ color: 'error.main' }}>
+          <ListItemIcon>
+            <DeleteIcon fontSize="small" sx={{ color: 'error.main' }} />
+          </ListItemIcon>
+          <ListItemText>削除</ListItemText>
+        </MenuItem>
+      </Menu>
+
+      {/* カスタム壁タイプ操作メニュー */}
+      <Menu
+        anchorEl={wallTypeMenuAnchor}
+        open={Boolean(wallTypeMenuAnchor)}
+        onClose={handleWallTypeMenuClose}
+        anchorOrigin={{
+          vertical: 'top',
+          horizontal: 'right',
+        }}
+        transformOrigin={{
+          vertical: 'top',
+          horizontal: 'left',
+        }}
+      >
+        <MenuItem onClick={handleEditWallType}>
+          <ListItemIcon>
+            <EditIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>編集</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={handleDuplicateWallType}>
+          <ListItemIcon>
+            <CopyIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>複製</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={handleDeleteWallType} sx={{ color: 'error.main' }}>
+          <ListItemIcon>
+            <DeleteIcon fontSize="small" sx={{ color: 'error.main' }} />
+          </ListItemIcon>
+          <ListItemText>削除</ListItemText>
+        </MenuItem>
+      </Menu>
     </Box>
   )
 }
