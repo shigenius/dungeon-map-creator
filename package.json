@@ -1,8 +1,11 @@
 {
   "name": "dungeon-map-creator",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
+  "description": "Complete 3D Dungeon RPG Map Editor - Web-based map editor with 2D grid editing and 3D preview",
   "type": "module",
+  "keywords": ["dungeon", "map", "editor", "rpg", "3d", "react", "typescript", "canvas"],
+  "author": "Generated with Claude Code",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
