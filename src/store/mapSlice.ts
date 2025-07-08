@@ -338,7 +338,7 @@ const mapSlice = createSlice({
         })
         
         // イベントの位置をセルの座標に合わせる
-        const eventWithPosition = { ...event, position: { x, y } }
+        const eventWithPosition = { ...event, position: { x, y, placement: event.position.placement || 'floor', wallDirection: event.position.wallDirection } }
         cell.events.push(eventWithPosition)
         
         console.log('addEventToCell完了:', {
@@ -378,7 +378,7 @@ const mapSlice = createSlice({
       // 新しい位置にイベントを追加
       const newCell = state.dungeon.floors[floorIndex]?.cells[newY]?.[newX]
       if (newCell) {
-        const eventWithPosition = { ...event, position: { x: newX, y: newY } }
+        const eventWithPosition = { ...event, position: { x: newX, y: newY, placement: event.position.placement || 'floor', wallDirection: event.position.wallDirection } }
         newCell.events.push(eventWithPosition)
         
         // 履歴に追加
@@ -560,14 +560,14 @@ const mapSlice = createSlice({
     },
 
     // フロア管理アクション
-    addFloor: (state, action: PayloadAction<{ name: string; width: number; height: number }>) => {
+    addFloor: (state, action: PayloadAction<{ name: string; width: number; height: number; id?: string }>) => {
       if (!state.dungeon) return
       
       addToHistoryHelper(state)
       
-      const { name, width, height } = action.payload
+      const { name, width, height, id } = action.payload
       const newFloor = {
-        id: crypto.randomUUID(),
+        id: id || crypto.randomUUID(),
         name,
         width,
         height,

@@ -54,7 +54,7 @@ const TabPanel: React.FC<TabPanelProps> = ({ children, value, index }) => {
 
 const CustomTypeDialog: React.FC = () => {
   const dispatch = useDispatch()
-  const { showCustomTypeDialog, customTypeDialogMode, editingCustomType, customFloorTypes, customWallTypes } = useSelector(
+  const { showCustomTypeDialog, customTypeDialogMode, customTypeDialogType, editingCustomType, customFloorTypes, customWallTypes } = useSelector(
     (state: RootState) => state.editor
   )
 
@@ -74,8 +74,9 @@ const CustomTypeDialog: React.FC = () => {
       value?: number
       targetX?: number
       targetY?: number
-      targetFloor?: number
+      targetFloor?: string
       script?: string
+      properties?: Record<string, any>
     }>
   })
 
@@ -92,7 +93,11 @@ const CustomTypeDialog: React.FC = () => {
       type: 'custom' as 'door' | 'switch' | 'breakable' | 'teleport' | 'custom',
       requiresKey: '',
       durability: 1,
-      script: ''
+      script: '',
+      targetX: 0,
+      targetY: 0,
+      targetFloor: '',
+      properties: {} as Record<string, any>
     }
   })
 
@@ -178,7 +183,10 @@ const CustomTypeDialog: React.FC = () => {
           color: floorType.color,
           passable: floorType.passable,
           properties: floorType.properties || {},
-          effects: floorType.effects || []
+          effects: (floorType.effects || []).map(effect => ({
+            ...effect,
+            properties: effect.properties || {}
+          }))
         })
       } else if (customTypeDialogMode === 'wall') {
         const wallType = editingCustomType as CustomWallType
@@ -194,14 +202,52 @@ const CustomTypeDialog: React.FC = () => {
             type: wallType.behavior?.type || 'custom',
             requiresKey: wallType.behavior?.requiresKey || '',
             durability: wallType.behavior?.durability || 1,
-            script: wallType.behavior?.script || ''
+            script: wallType.behavior?.script || '',
+            targetX: wallType.behavior?.targetX || 0,
+            targetY: wallType.behavior?.targetY || 0,
+            targetFloor: wallType.behavior?.targetFloor || '',
+            properties: wallType.behavior?.properties || {}
           }
         })
       }
     } else {
       setIsEditMode(false)
+      // 新規作成時はUUIDを自動生成
+      if (showCustomTypeDialog) {
+        const newId = crypto.randomUUID()
+        if (customTypeDialogMode === 'floor') {
+          setFloorForm(prev => ({ ...prev, id: newId }))
+        } else if (customTypeDialogMode === 'wall') {
+          setWallForm(prev => ({ ...prev, id: newId }))
+        }
+      }
     }
   }, [editingCustomType, showCustomTypeDialog, customTypeDialogMode])
+
+  const handleDuplicate = () => {
+    if (customTypeDialogType === 'view') {
+      // 複製時は新しいIDを生成
+      const newId = crypto.randomUUID()
+      
+      if (customTypeDialogMode === 'floor') {
+        const duplicatedFloorType = {
+          ...floorForm,
+          id: newId,
+          name: `${floorForm.name} のコピー`
+        }
+        dispatch(addCustomFloorType(duplicatedFloorType))
+      } else if (customTypeDialogMode === 'wall') {
+        const duplicatedWallType = {
+          ...wallForm,
+          id: newId,
+          name: `${wallForm.name} のコピー`
+        }
+        dispatch(addCustomWallType(duplicatedWallType))
+      }
+      
+      handleClose()
+    }
+  }
 
   const handleClose = () => {
     dispatch(closeCustomTypeDialog())
@@ -227,7 +273,11 @@ const CustomTypeDialog: React.FC = () => {
         type: 'custom',
         requiresKey: '',
         durability: 1,
-        script: ''
+        script: '',
+        targetX: 0,
+        targetY: 0,
+        targetFloor: '',
+        properties: {}
       }
     })
     setTabValue(0)
@@ -278,7 +328,7 @@ const CustomTypeDialog: React.FC = () => {
   const handleAddEffect = () => {
     setFloorForm({
       ...floorForm,
-      effects: [...floorForm.effects, { type: 'custom' }]
+      effects: [...floorForm.effects, { type: 'custom', properties: {} }]
     })
   }
 
@@ -291,6 +341,58 @@ const CustomTypeDialog: React.FC = () => {
     const newEffects = [...floorForm.effects]
     newEffects[index] = { ...newEffects[index], [field]: value }
     setFloorForm({ ...floorForm, effects: newEffects })
+  }
+
+  const handleAddEffectProperty = (effectIndex: number, key: string, value: any) => {
+    if (!key.trim()) return
+    
+    const newEffects = [...floorForm.effects]
+    newEffects[effectIndex] = {
+      ...newEffects[effectIndex],
+      properties: {
+        ...newEffects[effectIndex].properties,
+        [key]: value
+      }
+    }
+    setFloorForm({ ...floorForm, effects: newEffects })
+  }
+
+  const handleRemoveEffectProperty = (effectIndex: number, key: string) => {
+    const newEffects = [...floorForm.effects]
+    const newProperties = { ...newEffects[effectIndex].properties }
+    delete newProperties[key]
+    newEffects[effectIndex] = {
+      ...newEffects[effectIndex],
+      properties: newProperties
+    }
+    setFloorForm({ ...floorForm, effects: newEffects })
+  }
+
+  const handleAddWallBehaviorProperty = (key: string, value: any) => {
+    if (!key.trim()) return
+    
+    setWallForm({
+      ...wallForm,
+      behavior: {
+        ...wallForm.behavior,
+        properties: {
+          ...wallForm.behavior.properties,
+          [key]: value
+        }
+      }
+    })
+  }
+
+  const handleRemoveWallBehaviorProperty = (key: string) => {
+    const newProperties = { ...wallForm.behavior.properties }
+    delete newProperties[key]
+    setWallForm({
+      ...wallForm,
+      behavior: {
+        ...wallForm.behavior,
+        properties: newProperties
+      }
+    })
   }
 
   const handleSave = () => {
@@ -348,7 +450,7 @@ const CustomTypeDialog: React.FC = () => {
     >
       <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <PaletteIcon />
-        {isEditMode ? 'カスタムタイプ編集' : 'カスタムタイプ作成'}
+        {customTypeDialogType === 'view' ? 'タイプ表示' : isEditMode ? 'カスタムタイプ編集' : 'カスタムタイプ作成'}
         <Box sx={{ ml: 'auto' }}>
           <IconButton onClick={handleClose}>
             <CloseIcon />
@@ -396,6 +498,7 @@ const CustomTypeDialog: React.FC = () => {
                 onChange={(e) => setFloorForm({ ...floorForm, name: e.target.value })}
                 margin="normal"
                 required
+                InputProps={{ readOnly: customTypeDialogType === 'view' }}
               />
               <TextField
                 fullWidth
@@ -405,6 +508,7 @@ const CustomTypeDialog: React.FC = () => {
                 margin="normal"
                 multiline
                 rows={2}
+                InputProps={{ readOnly: customTypeDialogType === 'view' }}
               />
               <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
                 <Typography variant="body2">色:</Typography>
@@ -413,6 +517,7 @@ const CustomTypeDialog: React.FC = () => {
                   value={floorForm.color}
                   onChange={(e) => setFloorForm({ ...floorForm, color: e.target.value })}
                   style={{ width: 50, height: 30 }}
+                  disabled={customTypeDialogType === 'view'}
                 />
                 <Box
                   sx={{
@@ -429,6 +534,7 @@ const CustomTypeDialog: React.FC = () => {
                   <Switch
                     checked={floorForm.passable}
                     onChange={(e) => setFloorForm({ ...floorForm, passable: e.target.checked })}
+                    disabled={customTypeDialogType === 'view'}
                   />
                 }
                 label="通行可能"
@@ -445,6 +551,7 @@ const CustomTypeDialog: React.FC = () => {
                 onClick={handleAddEffect}
                 size="small"
                 sx={{ mb: 1 }}
+                disabled={customTypeDialogType === 'view'}
               >
                 エフェクト追加
               </Button>
@@ -458,6 +565,7 @@ const CustomTypeDialog: React.FC = () => {
                         value={effect.type}
                         onChange={(e) => handleUpdateEffect(index, 'type', e.target.value)}
                         label="タイプ"
+                        disabled={customTypeDialogType === 'view'}
                       >
                         <MenuItem value="damage">ダメージ</MenuItem>
                         <MenuItem value="heal">回復</MenuItem>
@@ -470,6 +578,7 @@ const CustomTypeDialog: React.FC = () => {
                       size="small" 
                       onClick={() => handleRemoveEffect(index)}
                       color="error"
+                      disabled={customTypeDialogType === 'view'}
                     >
                       <DeleteIcon />
                     </IconButton>
@@ -487,7 +596,7 @@ const CustomTypeDialog: React.FC = () => {
                   )}
                   
                   {effect.type === 'teleport' && (
-                    <Box sx={{ display: 'flex', gap: 1 }}>
+                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                       <TextField
                         size="small"
                         label="X座標"
@@ -501,6 +610,12 @@ const CustomTypeDialog: React.FC = () => {
                         type="number"
                         value={effect.targetY || ''}
                         onChange={(e) => handleUpdateEffect(index, 'targetY', parseInt(e.target.value))}
+                      />
+                      <TextField
+                        size="small"
+                        label="フロアID"
+                        value={effect.targetFloor || ''}
+                        onChange={(e) => handleUpdateEffect(index, 'targetFloor', e.target.value)}
                       />
                     </Box>
                   )}
@@ -516,6 +631,49 @@ const CustomTypeDialog: React.FC = () => {
                       rows={2}
                     />
                   )}
+                  
+                  {/* カスタムプロパティセクション */}
+                  <Box sx={{ mt: 2 }}>
+                    <Typography variant="body2" sx={{ mb: 1 }}>
+                      カスタムプロパティ
+                    </Typography>
+                    <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
+                      <TextField
+                        size="small"
+                        label="キー"
+                        value={newPropertyKey}
+                        onChange={(e) => setNewPropertyKey(e.target.value)}
+                        sx={{ flex: 1 }}
+                      />
+                      <TextField
+                        size="small"
+                        label="値"
+                        value={newPropertyValue}
+                        onChange={(e) => setNewPropertyValue(e.target.value)}
+                        sx={{ flex: 1 }}
+                      />
+                      <Button
+                        size="small"
+                        onClick={() => {
+                          handleAddEffectProperty(index, newPropertyKey, newPropertyValue)
+                          setNewPropertyKey('')
+                          setNewPropertyValue('')
+                        }}
+                        disabled={!newPropertyKey.trim()}
+                      >
+                        追加
+                      </Button>
+                    </Box>
+                    {Object.entries(effect.properties || {}).map(([key, value]) => (
+                      <Chip
+                        key={key}
+                        label={`${key}: ${value}`}
+                        onDelete={() => handleRemoveEffectProperty(index, key)}
+                        size="small"
+                        sx={{ mr: 1, mb: 1 }}
+                      />
+                    ))}
+                  </Box>
                 </Box>
               ))}
             </Grid>
@@ -548,6 +706,7 @@ const CustomTypeDialog: React.FC = () => {
                 onChange={(e) => setWallForm({ ...wallForm, name: e.target.value })}
                 margin="normal"
                 required
+                InputProps={{ readOnly: customTypeDialogType === 'view' }}
               />
               <TextField
                 fullWidth
@@ -557,6 +716,7 @@ const CustomTypeDialog: React.FC = () => {
                 margin="normal"
                 multiline
                 rows={2}
+                InputProps={{ readOnly: customTypeDialogType === 'view' }}
               />
               <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
                 <Typography variant="body2">色:</Typography>
@@ -565,6 +725,7 @@ const CustomTypeDialog: React.FC = () => {
                   value={wallForm.color}
                   onChange={(e) => setWallForm({ ...wallForm, color: e.target.value })}
                   style={{ width: 50, height: 30 }}
+                  disabled={customTypeDialogType === 'view'}
                 />
                 <Box
                   sx={{
@@ -581,6 +742,7 @@ const CustomTypeDialog: React.FC = () => {
                   <Switch
                     checked={wallForm.transparent}
                     onChange={(e) => setWallForm({ ...wallForm, transparent: e.target.checked })}
+                    disabled={customTypeDialogType === 'view'}
                   />
                 }
                 label="透明"
@@ -591,6 +753,7 @@ const CustomTypeDialog: React.FC = () => {
                   <Switch
                     checked={wallForm.passable}
                     onChange={(e) => setWallForm({ ...wallForm, passable: e.target.checked })}
+                    disabled={customTypeDialogType === 'view'}
                   />
                 }
                 label="通行可能"
@@ -611,6 +774,7 @@ const CustomTypeDialog: React.FC = () => {
                     behavior: { ...wallForm.behavior, type: e.target.value as any }
                   })}
                   label="動作タイプ"
+                  disabled={customTypeDialogType === 'view'}
                 >
                   <MenuItem value="door">扉</MenuItem>
                   <MenuItem value="switch">スイッチ</MenuItem>
@@ -630,6 +794,7 @@ const CustomTypeDialog: React.FC = () => {
                     behavior: { ...wallForm.behavior, requiresKey: e.target.value }
                   })}
                   margin="normal"
+                  InputProps={{ readOnly: customTypeDialogType === 'view' }}
                 />
               )}
 
@@ -644,7 +809,45 @@ const CustomTypeDialog: React.FC = () => {
                     behavior: { ...wallForm.behavior, durability: parseInt(e.target.value) }
                   })}
                   margin="normal"
+                  InputProps={{ readOnly: customTypeDialogType === 'view' }}
                 />
+              )}
+
+              {wallForm.behavior.type === 'teleport' && (
+                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 1 }}>
+                  <TextField
+                    size="small"
+                    label="X座標"
+                    type="number"
+                    value={wallForm.behavior.targetX || ''}
+                    onChange={(e) => setWallForm({
+                      ...wallForm,
+                      behavior: { ...wallForm.behavior, targetX: parseInt(e.target.value) }
+                    })}
+                    InputProps={{ readOnly: customTypeDialogType === 'view' }}
+                  />
+                  <TextField
+                    size="small"
+                    label="Y座標"
+                    type="number"
+                    value={wallForm.behavior.targetY || ''}
+                    onChange={(e) => setWallForm({
+                      ...wallForm,
+                      behavior: { ...wallForm.behavior, targetY: parseInt(e.target.value) }
+                    })}
+                    InputProps={{ readOnly: customTypeDialogType === 'view' }}
+                  />
+                  <TextField
+                    size="small"
+                    label="フロアID"
+                    value={wallForm.behavior.targetFloor || ''}
+                    onChange={(e) => setWallForm({
+                      ...wallForm,
+                      behavior: { ...wallForm.behavior, targetFloor: e.target.value }
+                    })}
+                    InputProps={{ readOnly: customTypeDialogType === 'view' }}
+                  />
+                </Box>
               )}
 
               {wallForm.behavior.type === 'custom' && (
@@ -659,8 +862,54 @@ const CustomTypeDialog: React.FC = () => {
                   margin="normal"
                   multiline
                   rows={3}
+                  InputProps={{ readOnly: customTypeDialogType === 'view' }}
                 />
               )}
+
+              {/* 動作設定のカスタムプロパティ */}
+              <Box sx={{ mt: 2 }}>
+                <Typography variant="body2" sx={{ mb: 1 }}>
+                  動作カスタムプロパティ
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
+                  <TextField
+                    size="small"
+                    label="キー"
+                    value={newPropertyKey}
+                    onChange={(e) => setNewPropertyKey(e.target.value)}
+                    sx={{ flex: 1 }}
+                    InputProps={{ readOnly: customTypeDialogType === 'view' }}
+                  />
+                  <TextField
+                    size="small"
+                    label="値"
+                    value={newPropertyValue}
+                    onChange={(e) => setNewPropertyValue(e.target.value)}
+                    sx={{ flex: 1 }}
+                    InputProps={{ readOnly: customTypeDialogType === 'view' }}
+                  />
+                  <Button
+                    size="small"
+                    onClick={() => {
+                      handleAddWallBehaviorProperty(newPropertyKey, newPropertyValue)
+                      setNewPropertyKey('')
+                      setNewPropertyValue('')
+                    }}
+                    disabled={!newPropertyKey.trim() || customTypeDialogType === 'view'}
+                  >
+                    追加
+                  </Button>
+                </Box>
+                {Object.entries(wallForm.behavior.properties || {}).map(([key, value]) => (
+                  <Chip
+                    key={key}
+                    label={`${key}: ${value}`}
+                    onDelete={customTypeDialogType === 'view' ? undefined : () => handleRemoveWallBehaviorProperty(key)}
+                    size="small"
+                    sx={{ mr: 1, mb: 1 }}
+                  />
+                ))}
+              </Box>
             </Grid>
           </Grid>
         </TabPanel>
@@ -677,17 +926,19 @@ const CustomTypeDialog: React.FC = () => {
             label="キー"
             value={newPropertyKey}
             onChange={(e) => setNewPropertyKey(e.target.value)}
+            InputProps={{ readOnly: customTypeDialogType === 'view' }}
           />
           <TextField
             size="small"
             label="値"
             value={newPropertyValue}
             onChange={(e) => setNewPropertyValue(e.target.value)}
+            InputProps={{ readOnly: customTypeDialogType === 'view' }}
           />
           <Button
             variant="outlined"
             onClick={() => handleAddProperty(customTypeDialogMode === 'floor')}
-            disabled={!newPropertyKey.trim()}
+            disabled={!newPropertyKey.trim() || customTypeDialogType === 'view'}
           >
             追加
           </Button>
@@ -700,7 +951,7 @@ const CustomTypeDialog: React.FC = () => {
             <Chip
               key={key}
               label={`${key}: ${value}`}
-              onDelete={() => handleRemoveProperty(key, customTypeDialogMode === 'floor')}
+              onDelete={customTypeDialogType === 'view' ? undefined : () => handleRemoveProperty(key, customTypeDialogMode === 'floor')}
               size="small"
             />
           ))}
@@ -708,17 +959,29 @@ const CustomTypeDialog: React.FC = () => {
       </DialogContent>
 
       <DialogActions>
-        <Button onClick={handleClose}>キャンセル</Button>
-        <Button 
-          onClick={handleSave} 
-          variant="contained"
-          disabled={
-            customTypeDialogMode === 'floor' ? (!floorForm.name.trim() || !!floorIdError) : 
-            customTypeDialogMode === 'wall' ? (!wallForm.name.trim() || !!wallIdError) : true
-          }
-        >
-          {isEditMode ? '更新' : '作成'}
+        <Button onClick={handleClose}>
+          {customTypeDialogType === 'view' ? '閉じる' : 'キャンセル'}
         </Button>
+        {customTypeDialogType === 'view' ? (
+          <Button 
+            onClick={handleDuplicate} 
+            variant="contained"
+            color="primary"
+          >
+            複製
+          </Button>
+        ) : (
+          <Button 
+            onClick={handleSave} 
+            variant="contained"
+            disabled={
+              customTypeDialogMode === 'floor' ? (!floorForm.name.trim() || !!floorIdError) : 
+              customTypeDialogMode === 'wall' ? (!wallForm.name.trim() || !!wallIdError) : true
+            }
+          >
+            {isEditMode ? '更新' : '作成'}
+          </Button>
+        )}
       </DialogActions>
     </Dialog>
   )

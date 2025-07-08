@@ -67,6 +67,7 @@ interface EditorState {
   customWallTypes: CustomWallType[]
   showCustomTypeDialog: boolean
   customTypeDialogMode: 'floor' | 'wall' | null
+  customTypeDialogType: 'add' | 'edit' | 'view' | null
   editingCustomType: CustomFloorType | CustomWallType | null
   // イベント関連の状態
   showEventEditDialog: boolean
@@ -135,6 +136,7 @@ const initialState: EditorState = {
   customWallTypes: [],
   showCustomTypeDialog: false,
   customTypeDialogMode: null,
+  customTypeDialogType: null,
   editingCustomType: null,
   // イベント関連の初期状態
   showEventEditDialog: false,
@@ -381,10 +383,15 @@ const editorSlice = createSlice({
       }
     },
 
-    openCustomTypeDialog: (state, action: PayloadAction<{ mode: 'floor' | 'wall', editingType?: CustomFloorType | CustomWallType }>) => {
+    openCustomTypeDialog: (state, action: PayloadAction<{ 
+      type: 'floor' | 'wall'
+      mode: 'add' | 'edit' | 'view'
+      data?: CustomFloorType | CustomWallType 
+    }>) => {
       state.showCustomTypeDialog = true
-      state.customTypeDialogMode = action.payload.mode
-      state.editingCustomType = action.payload.editingType || null
+      state.customTypeDialogMode = action.payload.type
+      state.customTypeDialogType = action.payload.mode
+      state.editingCustomType = action.payload.data || null
       // アコーディオン状態の変更をここから削除（別途管理）
     },
 
@@ -393,6 +400,7 @@ const editorSlice = createSlice({
       state.editingCustomType = null
       // アコーディオン状態を維持するためcustomTypeDialogModeはリセットしない
       // state.customTypeDialogMode = null
+      // state.customTypeDialogType = null
       
       // カスタムタイプダイアログを閉じる際に該当アコーディオンを明示的に開いたままにする
       if (state.customTypeDialogMode === 'floor') {
@@ -516,6 +524,15 @@ const editorSlice = createSlice({
     setHighlightedEventId: (state, action: PayloadAction<string | null>) => {
       state.highlightedEventId = action.payload
     },
+
+    // カスタムタイプ設定アクション（インポート時）
+    setCustomFloorTypes: (state, action: PayloadAction<CustomFloorType[]>) => {
+      state.customFloorTypes = action.payload
+    },
+
+    setCustomWallTypes: (state, action: PayloadAction<CustomWallType[]>) => {
+      state.customWallTypes = action.payload
+    },
   },
 })
 
@@ -594,6 +611,9 @@ export const {
   setViewCenter,
   // イベントハイライト関連のアクション
   setHighlightedEventId,
+  // カスタムタイプ設定アクション
+  setCustomFloorTypes,
+  setCustomWallTypes,
 } = editorSlice.actions
 
 export default editorSlice.reducer

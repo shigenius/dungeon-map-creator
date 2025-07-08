@@ -95,7 +95,7 @@ describe('RightPanel 統合テスト', () => {
       }
     ]
 
-    store = createTestStore()
+    store = createTestStore({
       preloadedState: {
         map: {
           dungeon: testDungeon,

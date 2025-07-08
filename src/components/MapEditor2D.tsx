@@ -6,7 +6,7 @@ import { RootState } from '../store'
 import { updateCell, updateCells, placeTemplate, addDecorationToCell } from '../store/mapSlice'
 import { setCapturedCellData, setHoveredCellInfo, clearHoveredCellInfo, setHoveredCellPosition, clearHoveredCellPosition, setHoveredWallInfo, clearHoveredWallInfo, setTemplatePreviewPosition, setSelectionStart, setSelectionEnd, confirmSelection, setViewCenter, openEventEditDialog } from '../store/editorSlice'
 import { rotateTemplate as rotateTemplateUtil } from '../utils/templateUtils'
-import { Position, WallType, DecorationType, Decoration, EventType } from '../types/map'
+import { Position, WallType, DecorationType, Decoration, EventType, EventPlacementType } from '../types/map'
 
 // Hexカラーコードをrgbに変換するユーティリティ関数
 const hexToRgb = (hex: string) => {
@@ -2445,7 +2445,7 @@ const MapEditor2D: React.FC = React.memo(() => {
       type: eventType,
       name: eventName,
       description: config.description,
-      position: position,
+      position: { x: position.x, y: position.y, placement: 'floor' as EventPlacementType },
       appearance: {
         visible: true,
         color: config.color,

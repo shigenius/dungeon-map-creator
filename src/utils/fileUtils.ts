@@ -1,10 +1,17 @@
-import { Dungeon } from '../types/map'
+import { Dungeon, CustomFloorType, CustomWallType } from '../types/map'
 
 /**
  * ダンジョンをJSONファイルとしてダウンロードする
  */
-export const downloadDungeonAsJSON = (dungeon: Dungeon): void => {
-  const dataStr = JSON.stringify(dungeon, null, 2)
+export const downloadDungeonAsJSON = (dungeon: Dungeon, customFloorTypes?: CustomFloorType[], customWallTypes?: CustomWallType[]): void => {
+  // カスタムタイプ情報を含むダンジョンデータを作成
+  const dungeonWithCustomTypes: Dungeon = {
+    ...dungeon,
+    customFloorTypes: customFloorTypes || [],
+    customWallTypes: customWallTypes || []
+  }
+  
+  const dataStr = JSON.stringify(dungeonWithCustomTypes, null, 2)
   const dataBlob = new Blob([dataStr], { type: 'application/json' })
   const url = URL.createObjectURL(dataBlob)
   const link = document.createElement('a')
@@ -17,7 +24,7 @@ export const downloadDungeonAsJSON = (dungeon: Dungeon): void => {
 /**
  * ファイル選択ダイアログを開いてJSONファイルを読み込む
  */
-export const openDungeonFromFile = (onLoad: (dungeon: Dungeon) => void, onError?: (error: Error) => void): void => {
+export const openDungeonFromFile = (onLoad: (dungeon: Dungeon, customFloorTypes?: CustomFloorType[], customWallTypes?: CustomWallType[]) => void, onError?: (error: Error) => void): void => {
   // 既存のfile inputを削除
   const existingInput = document.querySelector('input[type="file"]')
   if (existingInput) {
@@ -45,7 +52,15 @@ export const openDungeonFromFile = (onLoad: (dungeon: Dungeon) => void, onError?
           console.log('ファイル内容:', content.substring(0, 200) + '...')
           const dungeonData = JSON.parse(content) as Dungeon
           console.log('JSONパース成功:', dungeonData)
-          onLoad(dungeonData)
+          
+          // カスタムタイプ情報を分離
+          const customFloorTypes = dungeonData.customFloorTypes || []
+          const customWallTypes = dungeonData.customWallTypes || []
+          
+          // ダンジョンデータからカスタムタイプ情報を削除（clean up）
+          const { customFloorTypes: _, customWallTypes: __, ...cleanDungeonData } = dungeonData
+          
+          onLoad(cleanDungeonData as Dungeon, customFloorTypes, customWallTypes)
         } catch (error) {
           console.error('JSONパースエラー:', error)
           if (onError) {

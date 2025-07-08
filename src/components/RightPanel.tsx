@@ -34,7 +34,7 @@ import {
   openEventEditDialog,
 } from '../store/editorSlice'
 import { placeTemplate, updateDungeonProperties } from '../store/mapSlice'
-import { Template, TemplateCategory } from '../types/map'
+import { Template, TemplateCategory, EventPlacementType } from '../types/map'
 import { presetTemplates, getCategoryDisplayName } from '../data/presetTemplates'
 import EventTemplateDialog from './EventTemplateDialog'
 import { EventTemplate } from '../data/eventTemplates'
@@ -207,7 +207,7 @@ const RightPanel: React.FC = () => {
         type: templateEvent.type || 'custom',
         name: templateEvent.name || 'イベント',
         description: templateEvent.description || '',
-        position: { x: 0, y: 0 }, // デフォルト位置
+        position: { x: 0, y: 0, placement: 'floor' as EventPlacementType }, // デフォルト位置
         appearance: {
           visible: true,
           ...templateEvent.appearance

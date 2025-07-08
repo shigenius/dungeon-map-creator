@@ -83,8 +83,9 @@ export interface CustomFloorType {
     value?: number
     targetX?: number
     targetY?: number
-    targetFloor?: number
+    targetFloor?: string
     script?: string
+    properties?: Record<string, any>
   }>
 }
 
@@ -102,6 +103,10 @@ export interface CustomWallType {
     requiresKey?: string
     durability?: number
     script?: string
+    targetX?: number
+    targetY?: number
+    targetFloor?: string
+    properties?: Record<string, any>
   }
 }
 
@@ -154,6 +159,15 @@ export interface TemplateGroup {
 export interface Position {
   x: number
   y: number
+}
+
+export type EventPlacementType = 'floor' | 'wall' | 'center'
+
+export interface EventPosition {
+  x: number
+  y: number
+  placement: EventPlacementType
+  wallDirection?: Direction // 壁に配置する場合の方向
 }
 
 export interface Floor {
@@ -246,7 +260,7 @@ export interface DungeonEvent {
   type: EventType
   name: string
   description?: string
-  position: Position
+  position: EventPosition
   appearance: {
     sprite?: string
     visible: boolean
@@ -323,6 +337,9 @@ export interface Dungeon {
     description?: string
   }
   properties: Record<string, any> // カスタムプロパティ
+  // カスタムタイプ情報（エクスポート/インポート用）
+  customFloorTypes?: CustomFloorType[]
+  customWallTypes?: CustomWallType[]
 }
 
 export interface MapEditorState {

@@ -95,14 +95,23 @@ const FloorManagerPanel: React.FC = () => {
   }
 
   const handleAddFloor = () => {
-    if (floorName.trim()) {
+    if (floorName.trim() && !idError) {
+      // ID重複チェック
+      const error = checkIdDuplicate(floorId)
+      if (error) {
+        setIdError(error)
+        return
+      }
+
       dispatch(addFloor({
         name: floorName.trim(),
         width: floorWidth,
-        height: floorHeight
+        height: floorHeight,
+        id: floorId.trim()
       }))
       setShowAddFloorDialog(false)
       setFloorName('')
+      setFloorId('')
       setFloorWidth(20)
       setFloorHeight(20)
     }
@@ -181,6 +190,15 @@ const FloorManagerPanel: React.FC = () => {
     handleMenuClose()
   }
 
+  const openAddFloorDialog = () => {
+    setFloorName('')
+    setFloorId(crypto.randomUUID())
+    setFloorWidth(20)
+    setFloorHeight(20)
+    setIdError('')
+    setShowAddFloorDialog(true)
+  }
+
   if (!dungeon) {
     return null
   }
@@ -192,7 +210,7 @@ const FloorManagerPanel: React.FC = () => {
           フロア管理
         </Typography>
         <Tooltip title="新しいフロアを追加">
-          <IconButton size="small" onClick={() => setShowAddFloorDialog(true)}>
+          <IconButton size="small" onClick={openAddFloorDialog}>
             <AddIcon />
           </IconButton>
         </Tooltip>
@@ -247,6 +265,17 @@ const FloorManagerPanel: React.FC = () => {
             onChange={(e) => setFloorName(e.target.value)}
             sx={{ mb: 2 }}
           />
+          <TextField
+            margin="dense"
+            label="フロアID"
+            fullWidth
+            variant="outlined"
+            value={floorId}
+            onChange={(e) => handleIdChange(e.target.value)}
+            error={!!idError}
+            helperText={idError || 'フロアの一意識別子（自動生成されます）'}
+            sx={{ mb: 2 }}
+          />
           <Box sx={{ display: 'flex', gap: 2 }}>
             <TextField
               margin="dense"
@@ -270,7 +299,7 @@ const FloorManagerPanel: React.FC = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setShowAddFloorDialog(false)}>キャンセル</Button>
-          <Button onClick={handleAddFloor} variant="contained" disabled={!floorName.trim()}>
+          <Button onClick={handleAddFloor} variant="contained" disabled={!floorName.trim() || !!idError}>
             追加
           </Button>
         </DialogActions>

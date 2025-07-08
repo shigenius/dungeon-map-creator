@@ -44,7 +44,7 @@ import {
   Error as ErrorIcon,
   Info as InfoIcon,
 } from '@mui/icons-material'
-import { DungeonEvent, EventType, TriggerType, ActionType, EventAction } from '../types/map'
+import { DungeonEvent, EventType, TriggerType, ActionType, EventAction, EventPosition, EventPlacementType, Direction } from '../types/map'
 import EventTemplateDialog from './EventTemplateDialog'
 import { EventTemplate } from '../data/eventTemplates'
 import { validateEvent, EventValidationResult, getValidationSummary } from '../utils/eventValidation'
@@ -148,7 +148,7 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
         type: 'treasure',
         name: '新しいイベント',
         description: '',
-        position: { x: 0, y: 0 },
+        position: { x: 0, y: 0, placement: 'floor' },
         appearance: {
           visible: true,
           color: '#ffd700',
@@ -572,6 +572,42 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
                     size="small"
                   />
                 </Box>
+                
+                <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+                  <InputLabel>配置タイプ</InputLabel>
+                  <Select
+                    value={editingEvent.position.placement}
+                    onChange={(e) => updateEvent('position', { 
+                      ...editingEvent.position, 
+                      placement: e.target.value as EventPlacementType,
+                      wallDirection: e.target.value === 'wall' ? 'north' : undefined
+                    })}
+                    label="配置タイプ"
+                  >
+                    <MenuItem value="floor">床に配置</MenuItem>
+                    <MenuItem value="wall">壁に配置</MenuItem>
+                    <MenuItem value="center">セル中央に配置</MenuItem>
+                  </Select>
+                </FormControl>
+                
+                {editingEvent.position.placement === 'wall' && (
+                  <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+                    <InputLabel>壁の方向</InputLabel>
+                    <Select
+                      value={editingEvent.position.wallDirection || 'north'}
+                      onChange={(e) => updateEvent('position', { 
+                        ...editingEvent.position, 
+                        wallDirection: e.target.value as Direction
+                      })}
+                      label="壁の方向"
+                    >
+                      <MenuItem value="north">北壁</MenuItem>
+                      <MenuItem value="east">東壁</MenuItem>
+                      <MenuItem value="south">南壁</MenuItem>
+                      <MenuItem value="west">西壁</MenuItem>
+                    </Select>
+                  </FormControl>
+                )}
                 
                 <Typography variant="subtitle2" gutterBottom sx={{ mt: 3 }}>
                   優先度

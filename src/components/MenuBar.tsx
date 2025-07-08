@@ -32,7 +32,9 @@ import {
   toggleLayerVisibility,
   openHelpDialog,
   toggleGrid,
-  openMapValidationDialog
+  openMapValidationDialog,
+  setCustomFloorTypes,
+  setCustomWallTypes
 } from '../store/editorSlice'
 import { downloadDungeonAsJSON, openDungeonFromFile } from '../utils/fileUtils'
 import { Layer } from '../types/map'
@@ -43,6 +45,8 @@ const MenuBar: React.FC = () => {
   const selectedLayer = useSelector((state: RootState) => state.editor.selectedLayer)
   const layerVisibility = useSelector((state: RootState) => state.editor.layerVisibility)
   const gridVisible = useSelector((state: RootState) => state.editor.gridVisible)
+  const customFloorTypes = useSelector((state: RootState) => state.editor.customFloorTypes)
+  const customWallTypes = useSelector((state: RootState) => state.editor.customWallTypes)
   const [fileMenuAnchor, setFileMenuAnchor] = React.useState<null | HTMLElement>(null)
   const [editMenuAnchor, setEditMenuAnchor] = React.useState<null | HTMLElement>(null)
   const [viewMenuAnchor, setViewMenuAnchor] = React.useState<null | HTMLElement>(null)
@@ -133,7 +137,7 @@ const MenuBar: React.FC = () => {
 
   const handleExportJSON = () => {
     if (dungeon) {
-      downloadDungeonAsJSON(dungeon)
+      downloadDungeonAsJSON(dungeon, customFloorTypes, customWallTypes)
     }
     handleMenuClose()
   }
@@ -152,9 +156,21 @@ const MenuBar: React.FC = () => {
   const handleOpen = () => {
     console.log('ファイルを開くメニューがクリックされました')
     openDungeonFromFile(
-      (dungeonData) => {
+      (dungeonData, customFloorTypes, customWallTypes) => {
         console.log('ファイルから読み込んだデータ:', dungeonData)
+        console.log('カスタム床タイプ:', customFloorTypes)
+        console.log('カスタム壁タイプ:', customWallTypes)
+        
         dispatch(loadDungeon(dungeonData))
+        
+        // カスタムタイプをエディタに設定
+        if (customFloorTypes) {
+          dispatch(setCustomFloorTypes(customFloorTypes))
+        }
+        if (customWallTypes) {
+          dispatch(setCustomWallTypes(customWallTypes))
+        }
+        
         console.log('Redux storeにデータを読み込み完了')
       },
       (error) => {

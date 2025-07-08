@@ -872,18 +872,384 @@ export const sampleDungeons: Record<string, Dungeon> = {
       treasureValue: 'high',
       explorationComplexity: 'medium'
     }
+  },
+
+  // 戦術重視の迷宮要塞
+  tacticalFortress: {
+    id: 'sample-tactical',
+    name: "暗影の迷宮要塞",
+    author: "ダンジョンマップクリエイター",
+    version: '1.0.0',
+    floors: [
+      // 1階 - 要塞の前庭（戦闘訓練エリア）
+      {
+        id: 'fortress-courtyard',
+        name: "要塞の前庭",
+        width: 15,
+        height: 15,
+        cells: Array.from({ length: 15 }, (_, y) =>
+          Array.from({ length: 15 }, (_, x) => {
+            const isOuterWall = x === 0 || x === 14 || y === 0 || y === 14
+            const isEntrance = x === 7 && y === 0
+            
+            // 複雑な迷路構造
+            const isWall = 
+              // 縦の壁
+              (x === 3 && y >= 2 && y <= 12) || (x === 6 && y >= 2 && y <= 6) ||
+              (x === 8 && y >= 8 && y <= 12) || (x === 11 && y >= 2 && y <= 10) ||
+              // 横の壁
+              (y === 3 && x >= 1 && x <= 5) || (y === 6 && x >= 8 && x <= 13) ||
+              (y === 9 && x >= 1 && x <= 7) || (y === 12 && x >= 9 && x <= 13)
+            
+            // トラップ位置
+            const trapPositions = [
+              {x: 2, y: 4}, {x: 5, y: 7}, {x: 9, y: 3}, {x: 12, y: 8}, {x: 4, y: 11}
+            ]
+            const isTrap = trapPositions.some(pos => pos.x === x && pos.y === y)
+            
+            // 敵の配置
+            const enemyPositions = [
+              {x: 1, y: 1, type: 'guard', name: '要塞の歩哨'},
+              {x: 13, y: 2, type: 'archer', name: '弓兵'},
+              {x: 2, y: 8, type: 'warrior', name: '戦士'},
+              {x: 10, y: 5, type: 'mage', name: '魔術師'},
+              {x: 7, y: 13, type: 'captain', name: '隊長'}
+            ]
+            const enemyHere = enemyPositions.find(pos => pos.x === x && pos.y === y)
+            
+            let events = []
+            let decorations = []
+            let floorType: 'normal' | 'damage' | 'slippery' | 'pit' | 'warp' = 'normal'
+            
+            // トラップ設置
+            if (isTrap) {
+              floorType = 'damage'
+              events.push({
+                id: `trap-${x}-${y}`,
+                name: '圧力プレート',
+                type: 'trap' as const,
+                description: '踏むと刃が飛び出す古い仕掛け',
+                position: { x, y },
+                appearance: { color: '#8b0000', icon: 'trap', visible: false },
+                trigger: { type: 'contact' as const, repeatPolicy: { type: 'always' as const } },
+                actions: [{
+                  id: 'damage-trap',
+                  type: 'damage' as const,
+                  params: { damage: 15, damageType: 'physical' }
+                }],
+                properties: {
+                  trapType: 'pressure_plate',
+                  damage: 15,
+                  detectionDC: 12,
+                  disarmDC: 14,
+                  resetTime: 300
+                }
+              })
+            }
+            
+            // 敵の配置
+            if (enemyHere) {
+              events.push({
+                id: `enemy-${x}-${y}`,
+                name: enemyHere.name,
+                type: 'enemy' as const,
+                description: `要塞を守る${enemyHere.type}`,
+                position: { x, y },
+                appearance: { color: '#dc143c', icon: 'enemy', visible: true },
+                trigger: { type: 'contact' as const, repeatPolicy: { type: 'once' as const } },
+                actions: [{
+                  id: 'start-battle',
+                  type: 'battle' as const,
+                  params: { enemyType: enemyHere.type, difficulty: 'normal' }
+                }],
+                properties: {
+                  enemyType: enemyHere.type,
+                  level: 3,
+                  hp: 45,
+                  attack: 12,
+                  defense: 8,
+                  aggroRange: 2,
+                  patrolPattern: 'guard'
+                }
+              })
+            }
+            
+            // 戦略ポイント（高台）
+            if ((x === 5 && y === 5) || (x === 9 && y === 9)) {
+              decorations.push({
+                id: `watchtower-${x}-${y}`,
+                name: '見張り台',
+                type: 'pillar' as const,
+                position: { x, y },
+                appearance: { color: '#696969', icon: 'pillar', visible: true },
+                properties: {
+                  elevation: 2,
+                  coverBonus: 3,
+                  visionBonus: 4
+                }
+              })
+            }
+            
+            return {
+              x, y,
+              floor: { type: floorType, passable: !isOuterWall && !isWall },
+              walls: {
+                north: (y === 0 && !isEntrance) || (isWall && y > 0) ? { type: 'normal' as const, transparent: false } : null,
+                east: (x === 14) || (isWall && x < 14) ? { type: 'normal' as const, transparent: false } : null,
+                south: (y === 14) || (isWall && y < 14) ? { type: 'normal' as const, transparent: false } : null,
+                west: (x === 0) || (isWall && x > 0) ? { type: 'normal' as const, transparent: false } : null,
+              },
+              events,
+              decorations,
+              properties: isTrap ? { trapArea: true } : {}
+            }
+          })
+        ),
+        environment: {
+          lighting: { ambient: 0.4, sources: [] },
+          ceiling: { height: 4 },
+          audio: {}
+        },
+        properties: {
+          floorTheme: 'fortress_courtyard',
+          difficulty: 3,
+          recommendedLevel: [5, 8],
+          combatFocused: true,
+          trapCount: 5,
+          enemyCount: 5,
+          tacticalElements: ['cover', 'elevation', 'chokepoints']
+        }
+      }
+    ],
+    resources: { textures: {}, sprites: {}, audio: {} },
+    metadata: {
+      created: new Date('2024-01-01').toISOString(),
+      modified: new Date('2024-01-01').toISOString(),
+      description: '戦術性を重視した迷宮要塞。敵とトラップが巧妙に配置され、戦闘スキルと戦略的思考が要求されます。'
+    },
+    properties: {
+      dungeonType: 'tactical_fortress',
+      difficultyLevel: 'hard',
+      recommendedLevel: 20,
+      maxPartySize: 4,
+      estimatedCompletionTime: 90,
+      dungeonTheme: 'military_fortress',
+      specialFeatures: ['tactical_combat', 'traps', 'enemy_placement', 'strategic_positioning'],
+      combatComplexity: 'high',
+      trapDensity: 'high',
+      enemyVariety: 'diverse'
+    }
+  },
+
+  // パズルの館
+  puzzleMansion: {
+    id: 'sample-puzzle',
+    name: "賢者の試練の館",
+    author: "ダンジョンマップクリエイター", 
+    version: '1.0.0',
+    floors: [
+      // 1階 - パズルホール
+      {
+        id: 'puzzle-hall',
+        name: "試練のホール",
+        width: 13,
+        height: 13,
+        cells: Array.from({ length: 13 }, (_, y) =>
+          Array.from({ length: 13 }, (_, x) => {
+            const isOuterWall = x === 0 || x === 12 || y === 0 || y === 12
+            const isEntrance = x === 6 && y === 0
+            
+            // 中央の円形パズル広場
+            const centerX = 6, centerY = 6
+            const distanceFromCenter = Math.sqrt((x - centerX) ** 2 + (y - centerY) ** 2)
+            const isInnerCircle = distanceFromCenter <= 2.5
+            const isOuterRing = distanceFromCenter > 2.5 && distanceFromCenter <= 4
+            
+            // 4つのパズル部屋
+            const roomWalls = [
+              // 北の部屋
+              (x >= 4 && x <= 8 && y === 2) || (x === 4 && y >= 2 && y <= 4) || (x === 8 && y >= 2 && y <= 4),
+              // 東の部屋  
+              (x >= 8 && x <= 10 && y === 4) || (x === 10 && y >= 4 && y <= 8) || (x >= 8 && x <= 10 && y === 8),
+              // 南の部屋
+              (x >= 4 && x <= 8 && y === 10) || (x === 4 && y >= 8 && y <= 10) || (x === 8 && y >= 8 && y <= 10),
+              // 西の部屋
+              (x >= 2 && x <= 4 && y === 4) || (x === 2 && y >= 4 && y <= 8) || (x >= 2 && x <= 4 && y === 8)
+            ]
+            const isRoomWall = roomWalls.some(wall => wall)
+            
+            // パズルギミック位置
+            const puzzleElements = [
+              {x: 6, y: 3, type: 'color_switch', name: '色彩の水晶'},
+              {x: 9, y: 6, type: 'number_lock', name: '数字の扉'},
+              {x: 6, y: 9, type: 'pattern_floor', name: '模様の床'},
+              {x: 3, y: 6, type: 'weight_scale', name: '重量の天秤'}
+            ]
+            const puzzleHere = puzzleElements.find(p => p.x === x && p.y === y)
+            
+            // 特殊床の設定
+            const specialFloors = [
+              {x: 5, y: 5, type: 'slippery'}, {x: 7, y: 7, type: 'slippery'},
+              {x: 4, y: 8, type: 'warp'}, {x: 8, y: 4, type: 'warp'}
+            ]
+            const specialFloor = specialFloors.find(f => f.x === x && f.y === y)
+            
+            let events = []
+            let decorations = []
+            let floorType: 'normal' | 'damage' | 'slippery' | 'pit' | 'warp' = 'normal'
+            
+            if (specialFloor) {
+              floorType = specialFloor.type as any
+            }
+            
+            // パズル要素の配置
+            if (puzzleHere) {
+              events.push({
+                id: `puzzle-${x}-${y}`,
+                name: puzzleHere.name,
+                type: 'switch' as const,
+                description: `${puzzleHere.type}を使った謎解き装置`,
+                position: { x, y },
+                appearance: { color: '#9370db', icon: 'switch', visible: true },
+                trigger: { type: 'interact' as const, repeatPolicy: { type: 'always' as const } },
+                actions: [{
+                  id: 'puzzle-interaction',
+                  type: 'custom' as const,
+                  params: { puzzleType: puzzleHere.type }
+                }],
+                properties: {
+                  puzzleType: puzzleHere.type,
+                  difficulty: 'medium',
+                  hintAvailable: true,
+                  solutionSteps: 3,
+                  resetOnFailure: true
+                }
+              })
+            }
+            
+            // 中央の賢者の石
+            if (x === 6 && y === 6) {
+              events.push({
+                id: 'sage-stone',
+                name: '賢者の石',
+                type: 'sign' as const,
+                description: '全てのパズルを解くと輝く神秘の石',
+                position: { x, y },
+                appearance: { color: '#ffd700', icon: 'sign', visible: true },
+                trigger: { type: 'interact' as const, repeatPolicy: { type: 'always' as const } },
+                actions: [{
+                  id: 'sage-message',
+                  type: 'message' as const,
+                  params: { text: '4つの試練を全て解けば、真の知恵が与えられん。' }
+                }],
+                properties: {
+                  requiredPuzzles: 4,
+                  completionReward: 'wisdom_scroll',
+                  glowEffect: true
+                }
+              })
+            }
+            
+            // 装飾的な要素
+            if (isInnerCircle && distanceFromCenter > 1.5) {
+              decorations.push({
+                id: `rune-${x}-${y}`,
+                name: '古代のルーン',
+                type: 'painting' as const,
+                position: { x, y },
+                appearance: { color: '#4169e1', icon: 'painting', visible: true },
+                properties: {
+                  runeType: 'ancient_knowledge',
+                  magicalAura: true
+                }
+              })
+            }
+            
+            return {
+              x, y,
+              floor: { type: floorType, passable: !isOuterWall && !isRoomWall },
+              walls: {
+                north: (y === 0 && !isEntrance) || (isRoomWall && y > 0) ? { type: 'normal' as const, transparent: false } : null,
+                east: (x === 12) || (isRoomWall && x < 12) ? { type: 'normal' as const, transparent: false } : null,
+                south: (y === 12) || (isRoomWall && y < 12) ? { type: 'normal' as const, transparent: false } : null,
+                west: (x === 0) || (isRoomWall && x > 0) ? { type: 'normal' as const, transparent: false } : null,
+              },
+              events,
+              decorations,
+              properties: puzzleHere ? { puzzleArea: true } : {}
+            }
+          })
+        ),
+        environment: {
+          lighting: { ambient: 0.6, sources: [] },
+          ceiling: { height: 6 },
+          audio: {}
+        },
+        properties: {
+          floorTheme: 'puzzle_mansion',
+          difficulty: 2,
+          recommendedLevel: [4, 7],
+          puzzleFocused: true,
+          puzzleCount: 4,
+          intellectualChallenge: true,
+          mechanicalComplexity: 'medium',
+          logicalThinking: 'required'
+        }
+      }
+    ],
+    resources: { textures: {}, sprites: {}, audio: {} },
+    metadata: {
+      created: new Date('2024-01-01').toISOString(),
+      modified: new Date('2024-01-01').toISOString(),
+      description: '知恵と論理的思考を試すパズルの館。戦闘よりも謎解きに重点を置いた、頭脳戦が楽しめるダンジョンです。'
+    },
+    properties: {
+      dungeonType: 'puzzle_mansion',
+      difficultyLevel: 'medium',
+      recommendedLevel: 15,
+      maxPartySize: 3,
+      estimatedCompletionTime: 75,
+      dungeonTheme: 'scholarly_challenges',
+      specialFeatures: ['puzzle_solving', 'logical_thinking', 'pattern_recognition', 'mechanical_devices'],
+      combatFocused: false,
+      intellectualChallenge: true,
+      puzzleVariety: 'high'
+    }
   }
 }
 
 export const getSampleDungeonsList = () => {
-  return Object.entries(sampleDungeons).map(([id, dungeon]) => ({
-    id,
-    name: dungeon.name,
-    description: dungeon.metadata.description || '',
-    author: dungeon.author,
-    difficulty: 'medium',
-    tags: ['完全ダンジョン', '3階層', '本格RPG', 'ボス戦', '宝箱', 'NPC'],
-    floors: dungeon.floors.length,
-    size: `${dungeon.floors[0]?.width || 0}×${dungeon.floors[0]?.height || 0}`
-  }))
+  return Object.entries(sampleDungeons).map(([id, dungeon]) => {
+    // ダンジョンごとの個別設定
+    const dungeonConfig = {
+      basicDungeon: {
+        difficulty: 'medium',
+        tags: ['完全ダンジョン', '3階層', '本格RPG', 'ボス戦', '宝箱', 'NPC']
+      },
+      tacticalFortress: {
+        difficulty: 'hard',
+        tags: ['戦術重視', '戦闘中心', 'トラップ', '敵配置', '戦略', '高難度']
+      },
+      puzzleMansion: {
+        difficulty: 'medium',
+        tags: ['パズル', '謎解き', '論理思考', '仕掛け', '知恵', '頭脳戦']
+      }
+    }
+    
+    const config = dungeonConfig[id as keyof typeof dungeonConfig] || {
+      difficulty: 'medium',
+      tags: ['ダンジョン']
+    }
+    
+    return {
+      id,
+      name: dungeon.name,
+      description: dungeon.metadata.description || '',
+      author: dungeon.author,
+      difficulty: config.difficulty,
+      tags: config.tags,
+      floors: dungeon.floors.length,
+      size: `${dungeon.floors[0]?.width || 0}×${dungeon.floors[0]?.height || 0}`
+    }
+  })
 }

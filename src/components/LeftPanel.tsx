@@ -41,7 +41,7 @@ import { useDispatch, useSelector } from 'react-redux'
 import { RootState } from '../store'
 import { setSelectedFloorType, setSelectedFloorPassable, setSelectedWallType, setSelectedDecorationType, setSelectedEventType, clearCapturedCellData, toggleFloorTypeAccordion, toggleWallTypeAccordion, toggleEventTypeAccordion, toggleDecorationTypeAccordion, openCustomTypeDialog, openEventEditDialog, setSelectedTemplate, setSelectedTool, setSelectedEventId, setHighlightedEventId, addCustomFloorType, updateCustomFloorType, removeCustomFloorType, addCustomWallType, updateCustomWallType, removeCustomWallType } from '../store/editorSlice'
 import { removeEventFromCell, addEventToCell, replaceFloorTypeInCells, replaceWallTypeInCells } from '../store/mapSlice'
-import { Layer, FloorType, WallType, DecorationType, EventType } from '../types/map'
+import { Layer, FloorType, WallType, DecorationType, EventType, EventPlacementType } from '../types/map'
 import FloorManagerPanel from './FloorManagerPanel'
 import EventTemplateDialog from './EventTemplateDialog'
 import { EventTemplate } from '../data/eventTemplates'
@@ -215,11 +215,11 @@ const LeftPanel: React.FC = () => {
   }
 
   const handleAddCustomFloorType = () => {
-    dispatch(openCustomTypeDialog({ mode: 'floor' }))
+    dispatch(openCustomTypeDialog({ type: 'floor', mode: 'add' }))
   }
 
   const handleAddCustomWallType = () => {
-    dispatch(openCustomTypeDialog({ mode: 'wall' }))
+    dispatch(openCustomTypeDialog({ type: 'wall', mode: 'add' }))
   }
 
   const handleDecorationTypeSelect = (decorationType: DecorationType) => {
@@ -303,7 +303,7 @@ const LeftPanel: React.FC = () => {
   const handleEditFloorType = () => {
     if (selectedFloorTypeForMenu) {
       // カスタムタイプダイアログを編集モードで開く
-      dispatch(openCustomTypeDialog({ mode: 'floor', editingType: selectedFloorTypeForMenu }))
+      dispatch(openCustomTypeDialog({ type: 'floor', mode: 'edit', data: selectedFloorTypeForMenu }))
       console.log('床タイプ編集:', selectedFloorTypeForMenu)
     }
     handleFloorTypeMenuClose()
@@ -361,7 +361,7 @@ const LeftPanel: React.FC = () => {
   const handleEditWallType = () => {
     if (selectedWallTypeForMenu) {
       // カスタムタイプダイアログを編集モードで開く
-      dispatch(openCustomTypeDialog({ mode: 'wall', editingType: selectedWallTypeForMenu }))
+      dispatch(openCustomTypeDialog({ type: 'wall', mode: 'edit', data: selectedWallTypeForMenu }))
       console.log('壁タイプ編集:', selectedWallTypeForMenu)
     }
     handleWallTypeMenuClose()
@@ -401,6 +401,122 @@ const LeftPanel: React.FC = () => {
     handleWallTypeMenuClose()
   }
 
+  // デフォルト床タイプの編集ハンドラー（読み取り専用）
+  const handleDefaultFloorTypeEdit = (floorType: { key: FloorType | 'normal_impassable'; name: string; color: string; description: string; passable?: boolean }) => {
+    // デフォルトの床タイプをカスタム床タイプ形式に変換（読み取り専用）
+    const customFloorType = {
+      id: `default-${floorType.key}`, // デフォルトタイプを示す特別なID
+      name: floorType.name,
+      description: floorType.description,
+      color: floorType.color,
+      passable: floorType.passable !== undefined ? floorType.passable : true,
+      properties: {},
+      // デフォルト床タイプの基本エフェクトを設定
+      effects: getDefaultFloorTypeEffects(floorType.key)
+    }
+    
+    // カスタム床タイプダイアログを読み取り専用モードで開く
+    dispatch(openCustomTypeDialog({
+      type: 'floor',
+      mode: 'view', // 読み取り専用モード
+      data: customFloorType
+    }))
+  }
+
+  // デフォルト床タイプの基本エフェクトを取得
+  const getDefaultFloorTypeEffects = (floorTypeKey: FloorType | 'normal_impassable') => {
+    switch (floorTypeKey) {
+      case 'damage':
+        return [{ type: 'damage' as const, value: 10 }]
+      case 'warp':
+        return [{ type: 'teleport' as const, targetX: 0, targetY: 0 }]
+      case 'normal':
+      case 'normal_impassable':
+      case 'slippery':
+      case 'pit':
+      default:
+        return []
+    }
+  }
+
+  // デフォルト壁タイプの編集ハンドラー（読み取り専用）
+  const handleDefaultWallTypeEdit = (wallType: { key: WallType; name: string; color: string; description: string }) => {
+    // デフォルトの壁タイプをカスタム壁タイプ形式に変換（読み取り専用）
+    const customWallType = {
+      id: `default-${wallType.key}`, // デフォルトタイプを示す特別なID
+      name: wallType.name,
+      description: wallType.description,
+      color: wallType.color,
+      transparent: getDefaultWallTransparency(wallType.key),
+      passable: getDefaultWallPassable(wallType.key),
+      properties: {},
+      // デフォルト壁タイプの基本動作を設定
+      behavior: getDefaultWallBehavior(wallType.key)
+    }
+    
+    // カスタム壁タイプダイアログを読み取り専用モードで開く
+    dispatch(openCustomTypeDialog({
+      type: 'wall',
+      mode: 'view', // 読み取り専用モード
+      data: customWallType
+    }))
+  }
+
+  // デフォルト壁タイプの透明度を取得
+  const getDefaultWallTransparency = (wallTypeKey: WallType) => {
+    switch (wallTypeKey) {
+      case 'invisible':
+        return true
+      case 'normal':
+      case 'door':
+      case 'locked_door':
+      case 'hidden_door':
+      case 'breakable':
+      case 'oneway':
+      case 'event':
+      default:
+        return false
+    }
+  }
+
+  // デフォルト壁タイプの通行可能性を取得
+  const getDefaultWallPassable = (wallTypeKey: WallType) => {
+    switch (wallTypeKey) {
+      case 'door':
+      case 'hidden_door':
+        return true
+      case 'normal':
+      case 'locked_door':
+      case 'breakable':
+      case 'oneway':
+      case 'invisible':
+      case 'event':
+      default:
+        return false
+    }
+  }
+
+  // デフォルト壁タイプの基本動作を取得
+  const getDefaultWallBehavior = (wallTypeKey: WallType) => {
+    switch (wallTypeKey) {
+      case 'door':
+        return { type: 'door' as const, requiresKey: '', durability: 1, script: '', targetX: 0, targetY: 0, targetFloor: '', properties: {} }
+      case 'locked_door':
+        return { type: 'door' as const, requiresKey: 'key', durability: 1, script: '', targetX: 0, targetY: 0, targetFloor: '', properties: {} }
+      case 'breakable':
+        return { type: 'breakable' as const, requiresKey: '', durability: 3, script: '', targetX: 0, targetY: 0, targetFloor: '', properties: {} }
+      case 'hidden_door':
+        return { type: 'door' as const, requiresKey: '', durability: 1, script: '', targetX: 0, targetY: 0, targetFloor: '', properties: {} }
+      case 'event':
+        return { type: 'switch' as const, requiresKey: '', durability: 1, script: '', targetX: 0, targetY: 0, targetFloor: '', properties: {} }
+      case 'normal':
+      case 'oneway':
+      case 'invisible':
+      default:
+        return { type: 'custom' as const, requiresKey: '', durability: 1, script: '', targetX: 0, targetY: 0, targetFloor: '', properties: {} }
+    }
+  }
+
   const handleTemplateSelect = (template: EventTemplate) => {
     if (template.presetEvent && dungeon) {
       const now = new Date().toISOString()
@@ -412,7 +528,7 @@ const LeftPanel: React.FC = () => {
         type: templateEvent.type || 'custom',
         name: templateEvent.name || 'イベント',
         description: templateEvent.description || '',
-        position: { x: 0, y: 0 }, // デフォルト位置
+        position: { x: 0, y: 0, placement: 'floor' as EventPlacementType }, // デフォルト位置
         appearance: {
           visible: true,
           ...templateEvent.appearance
@@ -564,26 +680,17 @@ const LeftPanel: React.FC = () => {
                         primary={floorType.name}
                         secondary={floorType.description}
                       />
-                      {floorType.key !== 'normal' && (
-                        <ListItemSecondaryAction>
+                      <ListItemSecondaryAction>
                           <IconButton 
                             size="small" 
                             onClick={(e) => {
                               e.stopPropagation()
-                              console.log('基本床タイプ編集:', {
-                                key: floorType.key,
-                                name: floorType.name,
-                                passable: floorType.passable,
-                                color: floorType.color
-                              })
-                              // TODO: 基本床タイプ編集機能を実装
-                              alert(`${floorType.name}の編集機能は今後実装予定です`)
+                              handleDefaultFloorTypeEdit(floorType)
                             }}
                           >
                             <MoreVertIcon fontSize="small" />
                           </IconButton>
                         </ListItemSecondaryAction>
-                      )}
                     </ListItemButton>
                   </ListItem>
                 ))}
@@ -683,6 +790,17 @@ const LeftPanel: React.FC = () => {
                         primary={wallType.name}
                         secondary={wallType.description}
                       />
+                      <ListItemSecondaryAction>
+                        <IconButton 
+                          size="small" 
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleDefaultWallTypeEdit(wallType)
+                          }}
+                        >
+                          <MoreVertIcon fontSize="small" />
+                        </IconButton>
+                      </ListItemSecondaryAction>
                     </ListItemButton>
                   </ListItem>
                 ))}
