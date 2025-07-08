@@ -227,6 +227,10 @@ const LeftPanel: React.FC = () => {
     dispatch(openCustomTypeDialog({ type: 'wall', mode: 'add' }))
   }
 
+  const handleAddCustomDecorationType = () => {
+    dispatch(openCustomTypeDialog({ type: 'decoration', mode: 'add' }))
+  }
+
   const handleDecorationTypeSelect = (decorationType: DecorationType) => {
     dispatch(setSelectedDecorationType(decorationType))
     // テンプレート選択を解除し、ペンツールに切り替え
@@ -406,6 +410,40 @@ const LeftPanel: React.FC = () => {
     handleWallTypeMenuClose()
   }
 
+  // カスタム装飾タイプの編集
+  const handleCustomDecorationTypeEdit = (decorationType: any) => {
+    dispatch(openCustomTypeDialog({
+      type: 'decoration',
+      mode: 'edit',
+      data: decorationType
+    }))
+    setDecorationTypeMenuAnchor(null)
+  }
+
+  // カスタム装飾タイプの削除
+  const handleCustomDecorationTypeDelete = (decorationType: any) => {
+    if (window.confirm(`装飾タイプ「${decorationType.name}」を削除しますか？`)) {
+      dispatch(removeCustomDecorationType(decorationType.id))
+      
+      // 削除された装飾タイプが現在選択されている場合、通常装飾に切り替え
+      if (selectedDecorationType === decorationType.id) {
+        dispatch(setSelectedDecorationType('furniture'))
+      }
+    }
+    setDecorationTypeMenuAnchor(null)
+  }
+
+  // 装飾タイプメニューの開閉
+  const handleDecorationTypeMenuOpen = (event: React.MouseEvent<HTMLElement>, decorationType: any) => {
+    setDecorationTypeMenuAnchor(event.currentTarget)
+    setSelectedDecorationTypeForMenu(decorationType)
+  }
+
+  const handleDecorationTypeMenuClose = () => {
+    setDecorationTypeMenuAnchor(null)
+    setSelectedDecorationTypeForMenu(null)
+  }
+
   // デフォルト床タイプの編集ハンドラー（読み取り専用）
   const handleDefaultFloorTypeEdit = (floorType: { key: FloorType | 'normal_impassable'; name: string; color: string; description: string; passable?: boolean }) => {
     // デフォルトの床タイプをカスタム床タイプ形式に変換（読み取り専用）
@@ -519,6 +557,86 @@ const LeftPanel: React.FC = () => {
       case 'invisible':
       default:
         return { type: 'custom' as const, requiresKey: '', durability: 1, script: '', targetX: 0, targetY: 0, targetFloor: '', properties: {} }
+    }
+  }
+
+  // デフォルト装飾タイプの編集ハンドラー（読み取り専用）
+  const handleDefaultDecorationTypeEdit = (decorationType: { key: DecorationType; name: string; color: string; description: string; icon: string }) => {
+    // デフォルトの装飾タイプをカスタム装飾タイプ形式に変換（読み取り専用）
+    const customDecorationType = {
+      id: `default-${decorationType.key}`, // デフォルトタイプを示す特別なID
+      name: decorationType.name,
+      description: decorationType.description,
+      color: decorationType.color,
+      icon: decorationType.icon,
+      interactable: getDefaultDecorationInteractable(decorationType.key),
+      layer: getDefaultDecorationLayer(decorationType.key),
+      properties: {},
+      script: getDefaultDecorationScript(decorationType.key)
+    }
+    
+    // カスタム装飾タイプダイアログを読み取り専用モードで開く
+    dispatch(openCustomTypeDialog({
+      type: 'decoration',
+      mode: 'view', // 読み取り専用モード
+      data: customDecorationType
+    }))
+  }
+
+  // デフォルト装飾タイプの相互作用可能性を取得
+  const getDefaultDecorationInteractable = (decorationTypeKey: DecorationType) => {
+    switch (decorationTypeKey) {
+      case 'furniture':
+      case 'painting':
+      case 'crystal':
+        return true
+      case 'statue':
+      case 'plant':
+      case 'torch':
+      case 'pillar':
+      case 'rug':
+      case 'rubble':
+      default:
+        return false
+    }
+  }
+
+  // デフォルト装飾タイプのレイヤーを取得
+  const getDefaultDecorationLayer = (decorationTypeKey: DecorationType) => {
+    switch (decorationTypeKey) {
+      case 'rug':
+        return 0 // 最背面
+      case 'pillar':
+      case 'statue':
+        return 2 // 前面
+      case 'furniture':
+      case 'plant':
+      case 'torch':
+      case 'painting':
+      case 'crystal':
+      case 'rubble':
+      default:
+        return 1 // 中間
+    }
+  }
+
+  // デフォルト装飾タイプのスクリプトを取得
+  const getDefaultDecorationScript = (decorationTypeKey: DecorationType) => {
+    switch (decorationTypeKey) {
+      case 'furniture':
+        return 'console.log("家具を調べた")'
+      case 'painting':
+        return 'console.log("絵画を鑑賞した")'
+      case 'crystal':
+        return 'console.log("クリスタルが輝いている")'
+      case 'statue':
+      case 'plant':
+      case 'torch':
+      case 'pillar':
+      case 'rug':
+      case 'rubble':
+      default:
+        return ''
     }
   }
 
@@ -1083,6 +1201,7 @@ const LeftPanel: React.FC = () => {
             </AccordionSummary>
             <AccordionDetails sx={{ p: 0 }}>
               <List dense>
+                {/* デフォルト装飾タイプ */}
                 {decorationTypes.map((decorationType) => (
                   <ListItem key={decorationType.key} disablePadding>
                     <ListItemButton
@@ -1100,9 +1219,59 @@ const LeftPanel: React.FC = () => {
                         primary={decorationType.name}
                         secondary={decorationType.description}
                       />
+                      <ListItemSecondaryAction>
+                        <IconButton
+                          edge="end"
+                          size="small"
+                          onClick={() => handleDefaultDecorationTypeEdit(decorationType)}
+                        >
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                      </ListItemSecondaryAction>
                     </ListItemButton>
                   </ListItem>
                 ))}
+                
+                {/* カスタム装飾タイプ */}
+                {customDecorationTypes.map((decorationType) => (
+                  <ListItem key={decorationType.id} disablePadding>
+                    <ListItemButton
+                      selected={selectedDecorationType === decorationType.id}
+                      onClick={() => handleDecorationTypeSelect(decorationType.id as DecorationType)}
+                      disabled={!dungeon}
+                      sx={{ pl: 2 }}
+                    >
+                      <ListItemIcon sx={{ minWidth: 32 }}>
+                        <Typography sx={{ fontSize: '16px' }}>
+                          {decorationType.icon}
+                        </Typography>
+                      </ListItemIcon>
+                      <ListItemText 
+                        primary={decorationType.name}
+                        secondary={decorationType.description}
+                      />
+                      <ListItemSecondaryAction>
+                        <IconButton
+                          edge="end"
+                          size="small"
+                          onClick={(e) => handleDecorationTypeMenuOpen(e, decorationType)}
+                        >
+                          <MoreVertIcon fontSize="small" />
+                        </IconButton>
+                      </ListItemSecondaryAction>
+                    </ListItemButton>
+                  </ListItem>
+                ))}
+                
+                {/* 装飾タイプ追加ボタン */}
+                <ListItem disablePadding>
+                  <ListItemButton onClick={handleAddCustomDecorationType} sx={{ pl: 2 }}>
+                    <ListItemIcon sx={{ minWidth: 32 }}>
+                      <AddIcon />
+                    </ListItemIcon>
+                    <ListItemText primary="カスタム装飾タイプを追加" />
+                  </ListItemButton>
+                </ListItem>
               </List>
             </AccordionDetails>
           </Accordion>
@@ -1354,6 +1523,34 @@ const LeftPanel: React.FC = () => {
           <ListItemText>複製</ListItemText>
         </MenuItem>
         <MenuItem onClick={handleDeleteWallType} sx={{ color: 'error.main' }}>
+          <ListItemIcon>
+            <DeleteIcon fontSize="small" sx={{ color: 'error.main' }} />
+          </ListItemIcon>
+          <ListItemText>削除</ListItemText>
+        </MenuItem>
+      </Menu>
+
+      {/* カスタム装飾タイプ操作メニュー */}
+      <Menu
+        anchorEl={decorationTypeMenuAnchor}
+        open={Boolean(decorationTypeMenuAnchor)}
+        onClose={handleDecorationTypeMenuClose}
+        anchorOrigin={{
+          vertical: 'top',
+          horizontal: 'right',
+        }}
+        transformOrigin={{
+          vertical: 'top',
+          horizontal: 'left',
+        }}
+      >
+        <MenuItem onClick={() => handleCustomDecorationTypeEdit(selectedDecorationTypeForMenu)}>
+          <ListItemIcon>
+            <EditIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>編集</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={() => handleCustomDecorationTypeDelete(selectedDecorationTypeForMenu)} sx={{ color: 'error.main' }}>
           <ListItemIcon>
             <DeleteIcon fontSize="small" sx={{ color: 'error.main' }} />
           </ListItemIcon>
