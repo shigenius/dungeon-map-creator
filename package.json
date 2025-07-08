@@ -17,7 +17,9 @@
     "test:coverage": "vitest run --coverage --reporter=default",
     "test:e2e": "npx playwright test --reporter=list",
     "test:e2e:ui": "playwright test --ui",
-    "test:all": "npm run test:unit && npm run test:e2e"
+    "test:all": "npm run test:unit && npm run test:e2e",
+    "deploy:gh": "npm run build && npx gh-pages -d dist",
+    "deploy:preview": "npm run build && npm run preview"
   },
   "dependencies": {
     "@emotion/react": "^11.11.1",
