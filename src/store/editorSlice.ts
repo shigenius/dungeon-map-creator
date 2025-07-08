@@ -1,5 +1,5 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit'
-import { DrawingTool, Layer, ViewMode, FloorType, WallType, Template, TemplateCategory, CustomFloorType, CustomWallType, DungeonEvent, DecorationType, EventType } from '../types/map'
+import { DrawingTool, Layer, ViewMode, FloorType, WallType, Template, TemplateCategory, CustomFloorType, CustomWallType, CustomDecorationType, DungeonEvent, DecorationType, EventType } from '../types/map'
 
 interface CapturedCellData {
   floor: {
@@ -65,10 +65,11 @@ interface EditorState {
   // カスタムタイプ関連の状態
   customFloorTypes: CustomFloorType[]
   customWallTypes: CustomWallType[]
+  customDecorationTypes: CustomDecorationType[]
   showCustomTypeDialog: boolean
-  customTypeDialogMode: 'floor' | 'wall' | null
+  customTypeDialogMode: 'floor' | 'wall' | 'decoration' | null
   customTypeDialogType: 'add' | 'edit' | 'view' | null
-  editingCustomType: CustomFloorType | CustomWallType | null
+  editingCustomType: CustomFloorType | CustomWallType | CustomDecorationType | null
   // イベント関連の状態
   showEventEditDialog: boolean
   editingEvent: DungeonEvent | null
@@ -134,6 +135,7 @@ const initialState: EditorState = {
   // カスタムタイプ関連の初期状態
   customFloorTypes: [],
   customWallTypes: [],
+  customDecorationTypes: [],
   showCustomTypeDialog: false,
   customTypeDialogMode: null,
   customTypeDialogType: null,
@@ -383,10 +385,31 @@ const editorSlice = createSlice({
       }
     },
 
+    addCustomDecorationType: (state, action: PayloadAction<CustomDecorationType>) => {
+      state.customDecorationTypes.push(action.payload)
+      // カスタム装飾タイプ作成後にアコーディオンを明示的に開いたままにする
+      state.accordionStates.decorationTypeAccordion = true
+      // 装飾レイヤーに切り替え（確実にアコーディオンが表示される状態にする）
+      state.selectedLayer = 'decorations'
+      // 新しく作成されたカスタム装飾タイプを自動的に選択
+      state.selectedDecorationType = action.payload.id as any
+    },
+
+    removeCustomDecorationType: (state, action: PayloadAction<string>) => {
+      state.customDecorationTypes = state.customDecorationTypes.filter(type => type.id !== action.payload)
+    },
+
+    updateCustomDecorationType: (state, action: PayloadAction<CustomDecorationType>) => {
+      const index = state.customDecorationTypes.findIndex(type => type.id === action.payload.id)
+      if (index !== -1) {
+        state.customDecorationTypes[index] = action.payload
+      }
+    },
+
     openCustomTypeDialog: (state, action: PayloadAction<{ 
-      type: 'floor' | 'wall'
+      type: 'floor' | 'wall' | 'decoration'
       mode: 'add' | 'edit' | 'view'
-      data?: CustomFloorType | CustomWallType 
+      data?: CustomFloorType | CustomWallType | CustomDecorationType 
     }>) => {
       state.showCustomTypeDialog = true
       state.customTypeDialogMode = action.payload.type
@@ -533,6 +556,10 @@ const editorSlice = createSlice({
     setCustomWallTypes: (state, action: PayloadAction<CustomWallType[]>) => {
       state.customWallTypes = action.payload
     },
+
+    setCustomDecorationTypes: (state, action: PayloadAction<CustomDecorationType[]>) => {
+      state.customDecorationTypes = action.payload
+    },
   },
 })
 
@@ -580,6 +607,9 @@ export const {
   addCustomWallType,
   removeCustomWallType,
   updateCustomWallType,
+  addCustomDecorationType,
+  removeCustomDecorationType,
+  updateCustomDecorationType,
   openCustomTypeDialog,
   closeCustomTypeDialog,
   // イベント関連のアクション
@@ -614,6 +644,7 @@ export const {
   // カスタムタイプ設定アクション
   setCustomFloorTypes,
   setCustomWallTypes,
+  setCustomDecorationTypes,
 } = editorSlice.actions
 
 export default editorSlice.reducer

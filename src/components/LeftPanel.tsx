@@ -39,7 +39,7 @@ import {
 } from '@mui/icons-material'
 import { useDispatch, useSelector } from 'react-redux'
 import { RootState } from '../store'
-import { setSelectedFloorType, setSelectedFloorPassable, setSelectedWallType, setSelectedDecorationType, setSelectedEventType, clearCapturedCellData, toggleFloorTypeAccordion, toggleWallTypeAccordion, toggleEventTypeAccordion, toggleDecorationTypeAccordion, openCustomTypeDialog, openEventEditDialog, setSelectedTemplate, setSelectedTool, setSelectedEventId, setHighlightedEventId, addCustomFloorType, updateCustomFloorType, removeCustomFloorType, addCustomWallType, updateCustomWallType, removeCustomWallType } from '../store/editorSlice'
+import { setSelectedFloorType, setSelectedFloorPassable, setSelectedWallType, setSelectedDecorationType, setSelectedEventType, clearCapturedCellData, toggleFloorTypeAccordion, toggleWallTypeAccordion, toggleEventTypeAccordion, toggleDecorationTypeAccordion, openCustomTypeDialog, openEventEditDialog, setSelectedTemplate, setSelectedTool, setSelectedEventId, setHighlightedEventId, addCustomFloorType, updateCustomFloorType, removeCustomFloorType, addCustomWallType, updateCustomWallType, removeCustomWallType, addCustomDecorationType, updateCustomDecorationType, removeCustomDecorationType } from '../store/editorSlice'
 import { removeEventFromCell, addEventToCell, replaceFloorTypeInCells, replaceWallTypeInCells } from '../store/mapSlice'
 import { Layer, FloorType, WallType, DecorationType, EventType, EventPlacementType } from '../types/map'
 import FloorManagerPanel from './FloorManagerPanel'
@@ -64,6 +64,7 @@ const LeftPanel: React.FC = () => {
   // カスタムタイプ関連
   const customFloorTypes = useSelector((state: RootState) => state.editor.customFloorTypes)
   const customWallTypes = useSelector((state: RootState) => state.editor.customWallTypes)
+  const customDecorationTypes = useSelector((state: RootState) => state.editor.customDecorationTypes)
   
   // その他の状態
   const capturedCellData = useSelector((state: RootState) => state.editor.capturedCellData)
@@ -82,6 +83,10 @@ const LeftPanel: React.FC = () => {
   // カスタム壁タイプ操作メニューの状態管理
   const [wallTypeMenuAnchor, setWallTypeMenuAnchor] = useState<null | HTMLElement>(null)
   const [selectedWallTypeForMenu, setSelectedWallTypeForMenu] = useState<any>(null)
+  
+  // カスタム装飾タイプ操作メニューの状態管理
+  const [decorationTypeMenuAnchor, setDecorationTypeMenuAnchor] = useState<null | HTMLElement>(null)
+  const [selectedDecorationTypeForMenu, setSelectedDecorationTypeForMenu] = useState<any>(null)
   
   // イベント検索・フィルタの状態管理
   const [eventSearchQuery, setEventSearchQuery] = useState('')

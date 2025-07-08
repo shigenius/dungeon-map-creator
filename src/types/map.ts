@@ -110,6 +110,18 @@ export interface CustomWallType {
   }
 }
 
+export interface CustomDecorationType {
+  id: string
+  name: string
+  description: string
+  color: string
+  icon: string
+  interactable: boolean
+  layer: number
+  properties: Record<string, any>
+  script?: string
+}
+
 // テンプレート関連の型定義
 export type TemplateCategory = 
   | 'room'        // 部屋

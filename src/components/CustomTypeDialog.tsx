@@ -35,8 +35,10 @@ import {
   addCustomWallType,
   updateCustomFloorType,
   updateCustomWallType,
+  addCustomDecorationType,
+  updateCustomDecorationType,
 } from '../store/editorSlice'
-import { CustomFloorType, CustomWallType } from '../types/map'
+import { CustomFloorType, CustomWallType, CustomDecorationType } from '../types/map'
 
 interface TabPanelProps {
   children?: React.ReactNode
@@ -54,7 +56,7 @@ const TabPanel: React.FC<TabPanelProps> = ({ children, value, index }) => {
 
 const CustomTypeDialog: React.FC = () => {
   const dispatch = useDispatch()
-  const { showCustomTypeDialog, customTypeDialogMode, customTypeDialogType, editingCustomType, customFloorTypes, customWallTypes } = useSelector(
+  const { showCustomTypeDialog, customTypeDialogMode, customTypeDialogType, editingCustomType, customFloorTypes, customWallTypes, customDecorationTypes } = useSelector(
     (state: RootState) => state.editor
   )
 
@@ -101,12 +103,26 @@ const CustomTypeDialog: React.FC = () => {
     }
   })
 
+  // 装飾タイプのフォーム状態
+  const [decorationForm, setDecorationForm] = useState({
+    id: '',
+    name: '',
+    description: '',
+    color: '#00ff00',
+    icon: '🪑',
+    interactable: false,
+    layer: 1,
+    properties: {} as Record<string, any>,
+    script: ''
+  })
+
   const [newPropertyKey, setNewPropertyKey] = useState('')
   const [newPropertyValue, setNewPropertyValue] = useState('')
   
   // ID編集のエラー状態
   const [floorIdError, setFloorIdError] = useState('')
   const [wallIdError, setWallIdError] = useState('')
+  const [decorationIdError, setDecorationIdError] = useState('')
 
   // ID重複チェック関数
   const checkFloorIdDuplicate = (newId: string) => {
@@ -130,6 +146,12 @@ const CustomTypeDialog: React.FC = () => {
     const duplicateWall = customWallTypes.find(wall => wall.id === newId)
     if (duplicateWall) {
       return 'このIDは既に壁タイプで使用されています'
+    }
+    
+    // カスタム装飾タイプとの重複チェック
+    const duplicateDecoration = customDecorationTypes.find(decoration => decoration.id === newId)
+    if (duplicateDecoration) {
+      return 'このIDは既に装飾タイプで使用されています'
     }
     
     return ''
@@ -156,6 +178,44 @@ const CustomTypeDialog: React.FC = () => {
     const duplicateFloor = customFloorTypes.find(floor => floor.id === newId)
     if (duplicateFloor) {
       return 'このIDは既に床タイプで使用されています'
+    }
+    
+    // カスタム装飾タイプとの重複チェック
+    const duplicateDecoration = customDecorationTypes.find(decoration => decoration.id === newId)
+    if (duplicateDecoration) {
+      return 'このIDは既に装飾タイプで使用されています'
+    }
+    
+    return ''
+  }
+
+  const checkDecorationIdDuplicate = (newId: string) => {
+    if (!newId.trim()) {
+      return 'IDは必須です'
+    }
+    
+    // 現在編集中のアイテムのIDは除外
+    const originalId = isEditMode && editingCustomType ? (editingCustomType as CustomDecorationType).id : null
+    if (originalId === newId) {
+      return ''
+    }
+    
+    // カスタム装飾タイプとの重複チェック
+    const duplicateDecoration = customDecorationTypes.find(decoration => decoration.id === newId)
+    if (duplicateDecoration) {
+      return 'このIDは既に装飾タイプで使用されています'
+    }
+    
+    // カスタム床タイプとの重複チェック
+    const duplicateFloor = customFloorTypes.find(floor => floor.id === newId)
+    if (duplicateFloor) {
+      return 'このIDは既に床タイプで使用されています'
+    }
+    
+    // カスタム壁タイプとの重複チェック
+    const duplicateWall = customWallTypes.find(wall => wall.id === newId)
+    if (duplicateWall) {
+      return 'このIDは既に壁タイプで使用されています'
     }
     
     return ''
