@@ -2,15 +2,13 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Provider } from 'react-redux'
-import { configureStore } from '@reduxjs/toolkit'
 import RightPanel from '../RightPanel'
-import mapSliceReducer from '../../store/mapSlice'
-import editorSliceReducer from '../../store/editorSlice'
+import { createTestStore } from '../../store/testStore'
 import { setSelectedTemplate, setHoveredCellInfo, setSelectedLayer } from '../../store/editorSlice'
 import { Dungeon, Template } from '../../types/map'
 
 describe('RightPanel 統合テスト', () => {
-  let store: ReturnType<typeof configureStore>
+  let store: ReturnType<typeof createTestStore>
   let user: ReturnType<typeof userEvent.setup>
   let testDungeon: Dungeon
   let testTemplates: Template[]
@@ -97,17 +95,7 @@ describe('RightPanel 統合テスト', () => {
       }
     ]
 
-    store = configureStore({
-      reducer: {
-        map: mapSliceReducer,
-        editor: editorSliceReducer
-      },
-      middleware: (getDefaultMiddleware) =>
-        getDefaultMiddleware({
-          // テスト環境では重いmiddlewareを無効化
-          serializableCheck: false,
-          immutableCheck: false,
-        }),
+    store = createTestStore()
       preloadedState: {
         map: {
           dungeon: testDungeon,

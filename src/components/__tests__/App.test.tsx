@@ -2,11 +2,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Provider } from 'react-redux'
-import { configureStore } from '@reduxjs/toolkit'
 import App from '../../App'
-import mapSliceReducer from '../../store/mapSlice'
-import editorSliceReducer from '../../store/editorSlice'
-import { RootState } from '../../store'
+import { createTestStore } from '../../store/testStore'
 
 // グローバルモック（setup.tsで設定済み）
 
@@ -36,16 +33,11 @@ HTMLCanvasElement.prototype.getContext = mockCanvas.getContext as any
 HTMLCanvasElement.prototype.getBoundingClientRect = mockCanvas.getBoundingClientRect as any
 
 describe('App 統合テスト', () => {
-  let store: ReturnType<typeof configureStore>
+  let store: ReturnType<typeof createTestStore>
   let user: ReturnType<typeof userEvent.setup>
 
   beforeEach(() => {
-    store = configureStore({
-      reducer: {
-        map: mapSliceReducer,
-        editor: editorSliceReducer
-      }
-    })
+    store = createTestStore()
 
     user = userEvent.setup()
     vi.clearAllMocks()
@@ -63,7 +55,7 @@ describe('App 統合テスト', () => {
         </Provider>
       )
 
-      expect(screen.getByText('Dungeon Map Creator')).toBeInTheDocument()
+      expect(screen.getByText('ダンジョンマップエディター')).toBeInTheDocument()
       expect(screen.getByText('新しいプロジェクト')).toBeInTheDocument()
     })
 
@@ -95,7 +87,7 @@ describe('App 統合テスト', () => {
         </Provider>
       )
 
-      expect(screen.getByText('プロジェクトが読み込まれていません')).toBeInTheDocument()
+      expect(screen.getByText('プロジェクトを作成してください')).toBeInTheDocument()
     })
   })
 
