@@ -17,10 +17,15 @@ module.exports = {
       'warn',
       { allowConstantExport: true },
     ],
-    'no-unused-vars': 'warn',
+    'no-unused-vars': ['warn', { 
+      argsIgnorePattern: '^_',
+      varsIgnorePattern: '^_|^React$',
+      ignoreRestSiblings: true 
+    }],
     'no-undef': 'off', // TypeScriptがチェックするため無効化
     'no-case-declarations': 'off', // TypeScriptで適切に処理されるため
     'no-constant-condition': 'warn',
+    'react-hooks/exhaustive-deps': 'warn',
   },
   globals: {
     NodeJS: 'readonly',
