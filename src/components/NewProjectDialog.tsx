@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import {
   Dialog,
   DialogTitle,
@@ -37,11 +37,13 @@ const NewProjectDialog: React.FC = () => {
   const [currentTab, setCurrentTab] = useState(0)
   
   const sampleDungeonsList = getSampleDungeonsList()
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const firstInputRef = useRef<HTMLInputElement>(null)
 
   const open = !dungeon || showNewProjectDialog
 
   // ダイアログが開いた時にフィールドをリセット
-  React.useEffect(() => {
+  useEffect(() => {
     if (showNewProjectDialog && dungeon) {
       setDungeonName('')
       setAuthor('')
@@ -49,6 +51,24 @@ const NewProjectDialog: React.FC = () => {
       setHeight(20)
     }
   }, [showNewProjectDialog, dungeon])
+
+  // フォーカス管理
+  useEffect(() => {
+    if (open && currentTab === 0) {
+      // 短いディレイでフォーカスを設定（Dialogの描画完了後）
+      const timer = setTimeout(() => {
+        firstInputRef.current?.focus()
+      }, 100)
+      return () => clearTimeout(timer)
+    }
+  }, [open, currentTab])
+
+  // キーボードナビゲーション
+  const handleKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key === 'Escape' && !isInitialProjectDialog) {
+      handleCancel()
+    }
+  }
 
   const handleCreate = () => {
     dispatch(createNewDungeon({
@@ -61,7 +81,9 @@ const NewProjectDialog: React.FC = () => {
   }
 
   const handleCancel = () => {
-    dispatch(closeNewProjectDialog())
+    if (!isInitialProjectDialog) {
+      dispatch(closeNewProjectDialog())
+    }
   }
 
   const handleSampleSelect = (sampleId: string) => {
@@ -83,32 +105,55 @@ const NewProjectDialog: React.FC = () => {
 
   return (
     <Dialog
+      ref={dialogRef}
       open={open}
-      onClose={handleCancel}
+      onClose={isInitialProjectDialog ? undefined : handleCancel}
       maxWidth="md"
       fullWidth
-      disableEscapeKeyDown
+      disableEscapeKeyDown={isInitialProjectDialog}
+      onKeyDown={handleKeyDown}
+      aria-labelledby="new-project-dialog-title"
+      aria-describedby="new-project-dialog-description"
     >
-      <DialogTitle>新規プロジェクト作成</DialogTitle>
-      <DialogContent>
+      <DialogTitle id="new-project-dialog-title">新規プロジェクト作成</DialogTitle>
+      <DialogContent id="new-project-dialog-description">
         <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
-          <Tabs value={currentTab} onChange={(_, newValue) => setCurrentTab(newValue)}>
-            <Tab label="空のプロジェクト" />
-            <Tab label="サンプルから選択" />
+          <Tabs 
+            value={currentTab} 
+            onChange={(_, newValue) => setCurrentTab(newValue)}
+            aria-label="プロジェクト作成方法の選択"
+          >
+            <Tab label="空のプロジェクト" aria-controls="tabpanel-0" />
+            <Tab label="サンプルから選択" aria-controls="tabpanel-1" />
           </Tabs>
         </Box>
 
         {currentTab === 0 && (
+          <div role="tabpanel" id="tabpanel-0" aria-labelledby="tab-0">
           <Grid container spacing={3} sx={{ mt: 1 }}>
           <Grid item xs={12}>
             <TextField
+              ref={firstInputRef}
               fullWidth
               label="ダンジョン名"
               value={dungeonName}
               onChange={(e) => setDungeonName(e.target.value)}
               placeholder="新しいダンジョン"
               required
+              aria-describedby="dungeon-name-help"
+              inputProps={{
+                'aria-label': 'ダンジョン名を入力してください',
+                maxLength: 50
+              }}
             />
+            <Typography 
+              id="dungeon-name-help" 
+              variant="caption" 
+              color="text.secondary"
+              sx={{ mt: 0.5, display: 'block' }}
+            >
+              最大50文字まで入力できます
+            </Typography>
           </Grid>
           <Grid item xs={12}>
             <TextField
@@ -117,7 +162,20 @@ const NewProjectDialog: React.FC = () => {
               value={author}
               onChange={(e) => setAuthor(e.target.value)}
               placeholder="名前を入力（任意）"
+              aria-describedby="author-help"
+              inputProps={{
+                'aria-label': '作成者名を入力してください（任意）',
+                maxLength: 30
+              }}
             />
+            <Typography 
+              id="author-help" 
+              variant="caption" 
+              color="text.secondary"
+              sx={{ mt: 0.5, display: 'block' }}
+            >
+              最大30文字まで。未入力の場合は「名無し」になります
+            </Typography>
           </Grid>
           <Grid item xs={6}>
             <Typography gutterBottom>
@@ -135,7 +193,18 @@ const NewProjectDialog: React.FC = () => {
                 { value: 50, label: '50' },
                 { value: 100, label: '100' },
               ]}
+              aria-label="マップの幅"
+              aria-describedby="width-help"
+              valueLabelDisplay="auto"
+              valueLabelFormat={(value) => `${value}マス`}
             />
+            <Typography 
+              id="width-help" 
+              variant="caption" 
+              color="text.secondary"
+            >
+              矢印キーまたはホームエンドキーで調整できます
+            </Typography>
           </Grid>
           <Grid item xs={6}>
             <Typography gutterBottom>
@@ -153,7 +222,18 @@ const NewProjectDialog: React.FC = () => {
                 { value: 50, label: '50' },
                 { value: 100, label: '100' },
               ]}
+              aria-label="マップの高さ"
+              aria-describedby="height-help"
+              valueLabelDisplay="auto"
+              valueLabelFormat={(value) => `${value}マス`}
             />
+            <Typography 
+              id="height-help" 
+              variant="caption" 
+              color="text.secondary"
+            >
+              矢印キーまたはホームエンドキーで調整できます
+            </Typography>
           </Grid>
           <Grid item xs={12}>
             <Box sx={{ bgcolor: 'background.default', p: 2, borderRadius: 1 }}>
@@ -166,9 +246,11 @@ const NewProjectDialog: React.FC = () => {
             </Box>
           </Grid>
           </Grid>
+          </div>
         )}
 
         {currentTab === 1 && (
+          <div role="tabpanel" id="tabpanel-1" aria-labelledby="tab-1">
           <Box sx={{ mt: 1 }}>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
               以下のサンプルダンジョンから選択してプロジェクトを開始できます
@@ -207,29 +289,55 @@ const NewProjectDialog: React.FC = () => {
                         size="small"
                         variant="contained"
                         onClick={() => handleSampleSelect(sample.id)}
+                        aria-label={`${sample.name}サンプルを選択`}
+                        aria-describedby={`sample-${sample.id}-description`}
                       >
                         このサンプルを使用
                       </Button>
+                      <Typography 
+                        id={`sample-${sample.id}-description`} 
+                        variant="caption" 
+                        sx={{ display: 'none' }}
+                      >
+                        {sample.description}
+                      </Typography>
                     </CardActions>
                   </Card>
                 </Grid>
               ))}
             </Grid>
           </Box>
+          </div>
         )}
       </DialogContent>
       <DialogActions>
         {!isInitialProjectDialog && (
-          <Button onClick={handleCancel}>キャンセル</Button>
+          <Button 
+            onClick={handleCancel}
+            aria-label="プロジェクト作成をキャンセル"
+          >
+            キャンセル
+          </Button>
         )}
         {currentTab === 0 && (
           <Button 
             onClick={handleCreate} 
             variant="contained"
             disabled={!dungeonName.trim()}
+            aria-label="新しいダンジョンプロジェクトを作成"
+            aria-describedby="create-button-help"
           >
             作成
           </Button>
+        )}
+        {currentTab === 0 && (
+          <Typography 
+            id="create-button-help" 
+            variant="caption" 
+            sx={{ display: 'none' }}
+          >
+            Enterキーでも作成できます
+          </Typography>
         )}
       </DialogActions>
     </Dialog>

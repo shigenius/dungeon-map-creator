@@ -340,8 +340,10 @@ const editorSlice = createSlice({
     // カスタムタイプ関連のアクション
     addCustomFloorType: (state, action: PayloadAction<CustomFloorType>) => {
       state.customFloorTypes.push(action.payload)
-      // カスタム床タイプ作成後にアコーディオンを開いたままにする
+      // カスタム床タイプ作成後にアコーディオンを明示的に開いたままにする
       state.accordionStates.floorTypeAccordion = true
+      // 床レイヤーに切り替え（確実にアコーディオンが表示される状態にする）
+      state.selectedLayer = 'floor'
       // 新しく作成されたカスタム床タイプを自動的に選択
       state.selectedFloorType = action.payload.id as any
       state.selectedFloorPassable = action.payload.passable
@@ -360,6 +362,12 @@ const editorSlice = createSlice({
 
     addCustomWallType: (state, action: PayloadAction<CustomWallType>) => {
       state.customWallTypes.push(action.payload)
+      // カスタム壁タイプ作成後にアコーディオンを明示的に開いたままにする
+      state.accordionStates.wallTypeAccordion = true
+      // 壁レイヤーに切り替え（確実にアコーディオンが表示される状態にする）
+      state.selectedLayer = 'walls'
+      // 新しく作成されたカスタム壁タイプを自動的に選択
+      state.selectedWallType = action.payload.id as any
     },
 
     removeCustomWallType: (state, action: PayloadAction<string>) => {
@@ -377,12 +385,7 @@ const editorSlice = createSlice({
       state.showCustomTypeDialog = true
       state.customTypeDialogMode = action.payload.mode
       state.editingCustomType = action.payload.editingType || null
-      // カスタムタイプダイアログを開く時に対応するアコーディオンを開いておく
-      if (action.payload.mode === 'floor') {
-        state.accordionStates.floorTypeAccordion = true
-      } else if (action.payload.mode === 'wall') {
-        state.accordionStates.wallTypeAccordion = true
-      }
+      // アコーディオン状態の変更をここから削除（別途管理）
     },
 
     closeCustomTypeDialog: (state) => {
@@ -390,6 +393,13 @@ const editorSlice = createSlice({
       state.editingCustomType = null
       // アコーディオン状態を維持するためcustomTypeDialogModeはリセットしない
       // state.customTypeDialogMode = null
+      
+      // カスタムタイプダイアログを閉じる際に該当アコーディオンを明示的に開いたままにする
+      if (state.customTypeDialogMode === 'floor') {
+        state.accordionStates.floorTypeAccordion = true
+      } else if (state.customTypeDialogMode === 'wall') {
+        state.accordionStates.wallTypeAccordion = true
+      }
     },
 
     // イベント関連のアクション

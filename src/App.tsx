@@ -10,6 +10,7 @@ import ToolBar from './components/ToolBar'
 import LeftPanel from './components/LeftPanel'
 import RightPanel from './components/RightPanel'
 import BottomPanel from './components/BottomPanel'
+import AccessibilityAnnouncer from './components/AccessibilityAnnouncer'
 
 // コード分割: 大きなコンポーネントを遅延読み込み
 const MainCanvas = lazy(() => import('./components/MainCanvas'))
@@ -323,6 +324,9 @@ function App() {
         }}
       />
       </Suspense>
+      
+      {/* アクセシビリティアナウンサー */}
+      <AccessibilityAnnouncer />
     </Box>
   )
 }

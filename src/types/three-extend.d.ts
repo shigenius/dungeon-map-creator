@@ -1,6 +1,7 @@
 // Three.js JSX elements type definitions for react-three-fiber
-import { Object3DNode, extend } from 'react-three-fiber'
+import { Object3DNode, extend } from '@react-three/fiber'
 import * as THREE from 'three'
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 
 declare global {
   namespace JSX {
@@ -24,6 +25,9 @@ declare global {
       
       // Helpers
       gridHelper: Object3DNode<THREE.GridHelper, typeof THREE.GridHelper>
+      
+      // Controls
+      orbitControls: Object3DNode<OrbitControls, typeof OrbitControls>
     }
   }
 }

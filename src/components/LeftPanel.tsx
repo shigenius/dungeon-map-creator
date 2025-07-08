@@ -24,7 +24,7 @@ import {
 import {
   ExpandMore as ExpandMoreIcon,
   GridOn as FloorIcon,
-  ViewWeek as WallIcon,
+  BorderAll as WallIcon,
   Event as EventIcon,
   Palette as DecorationIcon,
   Colorize as EyedropperIcon,
@@ -45,10 +45,29 @@ import { Layer, FloorType, WallType, DecorationType, EventType } from '../types/
 import FloorManagerPanel from './FloorManagerPanel'
 import EventTemplateDialog from './EventTemplateDialog'
 import { EventTemplate } from '../data/eventTemplates'
+import { getFloorTypePattern, getFloorTypeIcon, getEventShape, getEventPattern } from '../utils/accessibilityUtils'
 
 const LeftPanel: React.FC = () => {
   const dispatch = useDispatch()
-  const { selectedLayer, selectedFloorType, selectedFloorPassable, selectedWallType, selectedDecorationType, selectedEventType, capturedCellData, accordionStates, customFloorTypes, customWallTypes, currentFloor } = useSelector((state: RootState) => state.editor)
+  
+  // アコーディオン状態専用のセレクター（最適化のため分離）
+  const accordionStates = useSelector((state: RootState) => state.editor.accordionStates)
+  
+  // 基本的な選択状態
+  const selectedLayer = useSelector((state: RootState) => state.editor.selectedLayer)
+  const selectedFloorType = useSelector((state: RootState) => state.editor.selectedFloorType)
+  const selectedFloorPassable = useSelector((state: RootState) => state.editor.selectedFloorPassable)
+  const selectedWallType = useSelector((state: RootState) => state.editor.selectedWallType)
+  const selectedDecorationType = useSelector((state: RootState) => state.editor.selectedDecorationType)
+  const selectedEventType = useSelector((state: RootState) => state.editor.selectedEventType)
+  
+  // カスタムタイプ関連
+  const customFloorTypes = useSelector((state: RootState) => state.editor.customFloorTypes)
+  const customWallTypes = useSelector((state: RootState) => state.editor.customWallTypes)
+  
+  // その他の状態
+  const capturedCellData = useSelector((state: RootState) => state.editor.capturedCellData)
+  const currentFloor = useSelector((state: RootState) => state.editor.currentFloor)
   const dungeon = useSelector((state: RootState) => state.map.dungeon)
 
   // イベント操作メニューの状態管理
@@ -528,10 +547,18 @@ const LeftPanel: React.FC = () => {
                             width: 16,
                             height: 16,
                             bgcolor: floorType.color,
-                            border: '1px solid #ccc',
+                            backgroundImage: getFloorTypePattern(floorType.key),
+                            border: selectedFloorType === floorType.key ? '2px solid #000' : '1px solid #ccc',
                             borderRadius: '2px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '8px',
                           }}
-                        />
+                          aria-label={`${floorType.name}の床タイプアイコン`}
+                        >
+                          {getFloorTypeIcon(floorType.key)}
+                        </Box>
                       </ListItemIcon>
                       <ListItemText 
                         primary={floorType.name}
@@ -637,9 +664,19 @@ const LeftPanel: React.FC = () => {
                             width: 16,
                             height: 16,
                             bgcolor: wallType.color,
-                            border: '1px solid #ccc',
+                            border: selectedWallType === wallType.key ? '2px solid #000' : '1px solid #ccc',
                             borderRadius: '2px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '8px',
+                            '&::before': {
+                              content: '"▮"',
+                              color: 'rgba(0,0,0,0.7)',
+                              fontWeight: 'bold',
+                            }
                           }}
+                          aria-label={`${wallType.name}の壁タイプアイコン`}
                         />
                       </ListItemIcon>
                       <ListItemText 

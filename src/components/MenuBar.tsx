@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useCallback } from 'react'
 import {
   AppBar,
   Toolbar,
@@ -48,6 +48,56 @@ const MenuBar: React.FC = () => {
   const [viewMenuAnchor, setViewMenuAnchor] = React.useState<null | HTMLElement>(null)
   const [helpMenuAnchor, setHelpMenuAnchor] = React.useState<null | HTMLElement>(null)
 
+  // キーボードナビゲーション用のハンドラー
+  const handleMenuKeyDown = useCallback((event: React.KeyboardEvent, menuType: string) => {
+    switch (event.key) {
+      case 'ArrowRight':
+        // 次のメニューに移動
+        event.preventDefault()
+        closeAllMenus()
+        const nextMenu = getNextMenu(menuType)
+        if (nextMenu) {
+          const nextButton = document.querySelector(`[aria-label="${nextMenu}メニュー"]`) as HTMLElement
+          nextButton?.focus()
+        }
+        break
+      case 'ArrowLeft':
+        // 前のメニューに移動
+        event.preventDefault()
+        closeAllMenus()
+        const prevMenu = getPrevMenu(menuType)
+        if (prevMenu) {
+          const prevButton = document.querySelector(`[aria-label="${prevMenu}メニュー"]`) as HTMLElement
+          prevButton?.focus()
+        }
+        break
+      case 'Escape':
+        // メニューを閉じる
+        event.preventDefault()
+        closeAllMenus()
+        break
+    }
+  }, [])
+
+  const closeAllMenus = () => {
+    setFileMenuAnchor(null)
+    setEditMenuAnchor(null)
+    setViewMenuAnchor(null)
+    setHelpMenuAnchor(null)
+  }
+
+  const getNextMenu = (current: string): string | null => {
+    const menus = ['ファイル', '編集', '表示', 'ヘルプ']
+    const currentIndex = menus.indexOf(current)
+    return currentIndex < menus.length - 1 ? menus[currentIndex + 1] : menus[0]
+  }
+
+  const getPrevMenu = (current: string): string | null => {
+    const menus = ['ファイル', '編集', '表示', 'ヘルプ']
+    const currentIndex = menus.indexOf(current)
+    return currentIndex > 0 ? menus[currentIndex - 1] : menus[menus.length - 1]
+  }
+
   const handleFileMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setFileMenuAnchor(event.currentTarget)
   }
@@ -88,7 +138,7 @@ const MenuBar: React.FC = () => {
     handleMenuClose()
   }
 
-  const handleSwitchView = (mode: '2d') => {
+  const handleSwitchView = (mode: '2d' | '3d') => {
     dispatch(setViewMode(mode))
     handleMenuClose()
   }
@@ -164,14 +214,40 @@ const MenuBar: React.FC = () => {
           3D ダンジョンマップクリエイター
         </Typography>
         
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button color="inherit" onClick={handleFileMenuOpen}>
+        <Box sx={{ display: 'flex', gap: 1 }} role="menubar" aria-label="メインメニューバー">
+          <Button 
+            color="inherit" 
+            onClick={handleFileMenuOpen}
+            onKeyDown={(e) => handleMenuKeyDown(e, 'ファイル')}
+            aria-label="ファイルメニュー"
+            aria-haspopup="true"
+            aria-expanded={Boolean(fileMenuAnchor)}
+            aria-controls={fileMenuAnchor ? 'file-menu' : undefined}
+          >
             ファイル
           </Button>
-          <Button color="inherit" onClick={handleEditMenuOpen} disabled={!dungeon}>
+          <Button 
+            color="inherit" 
+            onClick={handleEditMenuOpen} 
+            disabled={!dungeon}
+            onKeyDown={(e) => handleMenuKeyDown(e, '編集')}
+            aria-label="編集メニュー"
+            aria-haspopup="true"
+            aria-expanded={Boolean(editMenuAnchor)}
+            aria-controls={editMenuAnchor ? 'edit-menu' : undefined}
+          >
             編集
           </Button>
-          <Button color="inherit" onClick={handleViewMenuOpen} disabled={!dungeon}>
+          <Button 
+            color="inherit" 
+            onClick={handleViewMenuOpen}
+            disabled={!dungeon}
+            onKeyDown={(e) => handleMenuKeyDown(e, '表示')}
+            aria-label="表示メニュー"
+            aria-haspopup="true"
+            aria-expanded={Boolean(viewMenuAnchor)}
+            aria-controls={viewMenuAnchor ? 'view-menu' : undefined}
+          >
             表示
           </Button>
           <Button 
@@ -185,7 +261,15 @@ const MenuBar: React.FC = () => {
           >
             マップ検証
           </Button>
-          <Button color="inherit" onClick={handleHelpMenuOpen}>
+          <Button 
+            color="inherit" 
+            onClick={handleHelpMenuOpen}
+            onKeyDown={(e) => handleMenuKeyDown(e, 'ヘルプ')}
+            aria-label="ヘルプメニュー"
+            aria-haspopup="true"
+            aria-expanded={Boolean(helpMenuAnchor)}
+            aria-controls={helpMenuAnchor ? 'help-menu' : undefined}
+          >
             ヘルプ
           </Button>
         </Box>
@@ -212,6 +296,8 @@ const MenuBar: React.FC = () => {
               onChange={(_, value) => value && handleLayerChange(value)}
               size="small"
               sx={{ mr: 3 }}
+              role="radiogroup"
+              aria-label="編集レイヤー選択"
             >
               {(['floor', 'walls', 'events', 'decorations'] as Layer[]).map((layer) => (
                 <ToggleButton
@@ -229,6 +315,9 @@ const MenuBar: React.FC = () => {
                       }
                     }
                   }}
+                  role="radio"
+                  aria-checked={selectedLayer === layer}
+                  aria-label={`${getLayerLabel(layer)}レイヤーを選択`}
                 >
                   {getLayerIcon(layer)}
                   <Box component="span" sx={{ ml: 1 }}>
@@ -299,26 +388,61 @@ const MenuBar: React.FC = () => {
         open={Boolean(editMenuAnchor)}
         onClose={handleMenuClose}
       >
-        <MenuItem onClick={handleUndo}>元に戻す (Ctrl+Z)</MenuItem>
-        <MenuItem onClick={handleRedo}>やり直し (Ctrl+Y)</MenuItem>
+        <MenuItem 
+          onClick={handleUndo}
+          role="menuitem"
+          aria-label="元に戻す (Ctrl+Z)"
+        >
+          元に戻す (Ctrl+Z)
+        </MenuItem>
+        <MenuItem 
+          onClick={handleRedo}
+          role="menuitem"
+          aria-label="やり直し (Ctrl+Y)"
+        >
+          やり直し (Ctrl+Y)
+        </MenuItem>
         <MenuItem onClick={handleMenuClose} disabled>コピー (Ctrl+C)</MenuItem>
         <MenuItem onClick={handleMenuClose} disabled>ペースト (Ctrl+V)</MenuItem>
       </Menu>
 
       {/* 表示メニュー */}
       <Menu
+        id="view-menu"
         anchorEl={viewMenuAnchor}
         open={Boolean(viewMenuAnchor)}
         onClose={handleMenuClose}
+        MenuListProps={{
+          'aria-labelledby': 'view-menu-button',
+          role: 'menu',
+        }}
       >
-        <MenuItem onClick={() => handleSwitchView('2d')}>2D編集モード</MenuItem>
+        <MenuItem 
+          onClick={() => handleSwitchView('2d')}
+          role="menuitem"
+          aria-label="2D編集モードに切り替え"
+        >
+          2D編集モード
+        </MenuItem>
+        <MenuItem 
+          onClick={() => handleSwitchView('3d')}
+          role="menuitem"
+          aria-label="3Dプレビューモードに切り替え"
+        >
+          3Dプレビューモード
+        </MenuItem>
       </Menu>
 
       {/* ヘルプメニュー */}
       <Menu
+        id="help-menu"
         anchorEl={helpMenuAnchor}
         open={Boolean(helpMenuAnchor)}
         onClose={handleMenuClose}
+        MenuListProps={{
+          'aria-labelledby': 'help-menu-button',
+          role: 'menu',
+        }}
       >
         <MenuItem onClick={() => {
           dispatch(openHelpDialog())
