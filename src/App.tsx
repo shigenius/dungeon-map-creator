@@ -3,7 +3,7 @@ import { Box, CircularProgress } from '@mui/material'
 import { useSelector, useDispatch } from 'react-redux'
 import { RootState } from './store'
 import { undo, redo, loadDungeon, addEventToCell, updateEventInCell, removeEventFromCell } from './store/mapSlice'
-import { setSelectedTool, setSelectedLayer, toggleGrid, setZoom, openNewProjectDialog, setShiftPressed, closeEventEditDialog, rotateTemplate, rotateTemplateLeft, closeHelpDialog, clearSelection, closeMapValidationDialog } from './store/editorSlice'
+import { setSelectedTool, setSelectedLayer, toggleGrid, setZoom, openNewProjectDialog, setShiftPressed, closeEventEditDialog, rotateTemplate, rotateTemplateLeft, closeHelpDialog, clearSelection, closeMapValidationDialog, setCustomFloorTypes, setCustomWallTypes, setCustomDecorationTypes } from './store/editorSlice'
 import { downloadDungeonAsJSON, openDungeonFromFile } from './utils/fileUtils'
 import MenuBar from './components/MenuBar'
 import ToolBar from './components/ToolBar'
@@ -36,7 +36,7 @@ const LoadingSpinner = () => (
 function App() {
   const dispatch = useDispatch()
   const dungeon = useSelector((state: RootState) => state.map.dungeon)
-  const { zoom, selectedLayer, showNewProjectDialog, showEventEditDialog, editingEvent, selectedTool, selectedTemplate, selectionMode, showHelpDialog, showMapValidationDialog, currentFloor } = useSelector((state: RootState) => state.editor)
+  const { zoom, selectedLayer, showNewProjectDialog, showEventEditDialog, editingEvent, selectedTool, selectedTemplate, selectionMode, showHelpDialog, showMapValidationDialog, currentFloor, customFloorTypes, customWallTypes, customDecorationTypes } = useSelector((state: RootState) => state.editor)
 
   // ダンジョンが存在しない場合に新規プロジェクトダイアログを表示
   useEffect(() => {
@@ -96,7 +96,7 @@ function App() {
             event.preventDefault()
             // 保存機能
             if (dungeon) {
-              downloadDungeonAsJSON(dungeon)
+              downloadDungeonAsJSON(dungeon, customFloorTypes, customWallTypes, customDecorationTypes)
             }
             break
           case 'g':
@@ -113,8 +113,11 @@ function App() {
             event.preventDefault()
             // ファイルを開く
             openDungeonFromFile(
-              (dungeonData) => {
+              (dungeonData, customFloorTypes, customWallTypes, customDecorationTypes) => {
                 dispatch(loadDungeon(dungeonData))
+                if (customFloorTypes) dispatch(setCustomFloorTypes(customFloorTypes))
+                if (customWallTypes) dispatch(setCustomWallTypes(customWallTypes))
+                if (customDecorationTypes) dispatch(setCustomDecorationTypes(customDecorationTypes))
                 console.log('ファイルから読み込んだデータ:', dungeonData)
               },
               (error) => {

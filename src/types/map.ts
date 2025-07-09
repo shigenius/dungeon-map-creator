@@ -352,6 +352,7 @@ export interface Dungeon {
   // カスタムタイプ情報（エクスポート/インポート用）
   customFloorTypes?: CustomFloorType[]
   customWallTypes?: CustomWallType[]
+  customDecorationTypes?: CustomDecorationType[]
 }
 
 export interface MapEditorState {

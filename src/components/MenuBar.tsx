@@ -34,7 +34,8 @@ import {
   toggleGrid,
   openMapValidationDialog,
   setCustomFloorTypes,
-  setCustomWallTypes
+  setCustomWallTypes,
+  setCustomDecorationTypes
 } from '../store/editorSlice'
 import { downloadDungeonAsJSON, openDungeonFromFile } from '../utils/fileUtils'
 import { Layer } from '../types/map'
@@ -47,6 +48,7 @@ const MenuBar: React.FC = () => {
   const gridVisible = useSelector((state: RootState) => state.editor.gridVisible)
   const customFloorTypes = useSelector((state: RootState) => state.editor.customFloorTypes)
   const customWallTypes = useSelector((state: RootState) => state.editor.customWallTypes)
+  const customDecorationTypes = useSelector((state: RootState) => state.editor.customDecorationTypes)
   const [fileMenuAnchor, setFileMenuAnchor] = React.useState<null | HTMLElement>(null)
   const [editMenuAnchor, setEditMenuAnchor] = React.useState<null | HTMLElement>(null)
   const [viewMenuAnchor, setViewMenuAnchor] = React.useState<null | HTMLElement>(null)
@@ -137,7 +139,7 @@ const MenuBar: React.FC = () => {
 
   const handleExportJSON = () => {
     if (dungeon) {
-      downloadDungeonAsJSON(dungeon, customFloorTypes, customWallTypes)
+      downloadDungeonAsJSON(dungeon, customFloorTypes, customWallTypes, customDecorationTypes)
     }
     handleMenuClose()
   }
@@ -156,10 +158,11 @@ const MenuBar: React.FC = () => {
   const handleOpen = () => {
     console.log('ファイルを開くメニューがクリックされました')
     openDungeonFromFile(
-      (dungeonData, customFloorTypes, customWallTypes) => {
+      (dungeonData, customFloorTypes, customWallTypes, customDecorationTypes) => {
         console.log('ファイルから読み込んだデータ:', dungeonData)
         console.log('カスタム床タイプ:', customFloorTypes)
         console.log('カスタム壁タイプ:', customWallTypes)
+        console.log('カスタム装飾タイプ:', customDecorationTypes)
         
         dispatch(loadDungeon(dungeonData))
         
@@ -169,6 +172,9 @@ const MenuBar: React.FC = () => {
         }
         if (customWallTypes) {
           dispatch(setCustomWallTypes(customWallTypes))
+        }
+        if (customDecorationTypes) {
+          dispatch(setCustomDecorationTypes(customDecorationTypes))
         }
         
         console.log('Redux storeにデータを読み込み完了')

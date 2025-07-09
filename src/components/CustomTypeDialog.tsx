@@ -227,6 +227,8 @@ const CustomTypeDialog: React.FC = () => {
       // ダイアログが開かれた時にタブを適切に設定
       if (customTypeDialogMode === 'wall') {
         setTabValue(1)
+      } else if (customTypeDialogMode === 'decoration') {
+        setTabValue(2)
       } else {
         setTabValue(0)
       }
@@ -269,6 +271,19 @@ const CustomTypeDialog: React.FC = () => {
             properties: wallType.behavior?.properties || {}
           }
         })
+      } else if (customTypeDialogMode === 'decoration') {
+        const decorationType = editingCustomType as CustomDecorationType
+        setDecorationForm({
+          id: decorationType.id,
+          name: decorationType.name,
+          description: decorationType.description || '',
+          color: decorationType.color,
+          icon: decorationType.icon,
+          interactable: decorationType.interactable,
+          layer: decorationType.layer,
+          properties: decorationType.properties || {},
+          script: decorationType.script || ''
+        })
       }
     } else {
       setIsEditMode(false)
@@ -279,6 +294,8 @@ const CustomTypeDialog: React.FC = () => {
           setFloorForm(prev => ({ ...prev, id: newId }))
         } else if (customTypeDialogMode === 'wall') {
           setWallForm(prev => ({ ...prev, id: newId }))
+        } else if (customTypeDialogMode === 'decoration') {
+          setDecorationForm(prev => ({ ...prev, id: newId }))
         }
       }
     }
@@ -303,6 +320,13 @@ const CustomTypeDialog: React.FC = () => {
           name: `${wallForm.name} のコピー`
         }
         dispatch(addCustomWallType(duplicatedWallType))
+      } else if (customTypeDialogMode === 'decoration') {
+        const duplicatedDecorationType = {
+          ...decorationForm,
+          id: newId,
+          name: `${decorationForm.name} のコピー`
+        }
+        dispatch(addCustomDecorationType(duplicatedDecorationType))
       }
       
       handleClose()
@@ -340,6 +364,17 @@ const CustomTypeDialog: React.FC = () => {
         properties: {}
       }
     })
+    setDecorationForm({
+      id: '',
+      name: '',
+      description: '',
+      color: '#00ff00',
+      icon: '🪑',
+      interactable: false,
+      layer: 1,
+      properties: {},
+      script: ''
+    })
     setTabValue(0)
     setIsEditMode(false)
   }
@@ -348,10 +383,10 @@ const CustomTypeDialog: React.FC = () => {
     setTabValue(newValue)
   }
 
-  const handleAddProperty = (isFloor: boolean) => {
+  const handleAddProperty = (typeMode: 'floor' | 'wall' | 'decoration') => {
     if (!newPropertyKey.trim()) return
     
-    if (isFloor) {
+    if (typeMode === 'floor') {
       setFloorForm({
         ...floorForm,
         properties: {
@@ -359,11 +394,19 @@ const CustomTypeDialog: React.FC = () => {
           [newPropertyKey]: newPropertyValue || ''
         }
       })
-    } else {
+    } else if (typeMode === 'wall') {
       setWallForm({
         ...wallForm,
         properties: {
           ...wallForm.properties,
+          [newPropertyKey]: newPropertyValue || ''
+        }
+      })
+    } else if (typeMode === 'decoration') {
+      setDecorationForm({
+        ...decorationForm,
+        properties: {
+          ...decorationForm.properties,
           [newPropertyKey]: newPropertyValue || ''
         }
       })
@@ -373,15 +416,19 @@ const CustomTypeDialog: React.FC = () => {
     setNewPropertyValue('')
   }
 
-  const handleRemoveProperty = (key: string, isFloor: boolean) => {
-    if (isFloor) {
+  const handleRemoveProperty = (key: string, typeMode: 'floor' | 'wall' | 'decoration') => {
+    if (typeMode === 'floor') {
       const newProperties = { ...floorForm.properties }
       delete newProperties[key]
       setFloorForm({ ...floorForm, properties: newProperties })
-    } else {
+    } else if (typeMode === 'wall') {
       const newProperties = { ...wallForm.properties }
       delete newProperties[key]
       setWallForm({ ...wallForm, properties: newProperties })
+    } else if (typeMode === 'decoration') {
+      const newProperties = { ...decorationForm.properties }
+      delete newProperties[key]
+      setDecorationForm({ ...decorationForm, properties: newProperties })
     }
   }
 
@@ -493,6 +540,26 @@ const CustomTypeDialog: React.FC = () => {
       } else {
         dispatch(addCustomWallType(customWallType))
       }
+    } else if (customTypeDialogMode === 'decoration') {
+      if (!decorationForm.name.trim()) return
+      
+      const customDecorationType: CustomDecorationType = {
+        id: decorationForm.id || crypto.randomUUID(),
+        name: decorationForm.name,
+        description: decorationForm.description,
+        color: decorationForm.color,
+        icon: decorationForm.icon,
+        interactable: decorationForm.interactable,
+        layer: decorationForm.layer,
+        properties: decorationForm.properties,
+        script: decorationForm.script
+      }
+      
+      if (isEditMode) {
+        dispatch(updateCustomDecorationType(customDecorationType))
+      } else {
+        dispatch(addCustomDecorationType(customDecorationType))
+      }
     }
     
     handleClose()
@@ -529,6 +596,11 @@ const CustomTypeDialog: React.FC = () => {
             label="壁タイプ" 
             disabled={customTypeDialogMode !== 'wall'} 
             sx={{ display: customTypeDialogMode === 'wall' ? 'flex' : 'none' }}
+          />
+          <Tab 
+            label="装飾タイプ" 
+            disabled={customTypeDialogMode !== 'decoration'} 
+            sx={{ display: customTypeDialogMode === 'decoration' ? 'flex' : 'none' }}
           />
         </Tabs>
 
@@ -974,6 +1046,115 @@ const CustomTypeDialog: React.FC = () => {
           </Grid>
         </TabPanel>
 
+        {/* 装飾タイプフォーム */}
+        <TabPanel value={tabValue} index={2}>
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                label="ID"
+                value={decorationForm.id}
+                onChange={(e) => {
+                  setDecorationForm({ ...decorationForm, id: e.target.value })
+                  const error = checkDecorationIdDuplicate(e.target.value)
+                  setDecorationIdError(error)
+                }}
+                margin="normal"
+                required
+                error={!!decorationIdError}
+                helperText={decorationIdError || 'カスタム装飾タイプの一意識別子'}
+                placeholder={isEditMode ? '現在のID' : '例: my_custom_decoration'}
+                InputProps={{ readOnly: customTypeDialogType === 'view' }}
+              />
+              <TextField
+                fullWidth
+                label="名前"
+                value={decorationForm.name}
+                onChange={(e) => setDecorationForm({ ...decorationForm, name: e.target.value })}
+                margin="normal"
+                required
+                InputProps={{ readOnly: customTypeDialogType === 'view' }}
+              />
+              <TextField
+                fullWidth
+                label="説明"
+                value={decorationForm.description}
+                onChange={(e) => setDecorationForm({ ...decorationForm, description: e.target.value })}
+                margin="normal"
+                multiline
+                rows={2}
+                InputProps={{ readOnly: customTypeDialogType === 'view' }}
+              />
+              <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Typography variant="body2">色:</Typography>
+                <input
+                  type="color"
+                  value={decorationForm.color}
+                  onChange={(e) => setDecorationForm({ ...decorationForm, color: e.target.value })}
+                  style={{ width: 50, height: 30 }}
+                  disabled={customTypeDialogType === 'view'}
+                />
+                <Box
+                  sx={{
+                    width: 30,
+                    height: 30,
+                    bgcolor: decorationForm.color,
+                    border: '1px solid #ccc',
+                    borderRadius: 1
+                  }}
+                />
+              </Box>
+              <TextField
+                fullWidth
+                label="アイコン"
+                value={decorationForm.icon}
+                onChange={(e) => setDecorationForm({ ...decorationForm, icon: e.target.value })}
+                margin="normal"
+                placeholder="例: 🪑"
+                InputProps={{ readOnly: customTypeDialogType === 'view' }}
+              />
+            </Grid>
+            
+            <Grid item xs={12} md={6}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={decorationForm.interactable}
+                    onChange={(e) => setDecorationForm({ ...decorationForm, interactable: e.target.checked })}
+                    disabled={customTypeDialogType === 'view'}
+                  />
+                }
+                label="相互作用可能"
+                sx={{ mt: 2, display: 'block' }}
+              />
+              <TextField
+                fullWidth
+                label="レイヤー"
+                type="number"
+                value={decorationForm.layer}
+                onChange={(e) => setDecorationForm({ ...decorationForm, layer: parseInt(e.target.value) })}
+                margin="normal"
+                helperText="0: 最背面, 1: 中間, 2: 前面"
+                InputProps={{ 
+                  readOnly: customTypeDialogType === 'view',
+                  inputProps: { min: 0, max: 2 }
+                }}
+              />
+              <TextField
+                fullWidth
+                label="スクリプト"
+                value={decorationForm.script}
+                onChange={(e) => setDecorationForm({ ...decorationForm, script: e.target.value })}
+                margin="normal"
+                multiline
+                rows={3}
+                placeholder="相互作用時に実行されるスクリプト"
+                InputProps={{ readOnly: customTypeDialogType === 'view' }}
+              />
+            </Grid>
+          </Grid>
+        </TabPanel>
+
         {/* カスタムプロパティ */}
         <Divider sx={{ my: 3 }} />
         <Typography variant="subtitle2" gutterBottom>
@@ -997,7 +1178,7 @@ const CustomTypeDialog: React.FC = () => {
           />
           <Button
             variant="outlined"
-            onClick={() => handleAddProperty(customTypeDialogMode === 'floor')}
+            onClick={() => handleAddProperty(customTypeDialogMode === 'floor' ? 'floor' : customTypeDialogMode === 'wall' ? 'wall' : 'decoration')}
             disabled={!newPropertyKey.trim() || customTypeDialogType === 'view'}
           >
             追加
@@ -1006,12 +1187,14 @@ const CustomTypeDialog: React.FC = () => {
 
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
           {Object.entries(
-            customTypeDialogMode === 'floor' ? floorForm.properties : wallForm.properties
+            customTypeDialogMode === 'floor' ? floorForm.properties : 
+            customTypeDialogMode === 'wall' ? wallForm.properties : 
+            decorationForm.properties
           ).map(([key, value]) => (
             <Chip
               key={key}
               label={`${key}: ${value}`}
-              onDelete={customTypeDialogType === 'view' ? undefined : () => handleRemoveProperty(key, customTypeDialogMode === 'floor')}
+              onDelete={customTypeDialogType === 'view' ? undefined : () => handleRemoveProperty(key, customTypeDialogMode === 'floor' ? 'floor' : customTypeDialogMode === 'wall' ? 'wall' : 'decoration')}
               size="small"
             />
           ))}
@@ -1036,7 +1219,8 @@ const CustomTypeDialog: React.FC = () => {
             variant="contained"
             disabled={
               customTypeDialogMode === 'floor' ? (!floorForm.name.trim() || !!floorIdError) : 
-              customTypeDialogMode === 'wall' ? (!wallForm.name.trim() || !!wallIdError) : true
+              customTypeDialogMode === 'wall' ? (!wallForm.name.trim() || !!wallIdError) :
+              customTypeDialogMode === 'decoration' ? (!decorationForm.name.trim() || !!decorationIdError) : true
             }
           >
             {isEditMode ? '更新' : '作成'}
