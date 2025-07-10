@@ -278,6 +278,7 @@ export interface DungeonEvent {
     visible: boolean
     color?: string
     icon?: string
+    direction?: Direction | 'none' // イベントの向き（未指定の場合は'none'）
     properties?: Record<string, any> // 外観カスタムプロパティ
   }
   trigger: EventTrigger

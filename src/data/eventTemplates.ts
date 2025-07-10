@@ -24,7 +24,8 @@ export const EVENT_TEMPLATES: EventTemplate[] = [
       appearance: { 
         color: '#ffd700', 
         icon: '💰', 
-        visible: true 
+        visible: true,
+        direction: 'none'
       },
       trigger: { 
         type: 'interact', 
@@ -60,7 +61,8 @@ export const EVENT_TEMPLATES: EventTemplate[] = [
       appearance: { 
         color: '#ff6b35', 
         icon: '🎁', 
-        visible: true 
+        visible: true,
+        direction: 'none'
       },
       trigger: { 
         type: 'interact', 
@@ -98,7 +100,8 @@ export const EVENT_TEMPLATES: EventTemplate[] = [
       appearance: { 
         color: '#40e0d0', 
         icon: '👤', 
-        visible: true 
+        visible: true,
+        direction: 'none'
       },
       trigger: { 
         type: 'interact', 
@@ -129,7 +132,8 @@ export const EVENT_TEMPLATES: EventTemplate[] = [
       appearance: { 
         color: '#8b4513', 
         icon: '🛒', 
-        visible: true 
+        visible: true,
+        direction: 'none'
       },
       trigger: { 
         type: 'interact', 
@@ -167,7 +171,8 @@ export const EVENT_TEMPLATES: EventTemplate[] = [
       appearance: { 
         color: '#44aaff', 
         icon: '💾', 
-        visible: true 
+        visible: true,
+        direction: 'none'
       },
       trigger: { 
         type: 'interact', 
@@ -203,7 +208,8 @@ export const EVENT_TEMPLATES: EventTemplate[] = [
       appearance: { 
         color: '#44ffaa', 
         icon: '❤️', 
-        visible: true 
+        visible: true,
+        direction: 'none'
       },
       trigger: { 
         type: 'interact', 
@@ -241,7 +247,8 @@ export const EVENT_TEMPLATES: EventTemplate[] = [
       appearance: { 
         color: '#ffaa44', 
         icon: '🔘', 
-        visible: true 
+        visible: true,
+        direction: 'none'
       },
       trigger: { 
         type: 'interact', 
@@ -277,7 +284,8 @@ export const EVENT_TEMPLATES: EventTemplate[] = [
       appearance: { 
         color: '#888888', 
         icon: '⬜', 
-        visible: true 
+        visible: true,
+        direction: 'none'
       },
       trigger: { 
         type: 'step', 
@@ -315,7 +323,8 @@ export const EVENT_TEMPLATES: EventTemplate[] = [
       appearance: { 
         color: '#888888', 
         icon: '🪜', 
-        visible: true 
+        visible: true,
+        direction: 'none'
       },
       trigger: { 
         type: 'interact', 
@@ -351,7 +360,8 @@ export const EVENT_TEMPLATES: EventTemplate[] = [
       appearance: { 
         color: '#666666', 
         icon: '🕳️', 
-        visible: true 
+        visible: true,
+        direction: 'none'
       },
       trigger: { 
         type: 'interact', 
@@ -389,7 +399,8 @@ export const EVENT_TEMPLATES: EventTemplate[] = [
       appearance: { 
         color: '#44ff44', 
         icon: '👹', 
-        visible: true 
+        visible: true,
+        direction: 'none'
       },
       trigger: { 
         type: 'contact', 
@@ -427,7 +438,8 @@ export const EVENT_TEMPLATES: EventTemplate[] = [
       appearance: { 
         color: '#9370db', 
         icon: '❓', 
-        visible: true 
+        visible: true,
+        direction: 'none'
       },
       trigger: { 
         type: 'interact', 

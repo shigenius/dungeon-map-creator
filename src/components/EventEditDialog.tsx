@@ -144,7 +144,8 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
         appearance: {
           visible: true,
           color: '#ffd700',
-          icon: '⭐'
+          icon: '⭐',
+          direction: 'none'
         },
         trigger: {
           type: 'interact',
@@ -562,6 +563,24 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
                   margin="normal"
                   helperText="絵文字または短い文字を入力（例: 💰, 👤, ⚔️, ⭐）"
                 />
+                
+                {/* イベントの向き設定（center配置のときのみ表示） */}
+                {editingEvent.position.placement === 'center' && (
+                  <FormControl fullWidth margin="normal">
+                    <InputLabel>向き</InputLabel>
+                    <Select
+                      value={editingEvent.appearance.direction || 'none'}
+                      onChange={(e) => updateAppearance('direction', e.target.value)}
+                      label="向き"
+                    >
+                      <MenuItem value="none">方向なし</MenuItem>
+                      <MenuItem value="north">北</MenuItem>
+                      <MenuItem value="east">東</MenuItem>
+                      <MenuItem value="south">南</MenuItem>
+                      <MenuItem value="west">西</MenuItem>
+                    </Select>
+                  </FormControl>
+                )}
               </Grid>
               <Grid item xs={12} md={6}>
                 <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'grey.100' }}>
