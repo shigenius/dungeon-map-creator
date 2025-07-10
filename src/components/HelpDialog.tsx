@@ -32,10 +32,7 @@ const HelpDialog: React.FC<HelpDialogProps> = ({ open, onClose }) => {
       shortcuts: [
         { key: '1', description: 'ペンツール' },
         { key: '2', description: '矩形ツール' },
-        { key: '3', description: '塗りつぶしツール' },
-        { key: '4', description: 'スポイトツール' },
-        { key: '5', description: '選択ツール' },
-        { key: '6', description: '消しゴムツール' },
+        { key: '3', description: '消しゴムツール' },
       ]
     },
     {

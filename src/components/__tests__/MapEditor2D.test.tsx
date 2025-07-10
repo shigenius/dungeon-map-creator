@@ -411,53 +411,7 @@ describe('MapEditor2D 統合テスト', () => {
       })
     })
 
-    it('バケツツールで塗りつぶしが実行される', async () => {
-      store.dispatch(editorSlice.actions.setActiveTool('fill'))
-      
-      render(
-        <Provider store={store}>
-          <MapEditor2D />
-        </Provider>
-      )
 
-      const canvas = screen.getByTestId('map-canvas')
-      
-      // バケツツールでクリック
-      fireEvent.mouseDown(canvas, {
-        clientX: 100,
-        clientY: 100,
-        button: 0
-      })
-
-      await waitFor(() => {
-        // 塗りつぶし処理が実行されることを確認
-        expect(mockCanvas.getContext).toHaveBeenCalled()
-      })
-    })
-
-    it('スポイトツールで床タイプが取得される', async () => {
-      store.dispatch(editorSlice.actions.setActiveTool('eyedropper'))
-      
-      render(
-        <Provider store={store}>
-          <MapEditor2D />
-        </Provider>
-      )
-
-      const canvas = screen.getByTestId('map-canvas')
-      
-      // スポイトツールでクリック
-      fireEvent.mouseDown(canvas, {
-        clientX: 100,
-        clientY: 100,
-        button: 0
-      })
-
-      await waitFor(() => {
-        // スポイト処理が実行されることを確認
-        expect(mockCanvas.getContext).toHaveBeenCalled()
-      })
-    })
   })
 
   describe('レイヤー管理', () => {

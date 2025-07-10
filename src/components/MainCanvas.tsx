@@ -16,8 +16,8 @@ const MainCanvas: React.FC = () => {
   const dungeon = useSelector((state: RootState) => state.map.dungeon)
 
   // 範囲選択が完了している（範囲が選択されている）かどうかを判定
-  const isRangeSelected = selectionMode && selectionStart && selectionEnd && 
-    (selectionStart.x !== selectionEnd.x || selectionStart.y !== selectionEnd.y) && selectionConfirmed
+  // 1x1の範囲でも有効な選択として扱う
+  const isRangeSelected = selectionMode && selectionStart && selectionEnd && selectionConfirmed
 
   const handleCreateTemplate = () => {
     dispatch(openCreateTemplateDialog())

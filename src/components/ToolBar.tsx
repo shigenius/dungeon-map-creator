@@ -11,8 +11,6 @@ import {
 import {
   Edit as PenIcon,
   CropSquare as RectangleIcon,
-  FormatColorFill as FillIcon,
-  Colorize as EyedropperIcon,
   Delete as EraserIcon,
   Undo as UndoIcon,
   Redo as RedoIcon,
@@ -45,7 +43,7 @@ const ToolBar: React.FC = () => {
   const handleToolKeyDown = useCallback((event: React.KeyboardEvent) => {
     if (!dungeon) return
     
-    const tools: DrawingTool[] = ['pen', 'rectangle', 'fill', 'eyedropper', 'eraser']
+    const tools: DrawingTool[] = ['pen', 'rectangle', 'eraser']
     const currentIndex = tools.indexOf(selectedTool)
     
     switch (event.key) {
@@ -132,32 +130,12 @@ const ToolBar: React.FC = () => {
           </Tooltip>
         </ToggleButton>
         <ToggleButton 
-          value="fill"
-          aria-label="塗りつぶしツール"
-          aria-describedby="fill-tool-description"
-          aria-pressed={selectedTool === 'fill'}
-        >
-          <Tooltip title="塗りつぶしツール (3) - 矢印キーで移動">
-            <FillIcon aria-hidden="true" />
-          </Tooltip>
-        </ToggleButton>
-        <ToggleButton 
-          value="eyedropper"
-          aria-label="スポイトツール"
-          aria-describedby="eyedropper-tool-description"
-          aria-pressed={selectedTool === 'eyedropper'}
-        >
-          <Tooltip title="スポイトツール (4) - セルの設定をキャプチャして他のセルに適用。矢印キーで移動">
-            <EyedropperIcon aria-hidden="true" />
-          </Tooltip>
-        </ToggleButton>
-        <ToggleButton 
           value="eraser"
           aria-label="消しゴムツール"
           aria-describedby="eraser-tool-description"
           aria-pressed={selectedTool === 'eraser'}
         >
-          <Tooltip title="消しゴムツール (5) - 壁やイベントを消去。矢印キーで移動">
+          <Tooltip title="消しゴムツール (3) - 壁やイベントを消去。矢印キーで移動">
             <EraserIcon aria-hidden="true" />
           </Tooltip>
         </ToggleButton>

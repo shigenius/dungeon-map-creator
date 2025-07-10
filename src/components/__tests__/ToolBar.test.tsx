@@ -191,22 +191,6 @@ describe('ToolBar 統合テスト', () => {
       })
     })
 
-    it('塗りつぶしツールの選択が正しく機能する', async () => {
-      render(
-        <Provider store={store}>
-          <ToolBar />
-        </Provider>
-      )
-
-      const fillTool = screen.getByLabelText('塗りつぶしツール')
-      await user.click(fillTool)
-
-      await waitFor(() => {
-        const state = store.getState()
-        expect(state.editor.activeTool).toBe('fill')
-      })
-    })
-
     it('スポイトツールの選択が正しく機能する', async () => {
       render(
         <Provider store={store}>
@@ -273,7 +257,7 @@ describe('ToolBar 統合テスト', () => {
       })
     })
 
-    it('3キーで塗りつぶしツールが選択される', async () => {
+    it('3キーでスポイトツールが選択される', async () => {
       render(
         <Provider store={store}>
           <ToolBar />
@@ -284,11 +268,11 @@ describe('ToolBar 統合テスト', () => {
 
       await waitFor(() => {
         const state = store.getState()
-        expect(state.editor.activeTool).toBe('fill')
+        expect(state.editor.activeTool).toBe('eyedropper')
       })
     })
 
-    it('4キーでスポイトツールが選択される', async () => {
+    it('4キーで消しゴムツールが選択される', async () => {
       render(
         <Provider store={store}>
           <ToolBar />
@@ -299,24 +283,10 @@ describe('ToolBar 統合テスト', () => {
 
       await waitFor(() => {
         const state = store.getState()
-        expect(state.editor.activeTool).toBe('eyedropper')
+        expect(state.editor.activeTool).toBe('eraser')
       })
     })
 
-    it('5キーで選択ツールが選択される', async () => {
-      render(
-        <Provider store={store}>
-          <ToolBar />
-        </Provider>
-      )
-
-      fireEvent.keyDown(document, { key: '5' })
-
-      await waitFor(() => {
-        const state = store.getState()
-        expect(state.editor.activeTool).toBe('select')
-      })
-    })
 
     it('テキスト入力中はショートカットが無効化される', async () => {
       render(
@@ -888,11 +858,11 @@ describe('ToolBar 統合テスト', () => {
       for (let i = 0; i < 10; i++) {
         store.dispatch(editorSlice.actions.setActiveTool('pen'))
         store.dispatch(editorSlice.actions.setActiveTool('rectangle'))
-        store.dispatch(editorSlice.actions.setActiveTool('fill'))
+        store.dispatch(editorSlice.actions.setActiveTool('eraser'))
       }
 
       await waitFor(() => {
-        expect(screen.getByLabelText('塗りつぶしツール')).toHaveAttribute('aria-pressed', 'true')
+        expect(screen.getByLabelText('消しゴムツール')).toHaveAttribute('aria-pressed', 'true')
       })
     })
 
@@ -912,7 +882,7 @@ describe('ToolBar 統合テスト', () => {
 
       await waitFor(() => {
         const state = store.getState()
-        expect(state.editor.activeTool).toBe('fill')
+        expect(state.editor.activeTool).toBe('eyedropper')
       })
     })
   })

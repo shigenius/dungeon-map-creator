@@ -20,7 +20,6 @@ import {
   Event,
   Palette,
   Grid3x3 as GridIcon,
-  Assessment as AssessmentIcon,
 } from '@mui/icons-material'
 import { useDispatch, useSelector } from 'react-redux'
 import { RootState } from '../store'
@@ -32,7 +31,6 @@ import {
   toggleLayerVisibility,
   openHelpDialog,
   toggleGrid,
-  openMapValidationDialog,
   setCustomFloorTypes,
   setCustomWallTypes,
   setCustomDecorationTypes
@@ -271,17 +269,6 @@ const MenuBar: React.FC = () => {
             aria-controls={viewMenuAnchor ? 'view-menu' : undefined}
           >
             表示
-          </Button>
-          <Button 
-            color="inherit" 
-            startIcon={<AssessmentIcon />}
-            onClick={() => {
-              dispatch(openMapValidationDialog())
-              handleMenuClose()
-            }}
-            disabled={!dungeon}
-          >
-            マップ検証
           </Button>
           <Button 
             color="inherit" 

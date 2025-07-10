@@ -90,6 +90,7 @@ interface EditorState {
   showMapValidationDialog: boolean
   // ビューポート関連の状態
   viewCenter: { x: number; y: number } | null
+  viewOffset: { x: number; y: number }
   // イベントハイライト関連の状態
   highlightedEventId: string | null
   // 初回自動プロジェクト作成ダイアログかどうか
@@ -160,6 +161,7 @@ const initialState: EditorState = {
   showMapValidationDialog: false,
   // ビューポート関連の初期状態
   viewCenter: null,
+  viewOffset: { x: 0, y: 0 },
   // イベントハイライト関連の初期状態
   highlightedEventId: null,
   // 初回自動プロジェクト作成ダイアログの初期状態
@@ -234,13 +236,6 @@ const editorSlice = createSlice({
       state.layerVisibility[action.payload] = !state.layerVisibility[action.payload]
     },
     
-    setCapturedCellData: (state, action: PayloadAction<CapturedCellData>) => {
-      state.capturedCellData = action.payload
-    },
-    
-    clearCapturedCellData: (state) => {
-      state.capturedCellData = null
-    },
     
     setHoveredCellInfo: (state, action: PayloadAction<HoveredCellInfo>) => {
       state.hoveredCellInfo = action.payload
@@ -531,16 +526,13 @@ const editorSlice = createSlice({
       state.showHelpDialog = false
     },
 
-    openMapValidationDialog: (state) => {
-      state.showMapValidationDialog = true
-    },
-
-    closeMapValidationDialog: (state) => {
-      state.showMapValidationDialog = false
-    },
 
     setViewCenter: (state, action: PayloadAction<{ x: number; y: number }>) => {
       state.viewCenter = action.payload
+    },
+
+    setViewOffset: (state, action: PayloadAction<{ x: number; y: number }>) => {
+      state.viewOffset = action.payload
     },
 
     // イベントハイライト関連のアクション
@@ -572,8 +564,6 @@ export const {
   setSelectedWallType,
   setSelectedDecorationType,
   setSelectedEventType,
-  setCapturedCellData,
-  clearCapturedCellData,
   setHoveredCellInfo,
   clearHoveredCellInfo,
   setHoveredCellPosition,
@@ -634,11 +624,9 @@ export const {
   // ヘルプダイアログ関連のアクション
   openHelpDialog,
   closeHelpDialog,
-  // マップ検証ダイアログ関連のアクション
-  openMapValidationDialog,
-  closeMapValidationDialog,
   // ビューポート関連のアクション
   setViewCenter,
+  setViewOffset,
   // イベントハイライト関連のアクション
   setHighlightedEventId,
   // カスタムタイプ設定アクション

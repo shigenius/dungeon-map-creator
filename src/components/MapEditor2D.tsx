@@ -4,7 +4,7 @@ import { useSelector, useDispatch } from 'react-redux'
 import { createSelector } from '@reduxjs/toolkit'
 import { RootState } from '../store'
 import { updateCell, updateCells, placeTemplate, addDecorationToCell } from '../store/mapSlice'
-import { setCapturedCellData, setHoveredCellInfo, clearHoveredCellInfo, setHoveredCellPosition, clearHoveredCellPosition, setHoveredWallInfo, clearHoveredWallInfo, setTemplatePreviewPosition, setSelectionStart, setSelectionEnd, confirmSelection, setViewCenter, openEventEditDialog } from '../store/editorSlice'
+import { setHoveredCellInfo, clearHoveredCellInfo, setHoveredCellPosition, clearHoveredCellPosition, setHoveredWallInfo, clearHoveredWallInfo, setTemplatePreviewPosition, setSelectionStart, setSelectionEnd, confirmSelection, setViewCenter, setViewOffset, openEventEditDialog } from '../store/editorSlice'
 import { rotateTemplate as rotateTemplateUtil } from '../utils/templateUtils'
 import { Position, WallType, DecorationType, Decoration, EventType, EventPlacementType } from '../types/map'
 
@@ -37,9 +37,9 @@ const selectSelectionEnd = (state: RootState) => state.editor.selectionEnd
 const selectTemplatePreviewPosition = (state: RootState) => state.editor.templatePreviewPosition
 const selectSelectedEventId = (state: RootState) => state.editor.selectedEventId
 const selectHighlightedEventId = (state: RootState) => state.editor.highlightedEventId
-const selectCapturedCellData = (state: RootState) => state.editor.capturedCellData
 const selectCustomFloorTypes = (state: RootState) => state.editor.customFloorTypes
 const selectCustomWallTypes = (state: RootState) => state.editor.customWallTypes
+const selectViewOffset = (state: RootState) => state.editor.viewOffset
 
 // コンパウンドセレクター（複数の状態を組み合わせる）
 const selectCurrentFloorData = createSelector(
@@ -525,13 +525,18 @@ const MapEditor2D: React.FC = React.memo(() => {
   const templatePreviewPosition = useSelector(selectTemplatePreviewPosition)
   const selectedEventId = useSelector(selectSelectedEventId)
   const highlightedEventId = useSelector(selectHighlightedEventId)
-  const capturedCellData = useSelector(selectCapturedCellData)
   const selectedFloorType = useSelector(selectSelectedFloorType)
   const selectedFloorPassable = useSelector((state: RootState) => state.editor.selectedFloorPassable)
   const selectedWallType = useSelector(selectSelectedWallType)
   const selectedDecorationType = useSelector(selectSelectedDecorationType)
   const customFloorTypes = useSelector(selectCustomFloorTypes)
   const customWallTypes = useSelector(selectCustomWallTypes)
+  const viewOffset = useSelector(selectViewOffset)
+  
+  // パン機能用の状態管理
+  const [isPanning, setIsPanning] = useState(false)
+  const [panStart, setPanStart] = useState<{ x: number; y: number } | null>(null)
+  const [panDelta, setPanDelta] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
   
   // カスタム床タイプを考慮した床の色を取得する関数
   const getFloorColor = useCallback((floorType: string, passable: boolean) => {
@@ -648,7 +653,8 @@ const MapEditor2D: React.FC = React.memo(() => {
       }
       setLastFloorData(JSON.parse(JSON.stringify(floor))) // ディープコピー
     }
-  }, [floor, detectChangedCells])
+  }, [floor]) // detectChangedCellsを依存関係から除外（無限ループ防止）
+  // eslint-disable-next-line react-hooks/exhaustive-deps
 
   // マウス位置から最も近い壁を検出する関数
   const getClosestWallFromMouse = useCallback((event: React.MouseEvent): { position: Position; direction: 'north' | 'east' | 'south' | 'west' } | null => {
@@ -700,26 +706,26 @@ const MapEditor2D: React.FC = React.memo(() => {
     // 縦線 - 各線の位置を個別に計算してピクセル整合性を保つ
     for (let x = 0; x <= floor.width; x++) {
       // 累積誤差を避けるため、各線の位置を独立して計算し、ピクセル境界に合わせる
-      const xPos = Math.round(x * cellSize) + 0.5
+      const xPos = Math.round(x * cellSize) + 0.5 + viewOffset.x
       ctx.beginPath()
-      ctx.moveTo(xPos, 0)
-      ctx.lineTo(xPos, floor.height * cellSize)
+      ctx.moveTo(xPos, 0 + viewOffset.y)
+      ctx.lineTo(xPos, floor.height * cellSize + viewOffset.y)
       ctx.stroke()
     }
 
     // 横線 - 各線の位置を個別に計算してピクセル整合性を保つ
     for (let y = 0; y <= floor.height; y++) {
       // 累積誤差を避けるため、各線の位置を独立して計算し、ピクセル境界に合わせる
-      const yPos = Math.round(y * cellSize) + 0.5
+      const yPos = Math.round(y * cellSize) + 0.5 + viewOffset.y
       ctx.beginPath()
-      ctx.moveTo(0, yPos)
-      ctx.lineTo(floor.width * cellSize, yPos)
+      ctx.moveTo(0 + viewOffset.x, yPos)
+      ctx.lineTo(floor.width * cellSize + viewOffset.x, yPos)
       ctx.stroke()
     }
     
     // アンチエイリアシングを元に戻す
     ctx.imageSmoothingEnabled = true
-  }, [gridVisible, floor, cellSize])
+  }, [gridVisible, floor, cellSize, viewOffset])
 
   const drawFloor = useCallback((ctx: CanvasRenderingContext2D, changedCellsOnly = false) => {
     if (!floor) return
@@ -731,9 +737,9 @@ const MapEditor2D: React.FC = React.memo(() => {
           continue
         }
         const cell = floor.cells[y][x]
-        // 座標を整数に丸めて正確な配置を保証
-        const xPos = Math.round(x * cellSize)
-        const yPos = Math.round(y * cellSize)
+        // 座標を整数に丸めて正確な配置を保証（viewOffsetを適用）
+        const xPos = Math.round(x * cellSize) + viewOffset.x
+        const yPos = Math.round(y * cellSize) + viewOffset.y
 
         // 床の描画（カスタム床タイプ対応）
         const floorColor = getFloorColor(cell.floor.type, cell.floor.passable)
@@ -769,7 +775,7 @@ const MapEditor2D: React.FC = React.memo(() => {
         }
       }
     }
-  }, [floor, cellSize, changedCells])
+  }, [floor, cellSize, changedCells, customFloorTypes, viewOffset])
 
   const drawWalls = useCallback((ctx: CanvasRenderingContext2D, changedCellsOnly = false) => {
     if (!floor) return
@@ -1521,26 +1527,78 @@ const MapEditor2D: React.FC = React.memo(() => {
   }, [selectedTemplate, templatePreviewPosition, selectedTool, cellSize, floor, templateRotation])
 
   const drawRectanglePreview = useCallback((ctx: CanvasRenderingContext2D) => {
-    if (!isDrawingRectangle || !rectangleStart || !rectangleEnd) return
+    if (!isDrawingRectangle || !rectangleStart || !rectangleEnd || !floor) return
 
     const startX = Math.min(rectangleStart.x, rectangleEnd.x)
     const startY = Math.min(rectangleStart.y, rectangleEnd.y)
     const endX = Math.max(rectangleStart.x, rectangleEnd.x)
     const endY = Math.max(rectangleStart.y, rectangleEnd.y)
 
-    // 矩形の枠線を描画
-    ctx.strokeStyle = '#ffff00'  // 黄色
+    // 矩形の枠線を描画（SHIFTキーで赤色、通常は黄色）
+    ctx.strokeStyle = isShiftPressed ? '#ff0000' : '#ffff00'  // SHIFT=赤、通常=黄色
     ctx.lineWidth = 2
     ctx.setLineDash([5, 5])  // 破線
     ctx.strokeRect(
-      startX * cellSize,
-      startY * cellSize,
+      startX * cellSize + viewOffset.x,
+      startY * cellSize + viewOffset.y,
       (endX - startX + 1) * cellSize,
       (endY - startY + 1) * cellSize
     )
     ctx.setLineDash([])  // 破線を元に戻す
+    
+    // 壁レイヤーの場合、矩形の輪郭線上に配置される壁のプレビューを表示
+    if (selectedLayer === 'walls') {
+      const wallColor = isShiftPressed ? '#ff4444' : '#44ff44' // 削除=赤、配置=緑
+      ctx.strokeStyle = wallColor
+      ctx.lineWidth = 4
+      
+      for (let y = startY; y <= endY; y++) {
+        for (let x = startX; x <= endX; x++) {
+          const isTopEdge = y === startY
+          const isBottomEdge = y === endY
+          const isLeftEdge = x === startX
+          const isRightEdge = x === endX
+          
+          // 矩形の外周にのみ壁プレビューを表示
+          if (isTopEdge || isBottomEdge || isLeftEdge || isRightEdge) {
+            const xPos = x * cellSize
+            const yPos = y * cellSize
+            
+            if (isTopEdge) {
+              // 北の壁
+              ctx.beginPath()
+              ctx.moveTo(xPos, yPos)
+              ctx.lineTo(xPos + cellSize, yPos)
+              ctx.stroke()
+            }
+            if (isBottomEdge) {
+              // 南の壁
+              ctx.beginPath()
+              ctx.moveTo(xPos, yPos + cellSize)
+              ctx.lineTo(xPos + cellSize, yPos + cellSize)
+              ctx.stroke()
+            }
+            if (isLeftEdge) {
+              // 西の壁
+              ctx.beginPath()
+              ctx.moveTo(xPos, yPos)
+              ctx.lineTo(xPos, yPos + cellSize)
+              ctx.stroke()
+            }
+            if (isRightEdge) {
+              // 東の壁
+              ctx.beginPath()
+              ctx.moveTo(xPos + cellSize, yPos)
+              ctx.lineTo(xPos + cellSize, yPos + cellSize)
+              ctx.stroke()
+            }
+          }
+        }
+      }
+    }
+    
     ctx.lineWidth = 1
-  }, [isDrawingRectangle, rectangleStart, rectangleEnd, cellSize])
+  }, [isDrawingRectangle, rectangleStart, rectangleEnd, cellSize, selectedLayer, isShiftPressed, floor])
 
 
   const drawSelection = useCallback((ctx: CanvasRenderingContext2D) => {
@@ -1810,15 +1868,18 @@ const MapEditor2D: React.FC = React.memo(() => {
     const rawY = event.clientY - rect.top
     // セルサイズを整数に丸めて正確な座標変換を保証
     const roundedCellSize = Math.round(cellSize)
-    const x = Math.floor(rawX / roundedCellSize)
-    const y = Math.floor(rawY / roundedCellSize)
+    // viewOffsetを適用してマウス座標を調整
+    const adjustedX = rawX - viewOffset.x
+    const adjustedY = rawY - viewOffset.y
+    const x = Math.floor(adjustedX / roundedCellSize)
+    const y = Math.floor(adjustedY / roundedCellSize)
 
     if (x >= 0 && x < floor.width && y >= 0 && y < floor.height) {
       return { x, y }
     }
 
     return null
-  }, [cellSize, floor])
+  }, [cellSize, floor, viewOffset])
 
   // セルの実際の壁情報を取得する関数（隣接セルの壁も考慮）
   const getActualWallInfo = useCallback((position: Position) => {
@@ -1972,26 +2033,6 @@ const MapEditor2D: React.FC = React.memo(() => {
       return
     }
 
-    // アイドロッパーツールの処理
-    if (selectedTool === 'eyedropper') {
-      const capturedData = {
-        floor: {
-          type: currentCell.floor.type,
-          passable: currentCell.floor.passable
-        },
-        walls: {
-          north: currentCell.walls.north,
-          east: currentCell.walls.east,
-          south: currentCell.walls.south,
-          west: currentCell.walls.west
-        },
-        hasEvents: currentCell.events.length > 0
-      }
-      
-      dispatch(setCapturedCellData(capturedData))
-      console.log('セル状態をキャプチャしました:', capturedData)
-      return
-    }
 
 
     // 消しゴムツールの処理
@@ -2090,17 +2131,37 @@ const MapEditor2D: React.FC = React.memo(() => {
                     }
                   })
                 } else if (selectedLayer === 'walls') {
-                  // 全ての壁を削除
+                  // 矩形の輪郭線のみの壁を削除
+                  const isTopEdge = y === startY
+                  const isBottomEdge = y === endY
+                  const isLeftEdge = x === startX
+                  const isRightEdge = x === endX
+                  
+                  // 既存の壁を保持
+                  const walls = {
+                    north: cell.walls.north,
+                    east: cell.walls.east,
+                    south: cell.walls.south,
+                    west: cell.walls.west,
+                  }
+                  
+                  // 矩形の外周の壁のみ削除
+                  if (isTopEdge) {
+                    walls.north = null
+                  }
+                  if (isBottomEdge) {
+                    walls.south = null
+                  }
+                  if (isLeftEdge) {
+                    walls.west = null
+                  }
+                  if (isRightEdge) {
+                    walls.east = null
+                  }
+                  
                   updates.push({
                     position: cellPosition,
-                    cell: {
-                      walls: {
-                        north: null,
-                        east: null,
-                        south: null,
-                        west: null,
-                      }
-                    }
+                    cell: { walls }
                   })
                 } else if (selectedLayer === 'events') {
                   // イベントを消去
@@ -2118,43 +2179,46 @@ const MapEditor2D: React.FC = React.memo(() => {
               } else {
                 // 通常の矩形描画ツール
                 if (selectedLayer === 'floor') {
-                  let newFloorData
-                  if (capturedCellData) {
-                    newFloorData = {
-                      type: capturedCellData.floor.type,
-                      passable: capturedCellData.floor.passable
-                    }
-                  } else {
-                    newFloorData = {
-                      type: selectedFloorType,
-                      passable: selectedFloorPassable
-                    }
+                  const newFloorData = {
+                    type: selectedFloorType,
+                    passable: selectedFloorPassable
                   }
                   updates.push({
                     position: cellPosition,
                     cell: { floor: newFloorData }
                   })
                 } else if (selectedLayer === 'walls') {
-                  let walls
-                  if (capturedCellData) {
-                    walls = {
-                      north: capturedCellData.walls.north,
-                      east: capturedCellData.walls.east,
-                      south: capturedCellData.walls.south,
-                      west: capturedCellData.walls.west,
-                    }
-                  } else {
-                    const hasWall = cell.walls.north !== null
-                    const wall = hasWall ? null : {
-                      type: selectedWallType,
-                      transparent: getTransparentForWallType(selectedWallType),
-                    }
-                    walls = {
-                      north: wall,
-                      east: wall,
-                      south: wall,
-                      west: wall,
-                    }
+                  // 矩形の輪郭線のみに壁を配置
+                  const isTopEdge = y === startY
+                  const isBottomEdge = y === endY
+                  const isLeftEdge = x === startX
+                  const isRightEdge = x === endX
+                  
+                  // 既存の壁を保持
+                  const walls = {
+                    north: cell.walls.north,
+                    east: cell.walls.east,
+                    south: cell.walls.south,
+                    west: cell.walls.west,
+                  }
+                  
+                  // 矩形の外周にのみ壁を配置
+                  const wallData = {
+                    type: selectedWallType,
+                    transparent: getTransparentForWallType(selectedWallType),
+                  }
+                  
+                  if (isTopEdge) {
+                    walls.north = wallData
+                  }
+                  if (isBottomEdge) {
+                    walls.south = wallData
+                  }
+                  if (isLeftEdge) {
+                    walls.west = wallData
+                  }
+                  if (isRightEdge) {
+                    walls.east = wallData
                   }
                   updates.push({
                     position: cellPosition,
@@ -2216,20 +2280,12 @@ const MapEditor2D: React.FC = React.memo(() => {
 
     if (selectedLayer === 'floor') {
       if (selectedTool === 'pen') {
-        // 床の編集：キャプチャされたデータがあればそれを使用、なければ選択された床タイプを適用
-        let newFloorData
-        if (capturedCellData) {
-          newFloorData = {
-            type: capturedCellData.floor.type,
-            passable: capturedCellData.floor.passable
-          }
-        } else {
-          newFloorData = {
-            type: selectedFloorType,
-            passable: selectedFloorPassable
-          }
-          console.log('床タイプ更新:', { type: selectedFloorType, passable: selectedFloorPassable, position })
+        // 床の編集：選択された床タイプを適用
+        const newFloorData = {
+          type: selectedFloorType,
+          passable: selectedFloorPassable
         }
+        console.log('床タイプ更新:', { type: selectedFloorType, passable: selectedFloorPassable, position })
 
         dispatch(updateCell({
           floorIndex: currentFloor,
@@ -2238,88 +2294,37 @@ const MapEditor2D: React.FC = React.memo(() => {
             floor: newFloorData
           }
         }))
-      } else if (selectedTool === 'fill') {
-        // 塗りつぶしツール：同じタイプの床を一括変更
-        const targetPassable = currentCell.floor.passable
-        const targetType = currentCell.floor.type
-        
-        // キャプチャされたデータがあればそれを使用、なければ選択された床タイプを適用
-        let newFloorDataForFill
-        if (capturedCellData) {
-          newFloorDataForFill = {
-            type: capturedCellData.floor.type,
-            passable: capturedCellData.floor.passable
-          }
-        } else {
-          newFloorDataForFill = {
-            type: selectedFloorType,
-            passable: selectedFloorPassable
-          }
-        }
-        
-        // 同じタイプ・通行可否のセルを全て検索してバッチ更新データを準備
-        const updates = []
-        for (let y = 0; y < floor.height; y++) {
-          for (let x = 0; x < floor.width; x++) {
-            const cell = floor.cells[y][x]
-            if (cell.floor.passable === targetPassable && cell.floor.type === targetType) {
-              const newFloorData = newFloorDataForFill
-              updates.push({
-                position: { x, y },
-                cell: { floor: newFloorData }
-              })
-            }
-          }
-        }
-        
-        // バッチで更新を実行
-        if (updates.length > 0) {
-          dispatch(updateCells({
-            floorIndex: currentFloor,
-            updates
-          }))
-        }
       }
     } else if (selectedLayer === 'walls') {
       if (selectedTool === 'pen') {
-        // 壁の編集：キャプチャされたデータがあればそれを使用、なければ選択された壁タイプを適用
-        let walls
-        if (capturedCellData) {
-          walls = {
-            north: capturedCellData.walls.north,
-            east: capturedCellData.walls.east,
-            south: capturedCellData.walls.south,
-            west: capturedCellData.walls.west,
-          }
+        // 壁の編集：選択された壁タイプを適用
+        // クリック位置から壁方向を判定
+        const canvas = canvasRef.current!
+        const rect = canvas.getBoundingClientRect()
+        const mouseX = event.clientX - rect.left
+        const mouseY = event.clientY - rect.top
+        
+        const wallDirection = getWallDirectionFromClick(
+          mouseX, mouseY, position.x, position.y, cellSize
+        )
+        
+        // 現在のセルの壁状態をコピー
+        const walls = {
+          north: currentCell.walls.north,
+          east: currentCell.walls.east,
+          south: currentCell.walls.south,
+          west: currentCell.walls.west,
+        }
+        
+        // Shiftキーが押されている場合は削除、そうでなければ追加
+        if (event.shiftKey) {
+          // Shiftキーが押されている場合は強制的に削除
+          walls[wallDirection] = null
         } else {
-          // クリック位置から壁方向を判定
-          const canvas = canvasRef.current!
-          const rect = canvas.getBoundingClientRect()
-          const mouseX = event.clientX - rect.left
-          const mouseY = event.clientY - rect.top
-          
-          const wallDirection = getWallDirectionFromClick(
-            mouseX, mouseY, position.x, position.y, cellSize
-          )
-          
-          // 現在のセルの壁状態をコピー
-          walls = {
-            north: currentCell.walls.north,
-            east: currentCell.walls.east,
-            south: currentCell.walls.south,
-            west: currentCell.walls.west,
-          }
-          
-          // Shiftキーが押されている場合は削除、そうでなければ追加
-          if (event.shiftKey) {
-            // Shiftキーが押されている場合は強制的に削除
-            walls[wallDirection] = null
-          } else {
-            // 通常クリックは常に壁を追加
-            walls[wallDirection] = {
-              type: selectedWallType,
-              transparent: getTransparentForWallType(selectedWallType),
-            }
+          // 通常クリックは常に壁を追加
+          walls[wallDirection] = {
+            type: selectedWallType,
+            transparent: getTransparentForWallType(selectedWallType),
           }
         }
 
@@ -2404,7 +2409,7 @@ const MapEditor2D: React.FC = React.memo(() => {
         }
       }
     }
-  }, [selectedLayer, selectedTool, selectedFloorType, selectedWallType, selectedDecorationType, selectedEventType, isShiftPressed, currentFloor, capturedCellData, dispatch, floor, getCellPosition, selectedTemplate, templateRotation, isDragging, isActuallyDragging, rectangleStart, isDrawingRectangle])
+  }, [selectedLayer, selectedTool, selectedFloorType, selectedWallType, selectedDecorationType, selectedEventType, isShiftPressed, currentFloor, dispatch, floor, getCellPosition, selectedTemplate, templateRotation, isDragging, isActuallyDragging, rectangleStart, isDrawingRectangle])
 
   // イベントタイプに基づいてイベントを作成するヘルパー関数
   const createEventByType = useCallback((eventType: EventType, position: Position) => {
@@ -2497,8 +2502,24 @@ const MapEditor2D: React.FC = React.memo(() => {
 
 
   const handleCanvasMouseMove = useCallback((event: React.MouseEvent) => {
-    // 範囲選択モードでのマウスムーブ処理
-    if (selectionMode && selectionStart) {
+    // パン処理
+    if (isPanning && panStart) {
+      const deltaX = event.clientX - panStart.x
+      const deltaY = event.clientY - panStart.y
+      setPanDelta({ x: deltaX, y: deltaY })
+      
+      // viewOffsetを更新
+      const newOffset = {
+        x: viewOffset.x + deltaX,
+        y: viewOffset.y + deltaY
+      }
+      dispatch(setViewOffset(newOffset))
+      setPanStart({ x: event.clientX, y: event.clientY })
+      return
+    }
+    
+    // 範囲選択モードでのマウスムーブ処理（確定前のみ）
+    if (selectionMode && selectionStart && !selectionConfirmed) {
       const position = getCellPosition(event)
       if (position) {
         dispatch(setSelectionEnd(position))
@@ -2594,6 +2615,15 @@ const MapEditor2D: React.FC = React.memo(() => {
   }, [selectionMode, selectionStart, selectionConfirmed, dispatch, selectedTool, isDrawingRectangle, rectangleStart, getCellPosition, isDragging, dragStart, selectedLayer, dragStartMouse, isActuallyDragging, cellSize, floor, updateHoverInfo, getClosestWallFromMouse])
 
   const handleMouseDown = useCallback((event: React.MouseEvent) => {
+    // 中クリック（マウスホイールボタン）またはスペースキー+左クリックでパン開始
+    if (event.button === 1 || (event.button === 0 && event.ctrlKey)) {
+      event.preventDefault()
+      setIsPanning(true)
+      setPanStart({ x: event.clientX, y: event.clientY })
+      setPanDelta({ x: 0, y: 0 })
+      return
+    }
+    
     // 範囲選択モードの処理
     if (selectionMode) {
       const position = getCellPosition(event)
@@ -2717,14 +2747,9 @@ const MapEditor2D: React.FC = React.memo(() => {
       } else {
         // ドラッグしなかった場合：クリック処理として床の変更
         if (dragStart && floor) {
-          // 床の編集：キャプチャされたデータがあればそれを使用、なければ選択された床タイプを適用
+          // 床の編集：選択された床タイプを適用
           let newFloorData
-          if (capturedCellData) {
-            newFloorData = {
-              type: capturedCellData.floor.type,
-              passable: capturedCellData.floor.passable
-            }
-          } else if (isShiftPressed) {
+          if (isShiftPressed) {
             // Shiftキーで通常床にリセット
             newFloorData = {
               type: 'normal' as const,
@@ -2788,6 +2813,13 @@ const MapEditor2D: React.FC = React.memo(() => {
       }
     }
     
+    // パン機能の終了処理
+    if (isPanning) {
+      setIsPanning(false)
+      setPanStart(null)
+      setPanDelta({ x: 0, y: 0 })
+    }
+    
     // 状態をリセット
     setIsDragging(false)
     setIsActuallyDragging(false)
@@ -2796,7 +2828,7 @@ const MapEditor2D: React.FC = React.memo(() => {
     setDragStartPixel(null)
     setDragEndPixel(null)
     setDragStartMouse(null)
-  }, [isDragging, isActuallyDragging, dragStart, dragEnd, dragStartMouse, selectedLayer, selectedTool, selectedWallType, selectedFloorType, dispatch, currentFloor, getCellPosition, floor, cellSize, capturedCellData])
+  }, [isDragging, isActuallyDragging, dragStart, dragEnd, dragStartMouse, selectedLayer, selectedTool, selectedWallType, selectedFloorType, dispatch, currentFloor, getCellPosition, floor, cellSize, isPanning])
 
   useEffect(() => {
     // 変更されたセルがある場合は差分更新、そうでなければ完全再描画
@@ -2804,6 +2836,24 @@ const MapEditor2D: React.FC = React.memo(() => {
     const shouldUseDifferentialUpdate = changedCells.size > 0 && changedCells.size < totalCells * 0.1
     redraw(shouldUseDifferentialUpdate)
   }, [redraw, changedCells, floor])
+
+  // パン機能のためのグローバルmouseupイベントリスナー
+  useEffect(() => {
+    const handleGlobalMouseUp = () => {
+      if (isPanning) {
+        setIsPanning(false)
+        setPanStart(null)
+        setPanDelta({ x: 0, y: 0 })
+      }
+    }
+
+    if (isPanning) {
+      document.addEventListener('mouseup', handleGlobalMouseUp)
+      return () => {
+        document.removeEventListener('mouseup', handleGlobalMouseUp)
+      }
+    }
+  }, [isPanning])
 
 
   if (!floor) {
@@ -2827,7 +2877,6 @@ const MapEditor2D: React.FC = React.memo(() => {
         overflow: 'visible',
         cursor: selectedTool === 'pen' ? 'crosshair' : 
                 selectedTool === 'rectangle' ? 'cell' : 
-                selectedTool === 'eyedropper' ? 'grab' : 
                 selectedTool === 'template' ? 'copy' : 'default',
         position: 'relative',
         userSelect: 'none',

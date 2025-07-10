@@ -20,8 +20,6 @@ const AccessibilityAnnouncer: React.FC = () => {
       const toolNames = {
         pen: 'ペンツール',
         rectangle: '矩形ツール',
-        fill: '塗りつぶしツール',
-        eyedropper: 'スポイトツール',
         eraser: '消しゴムツール',
         template: 'テンプレートツール'
       }

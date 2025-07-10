@@ -60,11 +60,6 @@ const BottomPanel: React.FC = () => {
         />
       </Box>
       
-      <Box sx={{ ml: 'auto' }}>
-        <Typography variant="body2" color="text.secondary">
-          検証結果: 準備完了
-        </Typography>
-      </Box>
     </Paper>
   )
 }

@@ -27,7 +27,6 @@ import {
   BorderAll as WallIcon,
   Event as EventIcon,
   Palette as DecorationIcon,
-  Colorize as EyedropperIcon,
   Clear as ClearIcon,
   Add as AddIcon,
   Delete as DeleteIcon,
@@ -39,7 +38,7 @@ import {
 } from '@mui/icons-material'
 import { useDispatch, useSelector } from 'react-redux'
 import { RootState } from '../store'
-import { setSelectedFloorType, setSelectedFloorPassable, setSelectedWallType, setSelectedDecorationType, setSelectedEventType, clearCapturedCellData, toggleFloorTypeAccordion, toggleWallTypeAccordion, toggleEventTypeAccordion, toggleDecorationTypeAccordion, openCustomTypeDialog, openEventEditDialog, setSelectedTemplate, setSelectedTool, setSelectedEventId, setHighlightedEventId, addCustomFloorType, updateCustomFloorType, removeCustomFloorType, addCustomWallType, updateCustomWallType, removeCustomWallType, addCustomDecorationType, updateCustomDecorationType, removeCustomDecorationType } from '../store/editorSlice'
+import { setSelectedFloorType, setSelectedFloorPassable, setSelectedWallType, setSelectedDecorationType, setSelectedEventType, toggleFloorTypeAccordion, toggleWallTypeAccordion, toggleEventTypeAccordion, toggleDecorationTypeAccordion, openCustomTypeDialog, openEventEditDialog, setSelectedTemplate, setSelectedTool, setSelectedEventId, setHighlightedEventId, addCustomFloorType, updateCustomFloorType, removeCustomFloorType, addCustomWallType, updateCustomWallType, removeCustomWallType, addCustomDecorationType, updateCustomDecorationType, removeCustomDecorationType } from '../store/editorSlice'
 import { removeEventFromCell, addEventToCell, replaceFloorTypeInCells, replaceWallTypeInCells } from '../store/mapSlice'
 import { Layer, FloorType, WallType, DecorationType, EventType, EventPlacementType } from '../types/map'
 import FloorManagerPanel from './FloorManagerPanel'
@@ -67,7 +66,6 @@ const LeftPanel: React.FC = () => {
   const customDecorationTypes = useSelector((state: RootState) => state.editor.customDecorationTypes)
   
   // その他の状態
-  const capturedCellData = useSelector((state: RootState) => state.editor.capturedCellData)
   const currentFloor = useSelector((state: RootState) => state.editor.currentFloor)
   const dungeon = useSelector((state: RootState) => state.map.dungeon)
 
@@ -79,6 +77,10 @@ const LeftPanel: React.FC = () => {
   // カスタム床タイプ操作メニューの状態管理
   const [floorTypeMenuAnchor, setFloorTypeMenuAnchor] = useState<null | HTMLElement>(null)
   const [selectedFloorTypeForMenu, setSelectedFloorTypeForMenu] = useState<any>(null)
+  
+  // デフォルト床タイプ操作メニューの状態管理
+  const [defaultFloorTypeMenuAnchor, setDefaultFloorTypeMenuAnchor] = useState<null | HTMLElement>(null)
+  const [selectedDefaultFloorTypeForMenu, setSelectedDefaultFloorTypeForMenu] = useState<any>(null)
   
   // カスタム壁タイプ操作メニューの状態管理
   const [wallTypeMenuAnchor, setWallTypeMenuAnchor] = useState<null | HTMLElement>(null)
@@ -199,9 +201,6 @@ const LeftPanel: React.FC = () => {
     dispatch(setSelectedTool('pen'))
   }
   
-  const handleClearCapturedData = () => {
-    dispatch(clearCapturedCellData())
-  }
 
   const handleFloorTypeAccordionToggle = () => {
     dispatch(toggleFloorTypeAccordion())
@@ -464,6 +463,44 @@ const LeftPanel: React.FC = () => {
       mode: 'view', // 読み取り専用モード
       data: customFloorType
     }))
+  }
+
+  // デフォルト床タイプのメニューハンドラー
+  const handleDefaultFloorTypeMenuOpen = (event: React.MouseEvent<HTMLElement>, floorType: any) => {
+    event.stopPropagation()
+    setDefaultFloorTypeMenuAnchor(event.currentTarget)
+    setSelectedDefaultFloorTypeForMenu(floorType)
+  }
+
+  const handleDefaultFloorTypeMenuClose = () => {
+    setDefaultFloorTypeMenuAnchor(null)
+    setSelectedDefaultFloorTypeForMenu(null)
+  }
+
+  // デフォルト床タイプの複製ハンドラー
+  const handleDefaultFloorTypeDuplicate = () => {
+    if (!selectedDefaultFloorTypeForMenu) return
+    
+    const floorType = selectedDefaultFloorTypeForMenu
+    const newCustomFloorType = {
+      id: crypto.randomUUID(),
+      name: `${floorType.name}のコピー`,
+      description: `${floorType.description}（複製）`,
+      color: floorType.color,
+      passable: floorType.passable !== undefined ? floorType.passable : true,
+      properties: {},
+      // デフォルト床タイプの基本エフェクトを設定
+      effects: getDefaultFloorTypeEffects(floorType.key)
+    }
+    
+    // カスタム床タイプとして追加
+    dispatch(addCustomFloorType(newCustomFloorType))
+    
+    // 複製した床タイプを自動選択
+    dispatch(setSelectedFloorType(newCustomFloorType.id as any))
+    dispatch(setSelectedFloorPassable(newCustomFloorType.passable))
+    
+    handleDefaultFloorTypeMenuClose()
   }
 
   // デフォルト床タイプの基本エフェクトを取得
@@ -806,10 +843,7 @@ const LeftPanel: React.FC = () => {
                       <ListItemSecondaryAction>
                           <IconButton 
                             size="small" 
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleDefaultFloorTypeEdit(floorType)
-                            }}
+                            onClick={(e) => handleDefaultFloorTypeMenuOpen(e, floorType)}
                           >
                             <MoreVertIcon fontSize="small" />
                           </IconButton>
@@ -1327,92 +1361,6 @@ const LeftPanel: React.FC = () => {
         </>
       )}
 
-      {/* キャプチャされたセル情報（全レイヤー共通） */}
-      {capturedCellData && (
-        <>
-          <Accordion>
-            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <EyedropperIcon sx={{ mr: 1 }} />
-              <Typography>キャプチャされたセル</Typography>
-            </AccordionSummary>
-            <AccordionDetails sx={{ p: 2 }}>
-              <Box sx={{ mb: 2 }}>
-                <Typography variant="subtitle2" gutterBottom>
-                  床タイプ
-                </Typography>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                  <Box
-                    sx={{
-                      width: 16,
-                      height: 16,
-                      bgcolor: floorTypes.find(f => f.key === capturedCellData.floor.type)?.color || '#666',
-                      border: '1px solid #ccc',
-                      borderRadius: '2px',
-                      mr: 1,
-                    }}
-                  />
-                  <Typography variant="body2">
-                    {floorTypes.find(f => f.key === capturedCellData.floor.type)?.name || '不明'}
-                  </Typography>
-                </Box>
-                <Typography variant="body2" color="text.secondary">
-                  通行可否: {capturedCellData.floor.passable ? '可能' : '不可'}
-                </Typography>
-              </Box>
-              
-              <Box sx={{ mb: 2 }}>
-                <Typography variant="subtitle2" gutterBottom>
-                  壁情報
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {capturedCellData.walls.north ? '壁あり' : '壁なし'}
-                </Typography>
-                {capturedCellData.walls.north && (
-                  <Typography variant="body2">
-                    タイプ: {wallTypes.find(w => w.key === capturedCellData.walls.north?.type)?.name || '不明'}
-                  </Typography>
-                )}
-              </Box>
-              
-              <Box sx={{ mb: 2 }}>
-                <Typography variant="subtitle2" gutterBottom>
-                  イベント
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {capturedCellData.hasEvents ? 'イベントあり' : 'イベントなし'}
-                </Typography>
-              </Box>
-              
-              <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-                <Box
-                  component="button"
-                  onClick={handleClearCapturedData}
-                  sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 1,
-                    px: 2,
-                    py: 1,
-                    bgcolor: 'action.hover',
-                    border: '1px solid',
-                    borderColor: 'divider',
-                    borderRadius: 1,
-                    cursor: 'pointer',
-                    '&:hover': {
-                      bgcolor: 'action.selected',
-                    },
-                  }}
-                >
-                  <ClearIcon fontSize="small" />
-                  <Typography variant="body2">クリア</Typography>
-                </Box>
-              </Box>
-            </AccordionDetails>
-          </Accordion>
-          
-          <Divider />
-        </>
-      )}
 
       </Box>
 
@@ -1555,6 +1503,39 @@ const LeftPanel: React.FC = () => {
             <DeleteIcon fontSize="small" sx={{ color: 'error.main' }} />
           </ListItemIcon>
           <ListItemText>削除</ListItemText>
+        </MenuItem>
+      </Menu>
+
+      {/* デフォルト床タイプ操作メニュー */}
+      <Menu
+        anchorEl={defaultFloorTypeMenuAnchor}
+        open={Boolean(defaultFloorTypeMenuAnchor)}
+        onClose={handleDefaultFloorTypeMenuClose}
+        anchorOrigin={{
+          vertical: 'top',
+          horizontal: 'right',
+        }}
+        transformOrigin={{
+          vertical: 'top',
+          horizontal: 'left',
+        }}
+      >
+        <MenuItem onClick={() => {
+          if (selectedDefaultFloorTypeForMenu) {
+            handleDefaultFloorTypeEdit(selectedDefaultFloorTypeForMenu)
+          }
+          handleDefaultFloorTypeMenuClose()
+        }}>
+          <ListItemIcon>
+            <EditIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>編集</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={handleDefaultFloorTypeDuplicate}>
+          <ListItemIcon>
+            <CopyIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>複製</ListItemText>
         </MenuItem>
       </Menu>
     </Box>

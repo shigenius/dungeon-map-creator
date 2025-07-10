@@ -6,6 +6,10 @@ import {
   ZoomIn as ZoomInIcon,
   ZoomOut as ZoomOutIcon,
   CenterFocusStrong as CenterIcon,
+  ArrowUpward as ArrowUpIcon,
+  ArrowDownward as ArrowDownIcon,
+  ArrowBack as ArrowLeftIcon,
+  ArrowForward as ArrowRightIcon,
 } from '@mui/icons-material'
 import { Canvas, extend, useThree, useFrame } from '@react-three/fiber'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
@@ -60,11 +64,20 @@ const DungeonCell: React.FC<{
   }
   hasEvents: boolean
   hasDecorations: boolean
-}> = ({ x, y, floorType, passable, walls, hasEvents, hasDecorations }) => {
+  customFloorTypes: any[]
+  customWallTypes: any[]
+}> = ({ x, y, floorType, passable, walls, hasEvents, hasDecorations, customFloorTypes, customWallTypes }) => {
   const meshRef = useRef<THREE.Group>(null)
 
   // 床の色を取得
   const getFloorColor = (type: string) => {
+    // まずカスタム床タイプを確認
+    const customType = customFloorTypes.find(t => t.id === type)
+    if (customType) {
+      return customType.color
+    }
+    
+    // デフォルト床タイプの色
     switch (type) {
       case 'normal': return '#666666'
       case 'damage': return '#aa4444'
@@ -78,6 +91,14 @@ const DungeonCell: React.FC<{
   // 壁の色を取得
   const getWallColor = (wallType?: string) => {
     if (!wallType) return '#ffffff'
+    
+    // まずカスタム壁タイプを確認
+    const customType = customWallTypes.find(t => t.id === wallType)
+    if (customType) {
+      return customType.color
+    }
+    
+    // デフォルト壁タイプの色
     switch (wallType) {
       case 'door': return '#8b4513'
       case 'locked_door': return '#ffd700'
@@ -88,7 +109,7 @@ const DungeonCell: React.FC<{
   }
 
   return (
-    <group ref={meshRef} position={[x - 25, 0, y - 25]}>
+    <group ref={meshRef} position={[x, 0, y]}>
       {/* 床 */}
       {passable && (
         <mesh position={[0, -0.1, 0]} rotation={[-Math.PI / 2, 0, 0]}>
@@ -144,9 +165,11 @@ const DungeonCell: React.FC<{
 
 // 3Dシーンコンポーネント
 const DungeonScene: React.FC = () => {
-  const { dungeon, currentFloor } = useSelector((state: RootState) => ({
+  const { dungeon, currentFloor, customFloorTypes, customWallTypes } = useSelector((state: RootState) => ({
     dungeon: state.map.dungeon,
     currentFloor: state.editor.currentFloor,
+    customFloorTypes: state.editor.customFloorTypes,
+    customWallTypes: state.editor.customWallTypes,
   }))
 
   if (!dungeon) return null
@@ -173,18 +196,22 @@ const DungeonScene: React.FC = () => {
             walls={cell.walls}
             hasEvents={cell.events.length > 0}
             hasDecorations={cell.decorations.length > 0}
+            customFloorTypes={customFloorTypes}
+            customWallTypes={customWallTypes}
           />
         ))
       )}
 
       {/* グリッド（参考用） */}
-      <gridHelper args={[Math.max(floor.width, floor.height), Math.max(floor.width, floor.height), '#444444', '#444444']} />
+      <gridHelper 
+        args={[Math.max(floor.width, floor.height), Math.max(floor.width, floor.height), '#444444', '#444444']} 
+        position={[(floor.width - 1) / 2, 0, (floor.height - 1) / 2]}
+      />
     </group>
   )
 }
 
 const MapEditor3D: React.FC = () => {
-  const [cameraPosition] = useState<[number, number, number]>([20, 20, 20])
   const controlsRef = useRef<any>(null)
 
   const { dungeon, currentFloor } = useSelector((state: RootState) => ({
@@ -192,31 +219,106 @@ const MapEditor3D: React.FC = () => {
     currentFloor: state.editor.currentFloor,
   }))
 
+  // マップサイズに基づいて適切なカメラ位置を計算
+  const getCameraPosition = (): [number, number, number] => {
+    if (!dungeon?.floors[currentFloor]) {
+      return [20, 20, 20] // デフォルト位置
+    }
+    
+    const floor = dungeon.floors[currentFloor]
+    const centerX = (floor.width - 1) / 2
+    const centerZ = (floor.height - 1) / 2
+    const maxDimension = Math.max(floor.width, floor.height)
+    
+    // マップサイズに応じて適切な距離でカメラを配置
+    const distance = maxDimension * 1.5
+    const height = maxDimension * 0.8
+    
+    return [centerX + distance * 0.7, height, centerZ + distance * 0.7]
+  }
+
+  const cameraPosition = getCameraPosition()
+
+  // 初期時にOrbitControlsのターゲットをマップ中心に設定
+  useEffect(() => {
+    if (controlsRef.current && dungeon?.floors[currentFloor]) {
+      const floor = dungeon.floors[currentFloor]
+      const centerX = (floor.width - 1) / 2
+      const centerZ = (floor.height - 1) / 2
+      controlsRef.current.target.set(centerX, 0, centerZ)
+      controlsRef.current.update()
+    }
+  }, [dungeon, currentFloor])
+
   const handleZoomIn = () => {
     if (controlsRef.current) {
-      controlsRef.current.dollyIn(1.2)
-      controlsRef.current.update()
+      const controls = controlsRef.current
+      const camera = controls.object
+      const distance = camera.position.distanceTo(controls.target)
+      const newDistance = distance * 0.8 // ズームイン
+      
+      // カメラの位置を更新
+      const direction = new THREE.Vector3()
+      direction.subVectors(camera.position, controls.target).normalize()
+      camera.position.copy(controls.target).add(direction.multiplyScalar(newDistance))
+      controls.update()
     }
   }
 
   const handleZoomOut = () => {
     if (controlsRef.current) {
-      controlsRef.current.dollyOut(1.2)
-      controlsRef.current.update()
+      const controls = controlsRef.current
+      const camera = controls.object
+      const distance = camera.position.distanceTo(controls.target)
+      const newDistance = distance * 1.25 // ズームアウト
+      
+      // カメラの位置を更新
+      const direction = new THREE.Vector3()
+      direction.subVectors(camera.position, controls.target).normalize()
+      camera.position.copy(controls.target).add(direction.multiplyScalar(newDistance))
+      controls.update()
     }
   }
 
   const handleRotateLeft = () => {
     if (controlsRef.current) {
-      controlsRef.current.rotateLeft(Math.PI / 8)
-      controlsRef.current.update()
+      const controls = controlsRef.current
+      const camera = controls.object
+      const target = controls.target
+      
+      // Y軸周りに回転
+      const spherical = new THREE.Spherical()
+      spherical.setFromVector3(camera.position.clone().sub(target))
+      spherical.theta += Math.PI / 8 // 左回転
+      
+      // 新しい位置を計算
+      const newPosition = new THREE.Vector3()
+      newPosition.setFromSpherical(spherical)
+      newPosition.add(target)
+      
+      camera.position.copy(newPosition)
+      controls.update()
     }
   }
 
   const handleRotateRight = () => {
     if (controlsRef.current) {
-      controlsRef.current.rotateLeft(-Math.PI / 8)
-      controlsRef.current.update()
+      const controls = controlsRef.current
+      const camera = controls.object
+      const target = controls.target
+      
+      // Y軸周りに回転
+      const spherical = new THREE.Spherical()
+      spherical.setFromVector3(camera.position.clone().sub(target))
+      spherical.theta -= Math.PI / 8 // 右回転
+      
+      // 新しい位置を計算
+      const newPosition = new THREE.Vector3()
+      newPosition.setFromSpherical(spherical)
+      newPosition.add(target)
+      
+      camera.position.copy(newPosition)
+      controls.update()
     }
   }
 
@@ -224,9 +326,60 @@ const MapEditor3D: React.FC = () => {
     if (controlsRef.current && dungeon) {
       const floor = dungeon.floors[currentFloor]
       if (floor) {
-        controlsRef.current.target.set(floor.width / 2 - 25, 0, floor.height / 2 - 25)
+        // マップの中心に適切に設定
+        const centerX = (floor.width - 1) / 2
+        const centerZ = (floor.height - 1) / 2
+        controlsRef.current.target.set(centerX, 0, centerZ)
         controlsRef.current.update()
       }
+    }
+  }
+
+  const handleMoveUp = () => {
+    if (controlsRef.current) {
+      const controls = controlsRef.current
+      const moveDistance = 2
+      
+      // カメラとターゲットを同時に上方向に移動
+      controls.target.z -= moveDistance
+      controls.object.position.z -= moveDistance
+      controls.update()
+    }
+  }
+
+  const handleMoveDown = () => {
+    if (controlsRef.current) {
+      const controls = controlsRef.current
+      const moveDistance = 2
+      
+      // カメラとターゲットを同時に下方向に移動
+      controls.target.z += moveDistance
+      controls.object.position.z += moveDistance
+      controls.update()
+    }
+  }
+
+  const handleMoveLeft = () => {
+    if (controlsRef.current) {
+      const controls = controlsRef.current
+      const moveDistance = 2
+      
+      // カメラとターゲットを同時に左方向に移動
+      controls.target.x -= moveDistance
+      controls.object.position.x -= moveDistance
+      controls.update()
+    }
+  }
+
+  const handleMoveRight = () => {
+    if (controlsRef.current) {
+      const controls = controlsRef.current
+      const moveDistance = 2
+      
+      // カメラとターゲットを同時に右方向に移動
+      controls.target.x += moveDistance
+      controls.object.position.x += moveDistance
+      controls.update()
     }
   }
 
@@ -309,6 +462,53 @@ const MapEditor3D: React.FC = () => {
             <CenterIcon />
           </IconButton>
         </Tooltip>
+      </Box>
+
+      {/* カメラ移動コントロール */}
+      <Box
+        sx={{
+          position: 'absolute',
+          top: 16,
+          right: 16,
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, 1fr)',
+          gridTemplateRows: 'repeat(3, 1fr)',
+          gap: 0.5,
+          bgcolor: 'rgba(0, 0, 0, 0.7)',
+          p: 1,
+          borderRadius: 1,
+        }}
+      >
+        {/* 上段：上移動 */}
+        <Box />
+        <Tooltip title="上に移動">
+          <IconButton size="small" onClick={handleMoveUp} sx={{ color: 'white' }}>
+            <ArrowUpIcon />
+          </IconButton>
+        </Tooltip>
+        <Box />
+        
+        {/* 中段：左移動・右移動 */}
+        <Tooltip title="左に移動">
+          <IconButton size="small" onClick={handleMoveLeft} sx={{ color: 'white' }}>
+            <ArrowLeftIcon />
+          </IconButton>
+        </Tooltip>
+        <Box />
+        <Tooltip title="右に移動">
+          <IconButton size="small" onClick={handleMoveRight} sx={{ color: 'white' }}>
+            <ArrowRightIcon />
+          </IconButton>
+        </Tooltip>
+        
+        {/* 下段：下移動 */}
+        <Box />
+        <Tooltip title="下に移動">
+          <IconButton size="small" onClick={handleMoveDown} sx={{ color: 'white' }}>
+            <ArrowDownIcon />
+          </IconButton>
+        </Tooltip>
+        <Box />
       </Box>
 
       {/* フロア情報 */}

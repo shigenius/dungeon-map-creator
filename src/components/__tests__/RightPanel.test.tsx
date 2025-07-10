@@ -153,7 +153,6 @@ describe('RightPanel 統合テスト', () => {
           selectionConfirmed: false,
           showCreateTemplateDialog: false,
           showHelpDialog: false,
-          showMapValidationDialog: false,
           viewCenter: null
         }
       }

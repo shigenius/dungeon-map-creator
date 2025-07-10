@@ -213,7 +213,7 @@ describe('App 統合テスト', () => {
         })
       })
 
-      it('3キーで塗りつぶしツールが選択される', async () => {
+      it('3キーで消しゴムツールが選択される', async () => {
         render(
           <Provider store={store}>
             <App />
@@ -224,7 +224,7 @@ describe('App 統合テスト', () => {
 
         await waitFor(() => {
           const state = store.getState()
-          expect(state.editor.activeTool).toBe('fill')
+          expect(state.editor.activeTool).toBe('eraser')
         })
       })
 

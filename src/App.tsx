@@ -3,7 +3,7 @@ import { Box, CircularProgress } from '@mui/material'
 import { useSelector, useDispatch } from 'react-redux'
 import { RootState } from './store'
 import { undo, redo, loadDungeon, addEventToCell, updateEventInCell, removeEventFromCell } from './store/mapSlice'
-import { setSelectedTool, setSelectedLayer, toggleGrid, setZoom, openNewProjectDialog, setShiftPressed, closeEventEditDialog, rotateTemplate, rotateTemplateLeft, closeHelpDialog, clearSelection, closeMapValidationDialog, setCustomFloorTypes, setCustomWallTypes, setCustomDecorationTypes } from './store/editorSlice'
+import { setSelectedTool, setSelectedLayer, toggleGrid, setZoom, openNewProjectDialog, setShiftPressed, closeEventEditDialog, rotateTemplate, rotateTemplateLeft, closeHelpDialog, clearSelection, setCustomFloorTypes, setCustomWallTypes, setCustomDecorationTypes } from './store/editorSlice'
 import { downloadDungeonAsJSON, openDungeonFromFile } from './utils/fileUtils'
 import MenuBar from './components/MenuBar'
 import ToolBar from './components/ToolBar'
@@ -19,7 +19,6 @@ const CustomTypeDialog = lazy(() => import('./components/CustomTypeDialog'))
 const EventEditDialog = lazy(() => import('./components/EventEditDialog'))
 const CreateTemplateDialog = lazy(() => import('./components/CreateTemplateDialog'))
 const HelpDialog = lazy(() => import('./components/HelpDialog'))
-const MapValidationDialog = lazy(() => import('./components/MapValidationDialog'))
 
 // サスペンス用のローディングコンポーネント
 const LoadingSpinner = () => (
@@ -36,7 +35,7 @@ const LoadingSpinner = () => (
 function App() {
   const dispatch = useDispatch()
   const dungeon = useSelector((state: RootState) => state.map.dungeon)
-  const { zoom, selectedLayer, showNewProjectDialog, showEventEditDialog, editingEvent, selectedTool, selectedTemplate, selectionMode, showHelpDialog, showMapValidationDialog, currentFloor, customFloorTypes, customWallTypes, customDecorationTypes } = useSelector((state: RootState) => state.editor)
+  const { zoom, selectedLayer, showNewProjectDialog, showEventEditDialog, editingEvent, selectedTool, selectedTemplate, selectionMode, showHelpDialog, currentFloor, customFloorTypes, customWallTypes, customDecorationTypes } = useSelector((state: RootState) => state.editor)
 
   // ダンジョンが存在しない場合に新規プロジェクトダイアログを表示
   useEffect(() => {
@@ -152,14 +151,6 @@ function App() {
             break
           case '3':
             event.preventDefault()
-            dispatch(setSelectedTool('fill'))
-            break
-          case '4':
-            event.preventDefault()
-            dispatch(setSelectedTool('eyedropper'))
-            break
-          case '5':
-            event.preventDefault()
             dispatch(setSelectedTool('eraser'))
             break
           case 'f':
@@ -261,11 +252,6 @@ function App() {
         />
 
         {/* マップ検証ダイアログ */}
-        <MapValidationDialog
-          open={showMapValidationDialog}
-          onClose={() => dispatch(closeMapValidationDialog())}
-          dungeon={dungeon}
-        />
         <EventEditDialog 
         open={showEventEditDialog}
         event={editingEvent}

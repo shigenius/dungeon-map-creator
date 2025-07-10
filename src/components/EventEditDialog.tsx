@@ -28,7 +28,6 @@ import {
   Slider,
   Alert,
   AlertTitle,
-  Chip,
 } from '@mui/material'
 import {
   Close as CloseIcon,
@@ -39,15 +38,10 @@ import {
   Visibility as VisibilityIcon,
   VisibilityOff as VisibilityOffIcon,
   ContentCopy as TemplateIcon,
-  CheckCircle as CheckCircleIcon,
-  Warning as WarningIcon,
-  Error as ErrorIcon,
-  Info as InfoIcon,
 } from '@mui/icons-material'
 import { DungeonEvent, EventType, TriggerType, ActionType, EventAction, EventPosition, EventPlacementType, Direction } from '../types/map'
 import EventTemplateDialog from './EventTemplateDialog'
 import { EventTemplate } from '../data/eventTemplates'
-import { validateEvent, EventValidationResult, getValidationSummary } from '../utils/eventValidation'
 import { useSelector } from 'react-redux'
 import { RootState } from '../store'
 
@@ -83,8 +77,6 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
   const [tabValue, setTabValue] = useState(0)
   const [editingEvent, setEditingEvent] = useState<DungeonEvent | null>(null)
   const [showTemplateDialog, setShowTemplateDialog] = useState(false)
-  const [validationResult, setValidationResult] = useState<EventValidationResult | null>(null)
-  const [showValidation, setShowValidation] = useState(true)
   const [idError, setIdError] = useState<string>('')
   
   // Redux から全フロア情報を取得
@@ -175,15 +167,6 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
     }
   }, [event, open])
 
-  // リアルタイムバリデーション
-  useEffect(() => {
-    if (editingEvent) {
-      const result = validateEvent(editingEvent)
-      setValidationResult(result)
-    } else {
-      setValidationResult(null)
-    }
-  }, [editingEvent])
 
   const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue)
@@ -367,101 +350,6 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
     return labels[type] || type
   }
 
-  // バリデーション結果表示コンポーネント
-  const ValidationSummary: React.FC = () => {
-    if (!validationResult || !showValidation) return null
-
-    const { errors, warnings, info, isValid } = validationResult
-    const hasIssues = errors.length > 0 || warnings.length > 0 || info.length > 0
-
-    if (!hasIssues) {
-      return (
-        <Box sx={{ p: 2 }}>
-          <Alert severity="success" icon={<CheckCircleIcon />}>
-            <AlertTitle>バリデーション結果</AlertTitle>
-            問題ありません。イベントは正常に設定されています。
-          </Alert>
-        </Box>
-      )
-    }
-
-    return (
-      <Box sx={{ p: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-          <Typography variant="subtitle2">バリデーション結果</Typography>
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            <Chip
-              size="small"
-              icon={<CheckCircleIcon />}
-              label={getValidationSummary(validationResult)}
-              color={isValid ? 'success' : errors.length > 0 ? 'error' : 'warning'}
-              variant="outlined"
-            />
-          </Box>
-        </Box>
-
-        {errors.length > 0 && (
-          <Alert severity="error" sx={{ mb: 1 }}>
-            <AlertTitle>エラー ({errors.length}件)</AlertTitle>
-            <List dense>
-              {errors.map((error, index) => (
-                <ListItem key={index} sx={{ py: 0 }}>
-                  <Typography variant="body2">
-                    <strong>{error.field}:</strong> {error.message}
-                    {error.suggestion && (
-                      <Box component="span" sx={{ display: 'block', color: 'text.secondary', mt: 0.5 }}>
-                        💡 {error.suggestion}
-                      </Box>
-                    )}
-                  </Typography>
-                </ListItem>
-              ))}
-            </List>
-          </Alert>
-        )}
-
-        {warnings.length > 0 && (
-          <Alert severity="warning" sx={{ mb: 1 }}>
-            <AlertTitle>警告 ({warnings.length}件)</AlertTitle>
-            <List dense>
-              {warnings.map((warning, index) => (
-                <ListItem key={index} sx={{ py: 0 }}>
-                  <Typography variant="body2">
-                    <strong>{warning.field}:</strong> {warning.message}
-                    {warning.suggestion && (
-                      <Box component="span" sx={{ display: 'block', color: 'text.secondary', mt: 0.5 }}>
-                        💡 {warning.suggestion}
-                      </Box>
-                    )}
-                  </Typography>
-                </ListItem>
-              ))}
-            </List>
-          </Alert>
-        )}
-
-        {info.length > 0 && (
-          <Alert severity="info" sx={{ mb: 1 }}>
-            <AlertTitle>情報 ({info.length}件)</AlertTitle>
-            <List dense>
-              {info.map((item, index) => (
-                <ListItem key={index} sx={{ py: 0 }}>
-                  <Typography variant="body2">
-                    <strong>{item.field}:</strong> {item.message}
-                    {item.suggestion && (
-                      <Box component="span" sx={{ display: 'block', color: 'text.secondary', mt: 0.5 }}>
-                        💡 {item.suggestion}
-                      </Box>
-                    )}
-                  </Typography>
-                </ListItem>
-              ))}
-            </List>
-          </Alert>
-        )}
-      </Box>
-    )
-  }
 
   if (!editingEvent) return null
 
@@ -502,8 +390,6 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
           <Tab label="詳細設定" />
         </Tabs>
 
-        {/* バリデーション結果表示 */}
-        <ValidationSummary />
 
         <Box sx={{ px: 3 }}>
           {/* 基本設定タブ */}
