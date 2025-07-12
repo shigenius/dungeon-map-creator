@@ -4,6 +4,7 @@ Webベースの3DダンジョンRPG用マップエディタです。
 直感的な2Dグリッドエディタを使用してダンジョンマップを作成し、マップはJSON形式で保存・読み込み可能です。
 
 The site is hosted: https://dungeon-map-creator.vercel.app/
+or: https://shigenius.github.io/dungeon-map-creator/
 
 ## セットアップ
 
