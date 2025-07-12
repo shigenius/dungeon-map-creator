@@ -2,21 +2,21 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "framework": "vite",
+  "installCommand": "npm ci",
+  "devCommand": "npm run dev",
+  "env": {
+    "GITHUB_PAGES": "false"
+  },
+  "build": {
+    "env": {
+      "GITHUB_PAGES": "false"
+    }
+  },
   "rewrites": [
     {
       "source": "/(.*)",
       "destination": "/index.html"
     }
-  ],
-  "headers": [
-    {
-      "source": "/assets/(.*)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=31536000, immutable"
-        }
-      ]
-    }
   ]
 }
+EOF < /dev/null
