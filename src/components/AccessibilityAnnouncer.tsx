@@ -111,6 +111,6 @@ export default AccessibilityAnnouncer
 // グローバル関数の型定義
 declare global {
   interface Window {
-    accessibilityAnnounce?: (message: string, priority?: 'polite' | 'assertive') => void
+    accessibilityAnnounce?: (_message: string, _priority?: 'polite' | 'assertive') => void
   }
 }

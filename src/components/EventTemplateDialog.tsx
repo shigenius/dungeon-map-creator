@@ -17,14 +17,12 @@ import {
   Chip,
   InputAdornment,
   IconButton,
-  Tooltip,
 } from '@mui/material'
 import {
   Search as SearchIcon,
   Clear as ClearIcon,
 } from '@mui/icons-material'
 import { 
-  EVENT_TEMPLATES, 
   EventTemplate, 
   TEMPLATE_CATEGORIES,
   getTemplatesByCategory,
@@ -34,7 +32,7 @@ import {
 interface EventTemplateDialogProps {
   open: boolean
   onClose: () => void
-  onSelectTemplate: (template: EventTemplate) => void
+  onSelectTemplate: (_template: EventTemplate) => void
 }
 
 const EventTemplateDialog: React.FC<EventTemplateDialogProps> = ({

@@ -26,8 +26,6 @@ import {
   AccordionDetails,
   Paper,
   Slider,
-  Alert,
-  AlertTitle,
 } from '@mui/material'
 import {
   Close as CloseIcon,
@@ -35,11 +33,10 @@ import {
   Add as AddIcon,
   Delete as DeleteIcon,
   ExpandMore as ExpandMoreIcon,
-  Visibility as VisibilityIcon,
   VisibilityOff as VisibilityOffIcon,
   ContentCopy as TemplateIcon,
 } from '@mui/icons-material'
-import { DungeonEvent, EventType, TriggerType, ActionType, EventAction, EventPosition, EventPlacementType, Direction } from '../types/map'
+import { DungeonEvent, EventType, TriggerType, ActionType, EventAction, EventPlacementType, Direction } from '../types/map'
 import EventTemplateDialog from './EventTemplateDialog'
 import { EventTemplate } from '../data/eventTemplates'
 import { useSelector } from 'react-redux'
@@ -63,8 +60,8 @@ interface EventEditDialogProps {
   open: boolean
   event: DungeonEvent | null
   onClose: () => void
-  onSave: (event: DungeonEvent) => void
-  onDelete?: (eventId: string) => void
+  onSave: (_event: DungeonEvent) => void
+  onDelete?: (_eventId: string) => void
 }
 
 const EventEditDialog: React.FC<EventEditDialogProps> = ({

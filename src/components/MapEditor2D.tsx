@@ -654,7 +654,6 @@ const MapEditor2D: React.FC = React.memo(() => {
       setLastFloorData(JSON.parse(JSON.stringify(floor))) // ディープコピー
     }
   }, [floor]) // detectChangedCellsを依存関係から除外（無限ループ防止）
-  // eslint-disable-next-line react-hooks/exhaustive-deps
 
   // マウス位置から最も近い壁を検出する関数
   const getClosestWallFromMouse = useCallback((event: React.MouseEvent): { position: Position; direction: 'north' | 'east' | 'south' | 'west' } | null => {

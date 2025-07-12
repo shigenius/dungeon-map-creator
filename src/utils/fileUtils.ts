@@ -25,7 +25,7 @@ export const downloadDungeonAsJSON = (dungeon: Dungeon, customFloorTypes?: Custo
 /**
  * ファイル選択ダイアログを開いてJSONファイルを読み込む
  */
-export const openDungeonFromFile = (onLoad: (dungeon: Dungeon, customFloorTypes?: CustomFloorType[], customWallTypes?: CustomWallType[], customDecorationTypes?: CustomDecorationType[]) => void, onError?: (error: Error) => void): void => {
+export const openDungeonFromFile = (onLoad: (_dungeon: Dungeon, _customFloorTypes?: CustomFloorType[], _customWallTypes?: CustomWallType[], _customDecorationTypes?: CustomDecorationType[]) => void, onError?: (_error: Error) => void): void => {
   // 既存のfile inputを削除
   const existingInput = document.querySelector('input[type="file"]')
   if (existingInput) {
