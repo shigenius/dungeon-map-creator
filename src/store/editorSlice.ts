@@ -86,6 +86,8 @@ interface EditorState {
   showCreateTemplateDialog: boolean
   // ヘルプダイアログの状態
   showHelpDialog: boolean
+  // アバウトダイアログの状態
+  showAboutDialog: boolean
   // マップ検証ダイアログの状態
   showMapValidationDialog: boolean
   // ビューポート関連の状態
@@ -157,6 +159,7 @@ const initialState: EditorState = {
   showCreateTemplateDialog: false,
   // ヘルプダイアログの初期状態
   showHelpDialog: false,
+  showAboutDialog: false,
   // マップ検証ダイアログの初期状態
   showMapValidationDialog: false,
   // ビューポート関連の初期状態
@@ -526,6 +529,15 @@ const editorSlice = createSlice({
       state.showHelpDialog = false
     },
 
+    // アバウトダイアログ関連のアクション
+    openAboutDialog: (state) => {
+      state.showAboutDialog = true
+    },
+
+    closeAboutDialog: (state) => {
+      state.showAboutDialog = false
+    },
+
 
     setViewCenter: (state, action: PayloadAction<{ x: number; y: number }>) => {
       state.viewCenter = action.payload
@@ -624,6 +636,9 @@ export const {
   // ヘルプダイアログ関連のアクション
   openHelpDialog,
   closeHelpDialog,
+  // アバウトダイアログ関連のアクション
+  openAboutDialog,
+  closeAboutDialog,
   // ビューポート関連のアクション
   setViewCenter,
   setViewOffset,

@@ -30,6 +30,7 @@ import {
   setSelectedLayer, 
   toggleLayerVisibility,
   openHelpDialog,
+  openAboutDialog,
   toggleGrid,
   setCustomFloorTypes,
   setCustomWallTypes,
@@ -194,6 +195,11 @@ const MenuBar: React.FC = () => {
 
   const handleToggleGrid = () => {
     dispatch(toggleGrid())
+  }
+
+  const handleAbout = () => {
+    dispatch(openAboutDialog())
+    handleMenuClose()
   }
 
   const getLayerIcon = (layer: Layer) => {
@@ -459,7 +465,7 @@ const MenuBar: React.FC = () => {
         }}>
           操作方法・ヘルプ
         </MenuItem>
-        <MenuItem onClick={handleMenuClose} disabled>
+        <MenuItem onClick={handleAbout}>
           アバウト
         </MenuItem>
       </Menu>

@@ -19,6 +19,7 @@ const CustomTypeDialog = lazy(() => import('./components/CustomTypeDialog'))
 const EventEditDialog = lazy(() => import('./components/EventEditDialog'))
 const CreateTemplateDialog = lazy(() => import('./components/CreateTemplateDialog'))
 const HelpDialog = lazy(() => import('./components/HelpDialog'))
+const AboutDialog = lazy(() => import('./components/AboutDialog'))
 
 // サスペンス用のローディングコンポーネント
 const LoadingSpinner = () => (
@@ -250,6 +251,7 @@ function App() {
           open={showHelpDialog}
           onClose={() => dispatch(closeHelpDialog())}
         />
+        <AboutDialog />
 
         {/* マップ検証ダイアログ */}
         <EventEditDialog 
