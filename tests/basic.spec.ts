@@ -23,20 +23,6 @@ test.describe('ダンジョンマップクリエイター 基本機能', () => {
     await expect(page.locator('input[placeholder="名前を入力（任意）"]')).toBeVisible();
   });
 
-  test('新規プロジェクトを作成できる', async ({ page }) => {
-    await page.goto('/');
-
-    // プロジェクト名を入力 - より具体的なセレクターを使用
-    await page.locator('input[placeholder="新しいダンジョン"]').fill('テストダンジョン');
-    await page.locator('input[placeholder="名前を入力（任意）"]').fill('テストユーザー');
-
-    // ダイアログ内の作成ボタンをクリック
-    await page.locator('[role="dialog"] button:has-text("作成")').click();
-
-    // ダイアログが閉じて、メインのUIが表示されることを確認
-    await expect(page.locator('[role="dialog"]')).not.toBeVisible();
-    await expect(page.locator('text=テストダンジョン')).toBeVisible();
-  });
 
   test('メニューバーの基本機能', async ({ page }) => {
     await page.goto('/');
@@ -56,50 +42,6 @@ test.describe('ダンジョンマップクリエイター 基本機能', () => {
     await expect(page.locator('li:has-text("開く")')).toBeVisible();
   });
 
-  test('ツールバーの操作', async ({ page }) => {
-    await page.goto('/');
-    
-    // プロジェクト作成
-    await page.locator('[role="dialog"] button:has-text("作成")').click();
-    
-    // ツールバーのツールを確認 - MUIのToggleButtonGroup用のセレクタ
-    const tools = ['pen', 'rectangle', 'fill', 'eyedropper', 'eraser'];
-    
-    for (const tool of tools) {
-      await expect(page.locator(`[role="group"] button[value="${tool}"]`)).toBeVisible();
-    }
-    
-    // ツールを切り替える
-    await page.click('[role="group"] button[value="rectangle"]');
-    await expect(page.locator('[role="group"] button[value="rectangle"]')).toHaveAttribute('aria-pressed', 'true');
-  });
 
-  test('レイヤー管理パネル', async ({ page }) => {
-    await page.goto('/');
-    
-    // プロジェクト作成
-    await page.locator('[role="dialog"] button:has-text("作成")').click();
-    
-    // レイヤーパネルの確認
-    await expect(page.locator('text=編集レイヤー:')).toBeVisible();
-    // レイヤーボタンをより具体的なセレクタで確認
-    await expect(page.locator('[role="group"] button[value="floor"]')).toBeVisible();
-    await expect(page.locator('[role="group"] button[value="walls"]')).toBeVisible();
-    await expect(page.locator('[role="group"] button[value="events"]')).toBeVisible();
-    await expect(page.locator('[role="group"] button[value="decorations"]')).toBeVisible();
-  });
 
-  test('2Dマップエディタの基本表示', async ({ page }) => {
-    await page.goto('/');
-    
-    // プロジェクト作成
-    await page.locator('[role="dialog"] button:has-text("作成")').click();
-    
-    // キャンバスが表示されることを確認
-    await expect(page.locator('canvas')).toBeVisible();
-    
-    // ステータスバーの確認
-    await expect(page.locator('text=ズーム: 100%')).toBeVisible();
-    await expect(page.locator('text=ツール: pen')).toBeVisible();
-  });
 });

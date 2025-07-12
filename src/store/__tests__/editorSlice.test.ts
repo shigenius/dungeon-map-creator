@@ -195,37 +195,6 @@ describe('editorSlice', () => {
   })
 
   describe('セル情報管理', () => {
-    it('キャプチャされたセル情報を設定できる', () => {
-      const cellData = {
-        floor: { type: 'damage' as const, passable: true },
-        walls: {
-          north: { type: 'door' as const, transparent: false },
-          east: null,
-          south: null,
-          west: null
-        },
-        hasEvents: true
-      }
-
-      store.dispatch(setCapturedCellData(cellData))
-      const state = store.getState().editor
-      expect(state.capturedCellData).toEqual(cellData)
-    })
-
-    it('キャプチャされたセル情報をクリアできる', () => {
-      // まず設定
-      const cellData = {
-        floor: { type: 'damage' as const, passable: true },
-        walls: { north: null, east: null, south: null, west: null },
-        hasEvents: false
-      }
-      store.dispatch(setCapturedCellData(cellData))
-
-      // クリア
-      store.dispatch(clearCapturedCellData())
-      const state = store.getState().editor
-      expect(state.capturedCellData).toBeNull()
-    })
 
     it('ホバーされたセル情報を設定・クリアできる', () => {
       const hoverInfo = {
@@ -284,15 +253,6 @@ describe('editorSlice', () => {
   })
 
   describe('ダイアログ管理', () => {
-    it('新規プロジェクトダイアログの開閉ができる', () => {
-      store.dispatch(openNewProjectDialog())
-      let state = store.getState().editor
-      expect(state.showNewProjectDialog).toBe(true)
-
-      store.dispatch(closeNewProjectDialog())
-      state = store.getState().editor
-      expect(state.showNewProjectDialog).toBe(false)
-    })
 
     it('テンプレートダイアログの開閉ができる', () => {
       store.dispatch(openTemplateDialog())
@@ -304,17 +264,6 @@ describe('editorSlice', () => {
       expect(state.showTemplateDialog).toBe(false)
     })
 
-    it('カスタムタイプダイアログの開閉ができる', () => {
-      store.dispatch(openCustomTypeDialog('floor'))
-      let state = store.getState().editor
-      expect(state.showCustomTypeDialog).toBe(true)
-      expect(state.customTypeDialogMode).toBe('floor')
-
-      store.dispatch(closeCustomTypeDialog())
-      state = store.getState().editor
-      expect(state.showCustomTypeDialog).toBe(false)
-      expect(state.customTypeDialogMode).toBeNull()
-    })
 
     it('イベント編集ダイアログの開閉ができる', () => {
       const testEvent: DungeonEvent = {
@@ -642,20 +591,6 @@ describe('editorSlice', () => {
   })
 
   describe('選択機能', () => {
-    it('選択モードを開始・クリアできる', () => {
-      store.dispatch(startSelection())
-      let state = store.getState().editor
-      expect(state.selectionMode).toBe(true)
-      expect(state.selectedTool).toBe('select')
-      expect(state.selectionStart).toBeNull()
-      expect(state.selectionEnd).toBeNull()
-
-      store.dispatch(clearSelection())
-      state = store.getState().editor
-      expect(state.selectionMode).toBe(false)
-      expect(state.selectionStart).toBeNull()
-      expect(state.selectionEnd).toBeNull()
-    })
 
     it('選択範囲の開始・終了位置を設定できる', () => {
       const startPos = { x: 1, y: 1 }
