@@ -12,11 +12,52 @@
       "GITHUB_PAGES": "false"
     }
   },
+  "headers": [
+    {
+      "source": "/assets/(.*)\\.js",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/javascript"
+        }
+      ]
+    },
+    {
+      "source": "/assets/(.*)\\.css",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "text/css"
+        }
+      ]
+    },
+    {
+      "source": "/dungeon-map-creator/assets/(.*)\\.js",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/javascript"
+        }
+      ]
+    },
+    {
+      "source": "/dungeon-map-creator/assets/(.*)\\.css",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "text/css"
+        }
+      ]
+    }
+  ],
   "rewrites": [
     {
-      "source": "/(.*)",
+      "source": "/dungeon-map-creator/assets/(.*)",
+      "destination": "/assets/$1"
+    },
+    {
+      "source": "/((?!assets|dungeon-map-creator).*)",
       "destination": "/index.html"
     }
   ]
 }
-EOF < /dev/null
