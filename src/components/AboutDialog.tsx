@@ -87,7 +87,7 @@ const AboutDialog: React.FC = () => {
 
         <Divider sx={{ my: 2 }} />
 
-        <Box>
+        <Box sx={{ mb: 3 }}>
           <Typography variant="h6" gutterBottom>
             作者・連絡先
           </Typography>
@@ -113,6 +113,21 @@ const AboutDialog: React.FC = () => {
               Twitter: @shigeniust
             </Link>
           </Box>
+        </Box>
+
+        <Divider sx={{ my: 2 }} />
+
+        <Box>
+          <Typography variant="h6" gutterBottom>
+            免責事項・注意事項
+          </Typography>
+          <Typography variant="body2" paragraph color="text.secondary">
+            本アプリケーションは現状のまま提供されており、使用により生じた損害について一切の責任を負いません。
+            データの損失やバックアップについては、利用者の責任において行ってください。
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            本サービスの機能は予告なく変更される可能性があります。
+          </Typography>
         </Box>
       </DialogContent>
 
